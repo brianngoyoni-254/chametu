@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-forest: #0B5D3B;
+  --color-forest-dark: #08442A;
+  --color-navy: #102A43;
+  --color-emerald: #12A66A;
+  --color-gold: #D9A441;
+  --color-paper: #F6F4EE;
+  --color-line: #E4E0D3;
+  --font-display: "Sora", sans-serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  @apply bg-paper text-navy font-sans antialiased;
+}
