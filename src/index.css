@@ -1,18 +1,140 @@
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
 @import "tailwindcss";
 
 @theme {
-  --color-forest: #0B5D3B;
-  --color-forest-dark: #08442A;
-  --color-navy: #102A43;
-  --color-emerald: #12A66A;
-  --color-gold: #D9A441;
-  --color-paper: #F6F4EE;
-  --color-line: #E4E0D3;
-  --font-display: "Sora", sans-serif;
-  --font-sans: "Inter", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --color-forest: #0B7A5A;
+  --color-forest-dark: #075C44;
+  --color-navy: #0B1F33;
+  --color-emerald: #10B981;
+  --color-gold: #F5B942;
+  --color-paper: #F3F6F9;
+  --color-line: #E3E9EF;
+  --color-ink: #0B1F33;
+  --color-ink-soft: #5B6B7B;
+
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Design breakpoints (design collapses at 860px and 960px) */
+  --breakpoint-nav: 861px;
+  --breakpoint-hero: 961px;
 }
 
-body {
-  @apply bg-paper text-navy font-sans antialiased;
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 70px;
+    line-height: normal;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    background-image: radial-gradient(900px 420px at 85% -60px, rgba(16, 185, 129, 0.14), transparent);
+    background-repeat: no-repeat;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--color-navy);
+  }
+
+  p {
+    color: var(--color-ink-soft);
+    line-height: 1.6;
+  }
+}
+
+@layer components {
+  .wrap {
+    max-width: 1160px;
+    margin-inline: auto;
+    padding-inline: 18px;
+  }
+  @media (min-width: 641px) {
+    .wrap {
+      padding-inline: 28px;
+    }
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 19px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:active {
+    transform: translateY(1px);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #0B7A5A, #10B981);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    box-shadow: 0 6px 18px rgba(11, 93, 59, 0.32);
+  }
+
+  .btn-ghost {
+    color: var(--color-navy);
+    border-color: var(--color-line);
+  }
+  .btn-ghost:hover {
+    border-color: var(--color-navy);
+  }
+
+  .btn-gold {
+    background: var(--color-gold);
+    color: #3A2A08;
+  }
+  .btn-gold:hover {
+    box-shadow: 0 6px 18px rgba(217, 164, 65, 0.4);
+  }
+
+  .btn-outline {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+  .btn-outline:hover {
+    border-color: #fff;
+  }
+
+  .btn-white {
+    background: #fff;
+    color: var(--color-forest);
+  }
+  .btn-white-outline {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  /* Card used by Join + Edge (design's .v2c) */
+  .card-v2 {
+    background: #fff;
+    border: 1px solid var(--color-line);
+    border-radius: 18px;
+    padding: 22px;
+    box-shadow: 0 1px 2px rgba(11, 31, 51, 0.05), 0 8px 24px rgba(11, 31, 51, 0.05);
+    transition: transform 0.15s;
+  }
+  .card-v2:hover {
+    transform: translateY(-3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }
