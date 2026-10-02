@@ -1,20 +1,14 @@
 import { Link } from 'react-router-dom'
+import { CATALOG } from '../lib/catalog'
 
 const EARN = [
-  ['Subscription paid on time', '+100'],
+  ['Subscription paid on time', '0.5 pts / KSh'],
   ['Upgrade your plan', '+500'],
-  ['Referral that subscribes', '+1,000'],
-  ['Weekly activity', '+50'],
+  ['Referral that pays', '+2,000'],
+  ['Annual prepay', '+1,000'],
 ]
 
-const REDEEM = [
-  ['Template pack', '500'],
-  ['10% off next month', '1,000'],
-  ['100 SMS reminders', '1,200'],
-  ['Advanced analytics', '2,000'],
-  ['Partner data bundle', '3,000'],
-  ['Chama of the Month', '4,000'],
-]
+const REDEEM = CATALOG.map((perk) => [perk.name, perk.pts.toLocaleString()])
 
 function PointsList({ items }) {
   return (
@@ -49,16 +43,17 @@ export default function Rewards() {
             <PointsList items={EARN} />
 
             <div className="flex flex-wrap gap-2">
-              <Link to="/dashboard/admin" className="btn btn-white">
+              <Link to="/rewards" className="btn btn-white">
                 Open Rewards Marketplace
               </Link>
-              <a href="#rewards" className="btn btn-white-outline">
+              <Link to="/rewards/how-it-works" className="btn btn-white-outline">
                 See how it works
-              </a>
+              </Link>
             </div>
 
             <p className="mt-3.5 text-[.8rem] text-white/80">
-              Only verified chama admins can redeem. Points expire after 6–12 months of inactivity.
+              Plans start at KSh 500/month for up to 10 members. Only verified chama admins can redeem.
+              Points expire after 6&ndash;12 months of inactivity.
             </p>
           </div>
 
