@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { FiUsers, FiUserCheck, FiDollarSign, FiActivity } from 'react-icons/fi'
+import Reveal from './Reveal'
 
 const STATS = [
-  { target: 1284, suffix: '', label: 'Chamas on Chametu' },
-  { target: 18420, suffix: '', label: 'Active members' },
-  { target: 1400, suffix: 'M', label: 'KSh managed' },
+  { icon: FiUsers, target: 1284, suffix: '', label: 'Chamas on Chametu' },
+  { icon: FiUserCheck, target: 18420, suffix: '', label: 'Active members' },
+  { icon: FiDollarSign, target: 1400, suffix: 'M', label: 'KSh managed' },
 ]
 
 function useCountUp(target, active) {
@@ -32,11 +34,14 @@ function useCountUp(target, active) {
   return value
 }
 
-function Stat({ target, suffix, label, active }) {
+function Stat({ icon: Icon, target, suffix, label, active }) {
   const value = useCountUp(target, active)
   return (
-    <div>
-      <b className="block font-display text-[1.3rem] font-bold text-navy">
+    <div className="flex flex-col items-center gap-1">
+      <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest">
+        <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
+      </span>
+      <b className="font-display text-[1.3rem] font-bold leading-tight text-navy">
         {value.toLocaleString()}
         {suffix}
       </b>
@@ -73,17 +78,22 @@ export default function TrustBar() {
 
   return (
     <div className="wrap">
-      <div ref={ref} className="border-y border-line py-[22px]">
-        <div className="grid grid-cols-2 gap-[22px] text-center sm:grid-cols-4 sm:gap-[18px]">
-          {STATS.map((s) => (
-            <Stat key={s.label} {...s} active={active} />
-          ))}
-          <div>
-            <b className="block font-display text-[1.3rem] font-bold text-navy">99.98%</b>
-            <span className="text-[.76rem] text-ink-soft">Platform uptime</span>
+      <Reveal direction="fade">
+        <div ref={ref} className="border-y border-line py-[22px]">
+          <div className="grid grid-cols-2 gap-[22px] text-center sm:grid-cols-4 sm:gap-[18px]">
+            {STATS.map((s) => (
+              <Stat key={s.label} {...s} active={active} />
+            ))}
+            <div className="flex flex-col items-center gap-1">
+              <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest">
+                <FiActivity size={15} strokeWidth={2.2} aria-hidden="true" />
+              </span>
+              <b className="font-display text-[1.3rem] font-bold leading-tight text-navy">99.98%</b>
+              <span className="text-[.76rem] text-ink-soft">Platform uptime</span>
+            </div>
           </div>
         </div>
-      </div>
+      </Reveal>
     </div>
   )
 }

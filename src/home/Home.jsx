@@ -9,6 +9,7 @@ import HowItWorks from './HowItWorks'
 import Security from './Security'
 import CtaBand from './CtaBand'
 import Footer from './Footer'
+import ScrollToTop from './ScrollToTop'
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
       <Security />
       <CtaBand />
       <Footer />
+      <ScrollToTop />
     </>
   )
 }
