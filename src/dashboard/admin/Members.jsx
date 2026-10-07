@@ -6,11 +6,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 
-const STORAGE_KEY = 'chametu_members_v1'
+const STORAGE_KEY = 'chametu_members_v2'
 
 const SEED_MEMBERS = [
-  { id: 'm1', name: 'Brian Ngoyoni',  email: 'brian@chametu.co.ke',  phone: '0712 345 678', role: 'Chairman',    savings: 85000,  loan: 20000, status: 'active'  },
-  { id: 'm2', name: 'Jane Wanjiru',   email: 'jane@chametu.co.ke',   phone: '0722 111 222', role: 'Treasurer',   savings: 60000,  loan: 0,     status: 'active'  },
+  { id: 'm1', name: 'Daniel Muthui',  email: 'daniel@chametu.co.ke',  phone: '0712 345 678', role: 'Chairman',    savings: 85000,  loan: 20000, status: 'active'  },
+  { id: 'm2', name: 'Brian Ngoyoni',   email: 'brian@chametu.co.ke',   phone: '0722 111 222', role: 'Treasurer',   savings: 60000,  loan: 0,     status: 'active'  },
   { id: 'm3', name: 'Kevin Mwangi',   email: 'kevin@chametu.co.ke',  phone: '0733 555 001', role: 'Secretary',   savings: 45000,  loan: 50000, status: 'active'  },
   { id: 'm4', name: 'Mary Achieng',   email: 'mary@chametu.co.ke',   phone: '0722 900 123', role: 'Member',      savings: 120000, loan: 40000, status: 'active'  },
   { id: 'm5', name: 'David Otieno',   email: 'david@chametu.co.ke',  phone: '0711 888 234', role: 'Member',      savings: 30000,  loan: 18000, status: 'arrears' },
