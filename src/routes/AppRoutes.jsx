@@ -54,8 +54,8 @@ export default function AppRoutes() {
           <Route path="/dashboard" element={<Soon title="Dashboard" />} />
           <Route path="/dashboard/invite" element={<Soon title="Invite Members" />} />
           <Route path="/dashboard/chama" element={<Soon title="My Chama" />} />
-          <Route path="/dashboard/payments" element={<Soon title="Payments Tracker" />} />
-          <Route path="/dashboard/transactions" element={<Soon title="Transactions" />} />
+          {/* <Route path="/dashboard/payments" element={<Soon title="Payments Tracker" />} /> */}
+          {/* <Route path="/dashboard/transactions" element={<Soon title="Transactions" />} />
           <Route path="/dashboard/contributions" element={<Soon title="Contributions" />} />
           <Route path="/dashboard/savings" element={<Soon title="Savings" />} />
           <Route path="/dashboard/loans" element={<Soon title="Loans" />} />
@@ -64,7 +64,7 @@ export default function AppRoutes() {
           <Route path="/dashboard/assets" element={<Soon title="Assets" />} />
           <Route path="/dashboard/payouts" element={<Soon title="Payout Rotation" />} />
           <Route path="/dashboard/meetings" element={<Soon title="Meetings" />} />
-          <Route path="/dashboard/voting" element={<Soon title="Voting" />} />
+          <Route path="/dashboard/voting" element={<Soon title="Voting" />} /> */}
 
           <Route path="/dashboard/members" element={<Members />} />
 
