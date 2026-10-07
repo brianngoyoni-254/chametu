@@ -1,0 +1,76 @@
+src/
+|-- App.jsx
+|-- assets
+|   |-- hero.png
+|   |-- logos.png
+|   |-- react.svg
+|   `-- vite.svg
+|-- auth
+|   |-- ForgotPassword.jsx
+|   |-- Login.jsx
+|   `-- Register.jsx
+|-- components
+|   |-- Badge.jsx
+|   |-- Button.jsx
+|   |-- DataTable.jsx
+|   |-- Logo.jsx
+|   |-- Modal.jsx
+|   `-- StatCard.jsx
+|-- context
+|   |-- AuthContext.jsx
+|   |-- PointsContext.jsx
+|   `-- TierContext.jsx
+|-- dashboard
+|   |-- DashboardLayout.jsx
+|   |-- Sidebar.jsx
+|   |-- Topbar.jsx
+|   `-- admin
+|       |-- Assets.jsx
+|       |-- Contributions.jsx
+|       |-- Loans.jsx
+|       |-- Meetings.jsx
+|       |-- Members.jsx
+|       |-- MyChama.jsx
+|       |-- Overview.jsx
+|       |-- Portfolio.jsx
+|       |-- Reports.jsx
+|       |-- RolesPermissions.jsx
+|       |-- Savings.jsx
+|       |-- Transactions.jsx
+|       |-- Voting.jsx
+|       `-- Welfare.jsx
+|-- home
+|   |-- CtaBand.jsx
+|   |-- Edge.jsx
+|   |-- Features.jsx
+|   |-- Footer.jsx
+|   |-- Hero.jsx
+|   |-- Home.jsx
+|   |-- HowItWorks.jsx
+|   |-- HowRewardsWork.jsx
+|   |-- Join.jsx
+|   |-- Navbar.jsx
+|   |-- Rewards.jsx
+|   |-- Security.jsx
+|   `-- TrustBar.jsx
+|-- index.css
+|-- lib
+|   |-- catalog.js
+|   |-- pointsStore.js
+|   `-- tiers.js
+|-- main.jsx
+|-- rewards
+|   |-- Points.jsx
+|   |-- Rewards.jsx
+|   |-- TieCard.jsx
+|   |-- TierCard.jsx
+|   |-- TierComparison.jsx
+|   `-- components
+|       `-- PerkCard.jsx
+|-- routes
+|   |-- AppRoutes.jsx
+|   `-- ProtectedRoute.jsx
+`-- utils
+    `-- formatCurrency.js
+
+13 directories, 61 files
