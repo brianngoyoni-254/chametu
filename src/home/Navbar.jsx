@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FiMenu, FiX } from 'react-icons/fi'
+import { FiMenu, FiX, FiArrowRight } from 'react-icons/fi'
+import logo from '../assets/logos.png'
 
 const LINKS = [
   { href: '#features', label: 'Features' },
@@ -16,11 +17,14 @@ export default function Navbar() {
   return (
     <header className="sticky top-[env(safe-area-inset-top,0px)] z-50 border-b border-line bg-paper/92 backdrop-blur-sm">
       <div className="wrap flex items-center justify-between gap-3 py-[15px]">
-        <Link to="/" className="flex shrink-0 items-center gap-[9px] text-[1.1rem] font-bold text-navy">
-          <span className="relative block h-[29px] w-[29px] flex-none rounded-lg bg-[linear-gradient(155deg,#0B7A5A,#10B981)]">
-            <span className="absolute left-[7px] top-[9px] h-[2px] w-[15px] bg-gold shadow-[0_6px_0_var(--color-gold),0_12px_0_rgba(255,255,255,.6)]" />
-          </span>
-          Chametu
+        <Link to="/" className="flex shrink-0 items-center gap-[9px]">
+          <img
+            src={logo}
+            alt="Chametu"
+            className="h-[30px] w-auto object-contain"
+            width="120"
+            height="30"
+          />
         </Link>
 
         <nav className="hidden gap-7 text-[.92rem] font-medium text-navy nav:flex">
@@ -32,11 +36,18 @@ export default function Navbar() {
         </nav>
 
         <div className="flex items-center gap-4">
-          <Link to="/login" className="hidden text-[.88rem] font-semibold text-navy opacity-75 nav:block">
+          <Link
+            to="/login"
+            className="hidden text-[.88rem] font-semibold text-navy opacity-75 transition-opacity hover:opacity-100 nav:block"
+          >
             Log in
           </Link>
-          <Link to="/register" className="btn btn-primary whitespace-nowrap max-[400px]:px-3 max-[400px]:text-[.82rem]">
+          <Link
+            to="/register"
+            className="btn btn-primary whitespace-nowrap max-[400px]:px-3 max-[400px]:text-[.82rem]"
+          >
             Create your chama
+            <FiArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
           </Link>
         </div>
 

@@ -16,7 +16,6 @@
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
-  /* Design breakpoints (design collapses at 860px and 960px) */
   --breakpoint-nav: 861px;
   --breakpoint-hero: 961px;
 }
@@ -118,7 +117,6 @@
     border-color: rgba(255, 255, 255, 0.4);
   }
 
-  /* Card used by Join + Edge (design's .v2c) */
   .card-v2 {
     background: #fff;
     border: 1px solid var(--color-line);
@@ -130,11 +128,88 @@
   .card-v2:hover {
     transform: translateY(-3px);
   }
+
+  /* Scroll reveal */
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 22px, 0);
+    transition:
+      opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    backface-visibility: hidden;
+  }
+  .reveal-left {
+    transform: translate3d(-22px, 0, 0);
+  }
+  .reveal-right {
+    transform: translate3d(22px, 0, 0);
+  }
+  .reveal-down {
+    transform: translate3d(0, -22px, 0);
+  }
+  .reveal-fade {
+    transform: none;
+  }
+  .reveal.is-visible {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* Scroll to top */
+  .scroll-top {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 40;
+    display: grid;
+    place-items: center;
+    height: 44px;
+    width: 44px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: linear-gradient(135deg, #0B7A5A, #10B981);
+    color: #fff;
+    box-shadow: 0 10px 24px -8px rgba(11, 93, 59, 0.55);
+    cursor: pointer;
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+    pointer-events: none;
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.2s ease;
+  }
+  .scroll-top.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+  }
+  .scroll-top:hover {
+    box-shadow: 0 14px 30px -8px rgba(11, 93, 59, 0.65);
+  }
+  .scroll-top:active {
+    transform: translateY(1px) scale(0.98);
+  }
+  @media (min-width: 641px) {
+    .scroll-top {
+      right: 28px;
+      bottom: 28px;
+      height: 46px;
+      width: 46px;
+    }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
     scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .scroll-top {
+    transition: opacity 0.15s ease !important;
   }
 }

@@ -112,7 +112,7 @@ export default function HowRewardsWork() {
           <h2 className="text-2xl font-bold text-navy">Plans</h2>
           <p className="mt-2 max-w-[60ch] text-ink-soft">
             Every paid tier earns points on subscription spend and can redeem up to
-            its annual cap. The cap is the only gate — no hidden perk locks.
+            its annual cap. The cap is the only gate, with no hidden perk locks.
           </p>
 
           <div className="mt-6 grid gap-4 nav:grid-cols-4">
