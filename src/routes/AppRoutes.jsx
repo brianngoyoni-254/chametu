@@ -13,6 +13,8 @@ import Rewards from '../rewards/Rewards'
 import Points from '../rewards/Points'
 import TierComparison from '../rewards/TierComparison'
 
+import Members from '../dashboard/admin/Members'
+
 const Soon = ({ title }) => (
   <div className="max-w-[1180px] mx-auto">
     <h1 className="font-display font-bold text-2xl text-navy">{title}</h1>
@@ -23,7 +25,7 @@ const Soon = ({ title }) => (
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
+
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -47,11 +49,14 @@ export default function AppRoutes() {
           <Route path="/dashboard/payouts" element={<Soon title="Payout Rotation" />} />
           <Route path="/dashboard/meetings" element={<Soon title="Meetings" />} />
           <Route path="/dashboard/voting" element={<Soon title="Voting" />} />
-          <Route path="/dashboard/members" element={<Soon title="Members" />} />
+
+          <Route path="/dashboard/members" element={<Members />} />
+
           <Route path="/dashboard/roles" element={<Soon title="Roles & Permissions" />} />
           <Route path="/dashboard/statements" element={<Soon title="Statements" />} />
           <Route path="/dashboard/reports" element={<Soon title="Reports" />} />
 
+      
           <Route path="/rewards" element={<Rewards />} />
           <Route path="/rewards/points" element={<Points />} />
           <Route path="/rewards/plans" element={<TierComparison />} />
