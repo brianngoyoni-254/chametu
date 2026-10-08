@@ -14,6 +14,7 @@ import Points from '../rewards/Points'
 import TierComparison from '../rewards/TierComparison'
 
 import Members from '../dashboard/admin/Members'
+import Statements from '../dashboard/admin/Statements'
 // Finance
 import Payments from '../dashboard/admin/Payments'
 import Transactions from '../dashboard/admin/Transactions'
@@ -88,7 +89,7 @@ export default function AppRoutes() {
 
           <Route path="/dashboard/members" element={<Soon title="Members" />} />
           <Route path="/dashboard/roles" element={<Soon title="Roles & Permissions" />} />
-          <Route path="/dashboard/statements" element={<Soon title="Statements" />} />
+          <Route path="/dashboard/statements" element={<Statements />} />
           <Route path="/dashboard/reports" element={<Soon title="Reports" />} />
 
       
