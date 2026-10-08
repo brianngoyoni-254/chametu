@@ -4,6 +4,7 @@ import {
   Calendar, TrendingUp, Wallet, Bell,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import logoUrl from '../../assets/logos.png'
 
 const MEMBERS_KEY = 'chametu_members_v2'
 const ISSUED_KEY = 'chametu_statements_issued_v1'
@@ -19,7 +20,7 @@ const MONTHLY_CONTRIBUTION = 5000
 const LOAN_MONTHLY_REPAY = 3500
 const LATE_FEE = 100
 
-/* ---------- helpers ---------- */
+/* -helpers- */
 
 function loadMembers() {
   try {
@@ -67,6 +68,18 @@ function fmtKsh(n) {
 }
 
 /**
+ * Absolute URL for the logo so it resolves correctly inside
+ * a window.open('', '_blank') context (which has about:blank base).
+ */
+function absoluteLogo() {
+  try {
+    return new URL(logoUrl, window.location.origin).href
+  } catch {
+    return logoUrl
+  }
+}
+
+/**
  * Derive per-member per-month data deterministically from member status.
  * Replace this with a real ledger lookup when the backend exists.
  */
@@ -82,13 +95,14 @@ function monthDataFor(member, period) {
   return { contribution, paid, lateFee, loanRepay, isPaid: paid >= contribution }
 }
 
-/* ---------- print template ---------- */
+/* -print template- */
 
 function buildStatementHTML(member, period, data, summary) {
   const monthLabel = fmtMonth(period)
   const generatedAt = new Date().toLocaleDateString('en-KE', {
     day: 'numeric', month: 'long', year: 'numeric',
   })
+  const logoSrc = absoluteLogo()
 
   const rows = [
     ['Contribution', data.contribution, data.paid],
@@ -120,8 +134,10 @@ function buildStatementHTML(member, period, data, summary) {
   h2 { font-family: 'Sora', system-ui, sans-serif; font-size: 14px; margin: 0 0 8px; color: #0B1F33; }
   p { margin: 0; }
   .head { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 14px; border-bottom: 2px solid #0B7A5A; margin-bottom: 20px; }
-  .brand-mark { display: inline-block; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #0B7A5A, #10B981); vertical-align: middle; margin-right: 8px; }
-  .brand { font-family: 'Sora', system-ui, sans-serif; font-weight: 700; font-size: 16px; color: #0B1F33; }
+  .brand-row { display: flex; align-items: center; gap: 10px; }
+  .brand-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 8px; }
+  .brand-name { font-family: 'Sora', system-ui, sans-serif; font-weight: 700; font-size: 16px; color: #0B1F33; line-height: 1.1; }
+  .brand-sub { font-size: 10.5px; color: #5B6B7B; margin-top: 2px; }
   .meta { text-align: right; font-size: 11px; color: #5B6B7B; }
   .meta b { color: #0B1F33; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
@@ -150,11 +166,13 @@ function buildStatementHTML(member, period, data, summary) {
 <body>
   <div class="head">
     <div>
-      <span class="brand-mark"></span>
-      <span class="brand">${CHAMA.name}</span>
-      <p style="margin-top: 4px; font-size: 10.5px; color: #5B6B7B;">
-        Chama code ${CHAMA.code} · M-Pesa Paybill ${CHAMA.paybill}
-      </p>
+      <div class="brand-row">
+        <img src="${logoSrc}" alt="Chametu" class="brand-logo" />
+        <div>
+          <div class="brand-name">${CHAMA.name}</div>
+          <div class="brand-sub">Chama code ${CHAMA.code} · M-Pesa Paybill ${CHAMA.paybill}</div>
+        </div>
+      </div>
     </div>
     <div class="meta">
       <div>Statement period</div>
@@ -288,6 +306,7 @@ export default function Statements() {
 
   const handlePrintAll = () => {
     if (rows.length === 0) return toast.error('Nothing to print for this filter.')
+    const logoSrc = absoluteLogo()
     const pages = rows
       .map((row) => {
         const inner = buildStatementHTML(row.member, period, row.data, {
@@ -308,8 +327,10 @@ export default function Statements() {
   .statement-page { page-break-after: always; }
   .statement-page:last-child { page-break-after: auto; }
   .head { display: flex; justify-content: space-between; padding-bottom: 14px; border-bottom: 2px solid #0B7A5A; margin-bottom: 20px; }
-  .brand { font-weight: 700; font-size: 16px; color: #0B1F33; }
-  .brand-mark { display: inline-block; width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #0B7A5A, #10B981); vertical-align: middle; margin-right: 8px; }
+  .brand-row { display: flex; align-items: center; gap: 10px; }
+  .brand-logo { width: 36px; height: 36px; object-fit: contain; border-radius: 8px; }
+  .brand-name { font-family: 'Sora', system-ui, sans-serif; font-weight: 700; font-size: 16px; color: #0B1F33; line-height: 1.1; }
+  .brand-sub { font-size: 10.5px; color: #5B6B7B; margin-top: 2px; }
   .meta { text-align: right; font-size: 11px; color: #5B6B7B; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
   .block { border: 1px solid #E3E9EF; border-radius: 10px; padding: 12px 14px; }
