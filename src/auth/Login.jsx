@@ -34,6 +34,12 @@ export default function Login() {
     }
   }
 
+  const fillDemo = (demoEmail) => {
+    setEmail(demoEmail)
+    setPassword('demo')
+    setError('')
+  }
+
   return (
     <div className="grid grid-cols-1 min-h-screen bg-paper hero:grid-cols-[minmax(340px,5fr)_7fr]">
       {/* Left panel */}
@@ -120,18 +126,13 @@ export default function Login() {
             <Field
               label={
                 <div className="flex justify-between items-center">
-                  <span>Password </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setError(
-                        'Password reset by SMS or email needs the Chametu server. Ask your chairman or contact support.'
-                      )
-                    }
+                  <span>Password</span>
+                  <Link
+                    to="/forgot-password"
                     className="text-forest font-semibold text-[0.78rem] hover:underline"
                   >
-                      Forgot password?
-                  </button>
+                    Forgot password?
+                  </Link>
                 </div>
               }
             >
@@ -208,6 +209,35 @@ export default function Login() {
             </Link>
           </div>
 
+          {/* Demo quick-fill buttons */}
+          <div className="mt-6 pt-5 border-t border-line">
+            <p className="text-[0.74rem] text-ink-soft text-center mb-3">
+              <b className="text-navy">Demo:</b> any password works. Tap a role to fill the email.
+            </p>
+            <div className="grid grid-cols-2 gap-2 text-[0.72rem]">
+              <DemoButton
+                label="Daniel · Chairman"
+                email="daniel@chametu.co.ke"
+                onClick={fillDemo}
+              />
+              <DemoButton
+                label="Brian · Treasurer"
+                email="brian@chametu.co.ke"
+                onClick={fillDemo}
+              />
+              <DemoButton
+                label="Kevin · Secretary"
+                email="kevin@chametu.co.ke"
+                onClick={fillDemo}
+              />
+              <DemoButton
+                label="Mary · Member"
+                email="mary@chametu.co.ke"
+                onClick={fillDemo}
+              />
+            </div>
+          </div>
+
           <p className="text-[0.76rem] text-ink-soft text-center mt-5 leading-relaxed">
             Demo build: accounts live in this browser only. Production login needs a server with
             hashed passwords and SMS/email reset.
@@ -228,6 +258,18 @@ function Field({ label, children }) {
       </div>
       {children}
     </div>
+  )
+}
+
+function DemoButton({ label, email, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(email)}
+      className="px-2.5 py-2 rounded-lg border border-line bg-white text-navy font-semibold hover:border-forest hover:bg-forest/[0.03] transition text-[0.72rem] truncate"
+    >
+      {label}
+    </button>
   )
 }
 
