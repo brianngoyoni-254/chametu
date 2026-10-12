@@ -20,7 +20,7 @@ const ALLOC_COLORS = ['bg-forest', 'bg-emerald', 'bg-gold', 'bg-navy', 'bg-ink-s
 
 function Card({ title, to, linkLabel = 'View all', children, className = '' }) {
   return (
-    <section className={`rounded-2xl border border-line bg-white p-5 shadow-sm ${className}`}>
+    <section className={`rounded-2xl border border-line bg-card p-5 shadow-sm ${className}`}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="font-display text-sm font-semibold text-navy">{title}</h3>
         {to && (
@@ -38,7 +38,7 @@ function Stat({ to, label, value, sub, subTone, icon: Icon, tint }) {
   return (
     <Link
       to={to}
-      className="group rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/50 hover:shadow-md"
+      className="group rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/50 hover:shadow-md"
     >
       <div className="flex items-start justify-between">
         <span className="text-xs font-medium text-ink-soft">{label}</span>
@@ -87,8 +87,8 @@ export default function Overview() {
   ].filter(Boolean)
 
   const alertStyle = {
-    red: 'bg-red-50 text-red-600',
-    amber: 'bg-[#FBF1E0] text-[#8A6417]',
+    red: 'bg-red-500/15 text-red-600',
+    amber: 'bg-gold/15 text-[#8A6417]',
     gold: 'bg-gold/15 text-[#8A6112]',
   }
 
@@ -116,31 +116,31 @@ export default function Overview() {
             {d.memberCounts.arrears > 0 && ` · ${d.memberCounts.arrears} in arrears`}
           </p>
         </div>
-        <div className="rounded-lg border border-line bg-white px-3 py-1.5 text-xs font-medium text-ink-soft">{today}</div>
+        <div className="rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-medium text-ink-soft">{today}</div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4 md:grid-cols-2 sm:grid-cols-1">
         <Stat
           to="/dashboard/transactions" label="Group balance" icon={Wallet}
-          tint="bg-[#E9F5EF] text-forest" value={ksh(d.groupBalance)}
+          tint="bg-forest/10 text-forest" value={ksh(d.groupBalance)}
           sub={`↑ ${ksh(d.moneyIn)} in recently`} subTone="text-emerald"
         />
         <Stat
           to="/dashboard/contributions" label="Contributions" icon={Percent}
-          tint="bg-[#E9F5EF] text-emerald" value={ksh(d.collected)}
+          tint="bg-emerald/10 text-emerald" value={ksh(d.collected)}
           sub={`${d.contribPct}% of ${ksh(d.expected)}`}
           subTone={d.contribPct >= 90 ? 'text-emerald' : 'text-[#8A6417]'}
         />
         <Stat
           to="/dashboard/loans" label="Outstanding loans" icon={ArrowLeftRight}
-          tint="bg-[#FBF1E0] text-[#8A6417]" value={ksh(d.outstanding)}
+          tint="bg-gold/15 text-[#8A6417]" value={ksh(d.outstanding)}
           sub={d.overdueAmount > 0 ? `${ksh(d.overdueAmount)} overdue` : 'None overdue'}
           subTone={d.overdueAmount > 0 ? 'text-red-600' : 'text-emerald'}
         />
         <Stat
           to="/dashboard/portfolio" label="Investments" icon={TrendingUp}
-          tint="bg-[#EAF1F7] text-navy" value={ksh(d.portfolioValue)}
+          tint="bg-line text-navy" value={ksh(d.portfolioValue)}
           sub={`${d.gain >= 0 ? '↑ +' : '↓ −'}${ksh(Math.abs(d.gain))} gain`}
           subTone={d.gain >= 0 ? 'text-emerald' : 'text-red-600'}
         />
@@ -151,7 +151,7 @@ export default function Overview() {
         {quick.map((q) => (
           <Link
             key={q.label} to={q.to}
-            className="flex items-center gap-2.5 rounded-xl border border-line bg-white px-3.5 py-3 text-[0.82rem] font-semibold text-navy transition hover:border-forest/60 hover:bg-forest/[0.03]"
+            className="flex items-center gap-2.5 rounded-xl border border-line bg-card px-3.5 py-3 text-[0.82rem] font-semibold text-navy transition hover:border-forest/60 hover:bg-forest/[0.03]"
           >
             <q.icon size={15} className="text-forest" /> {q.label}
           </Link>
@@ -162,11 +162,11 @@ export default function Overview() {
       <div className="grid grid-cols-[1.5fr_1fr] gap-4 md:grid-cols-1">
         <Card title="Cash flow" to="/dashboard/transactions" linkLabel="Ledger">
           <div className="mb-4 grid grid-cols-2 gap-3">
-            <div className="rounded-xl bg-[#E9F5EF] p-3">
+            <div className="rounded-xl bg-forest/10 p-3">
               <div className="text-xs text-forest">Money in</div>
               <div className="mt-0.5 font-mono text-base font-bold text-navy">{ksh(d.moneyIn)}</div>
             </div>
-            <div className="rounded-xl bg-[#FBF1E0] p-3">
+            <div className="rounded-xl bg-gold/15 p-3">
               <div className="text-xs text-[#8A6417]">Money out</div>
               <div className="mt-0.5 font-mono text-base font-bold text-navy">{ksh(d.moneyOut)}</div>
             </div>
@@ -189,7 +189,7 @@ export default function Overview() {
             className="relative mx-auto grid h-36 w-36 place-items-center rounded-full"
             style={{ background: `conic-gradient(#10B981 ${d.contribPct * 3.6}deg, #EDEAE0 0deg)` }}
           >
-            <div className="absolute inset-3 rounded-full bg-white" />
+            <div className="absolute inset-3 rounded-full bg-card" />
             <div className="relative text-center">
               <div className="font-display text-2xl font-bold text-navy">{d.contribPct}%</div>
               <div className="text-xs text-ink-soft">of target</div>
@@ -266,7 +266,7 @@ export default function Overview() {
 
         <div className="space-y-4">
           {d.nextMeeting && (
-            <Link to="/dashboard/meetings" className="block rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:border-forest/50">
+            <Link to="/dashboard/meetings" className="block rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:border-forest/50">
               <div className="flex items-center gap-1.5 font-mono text-xs text-gold">
                 <CalendarDays size={13} /> {d.nextMeeting.date.toUpperCase()} · {d.nextMeeting.time}
               </div>
@@ -276,7 +276,7 @@ export default function Overview() {
           )}
 
           {d.pendingLoans[0] && (
-            <Link to="/dashboard/loans" className="block rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:border-forest/50">
+            <Link to="/dashboard/loans" className="block rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:border-forest/50">
               <div className="text-xs font-semibold uppercase tracking-wide text-ink-soft">Loan awaiting approval</div>
               <div className="mt-2 flex justify-between text-sm">
                 <span className="text-navy">{d.pendingLoans[0].member}</span>
@@ -288,7 +288,7 @@ export default function Overview() {
 
           <Card title="Members" to="/dashboard/members" linkLabel="Manage">
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#E9F5EF] text-forest"><Users size={18} /></span>
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-forest/10 text-forest"><Users size={18} /></span>
               <div>
                 <div className="font-display text-lg font-bold text-navy">{d.memberCounts.total}</div>
                 <div className="text-xs text-ink-soft">

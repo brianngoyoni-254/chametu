@@ -5,8 +5,8 @@ import {
   UserMinus, Trash2, Link2, XCircle, UserCheck, Pencil, Save,
 } from 'lucide-react'
 import { toast } from 'sonner'
-
-const STORAGE_KEY = 'chametu_members_v2'
+import { useChama } from '../../context/ChamaContext'
+import { useTier } from '../../context/TierContext'
 
 const SEED_MEMBERS = [
   { id: 'm1', name: 'Daniel Muthui',  email: 'daniel@chametu.co.ke',  phone: '0712 345 678', role: 'Chairman',    savings: 85000,  loan: 20000, status: 'active'  },
@@ -48,20 +48,6 @@ function initials(name) {
     .toUpperCase()
 }
 
-function loadMembers() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return SEED_MEMBERS
-}
-
-function saveMembers(list) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-  } catch {}
-}
-
 function buildCSV(members) {
   const headers = ['Name', 'Email', 'Phone', 'Role', 'Savings (KSh)', 'Loan (KSh)', 'Status']
   const rows = members.map((m) => [m.name, m.email, m.phone, m.role, m.savings, m.loan, m.status])
@@ -85,7 +71,6 @@ function downloadCSV(members) {
 function isValidEmail(v) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim())
 }
-
 
 function getMenuItems(member) {
   if (member.status === 'invited') {
@@ -117,6 +102,27 @@ function getMenuItems(member) {
     { key: 'deactivate', label: 'Deactivate',         icon: UserMinus },
     { key: 'remove',     label: 'Remove from chama',  icon: Trash2, danger: true },
   ]
+}
+
+/** Avatar cell — shows uploaded photo if present, otherwise initials on a gradient. */
+function MemberAvatar({ member, size = 'md' }) {
+  const dim = size === 'lg' ? 'w-11 h-11 text-[0.9rem]' : 'w-8 h-8 text-[0.72rem]'
+  if (member?.avatar) {
+    return (
+      <img
+        src={member.avatar}
+        alt={member.name}
+        className={`${dim} rounded-lg object-cover shrink-0`}
+      />
+    )
+  }
+  return (
+    <span
+      className={`${dim} rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold shrink-0`}
+    >
+      {initials(member?.name || '')}
+    </span>
+  )
 }
 
 function RowMenu({ member, onAction }) {
@@ -222,9 +228,7 @@ function ProfileModal({ member, open, onClose, onSave }) {
       >
         <div className="flex items-start justify-between px-5 py-4 border-b border-line">
           <div className="flex items-center gap-3">
-            <span className="w-11 h-11 rounded-xl bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold text-[0.9rem] shrink-0">
-              {initials(member.name)}
-            </span>
+            <MemberAvatar member={member} size="lg" />
             <div className="min-w-0">
               <h3 className="font-display font-semibold text-navy text-[1.05rem] truncate">
                 {editing ? 'Edit member' : member.name}
@@ -426,7 +430,7 @@ function ConfirmDialog({ open, title, body, confirmLabel, danger, onClose, onCon
   )
 }
 
-function InviteModal({ open, onClose, onInvite, existingEmails }) {
+function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('Member')
@@ -454,7 +458,8 @@ function InviteModal({ open, onClose, onInvite, existingEmails }) {
     if (!trimmedName) return setError('Enter the member\u2019s name.')
     if (!isValidEmail(trimmedEmail)) return setError('Enter a valid email address.')
     if (existingEmails.includes(trimmedEmail)) return setError('That email is already on this chama.')
-    onInvite({ name: trimmedName, email: trimmedEmail, role })
+    const ok = onInvite({ name: trimmedName, email: trimmedEmail, role })
+    if (ok === false) return
     setSent(true)
     setTimeout(() => onClose(), 1400)
   }
@@ -480,7 +485,11 @@ function InviteModal({ open, onClose, onInvite, existingEmails }) {
             <div className="flex items-start justify-between px-5 py-4 border-b border-line">
               <div>
                 <h3 className="font-display font-semibold text-navy text-[1.05rem]">Invite a member</h3>
-                <p className="mt-0.5 text-[0.82rem] text-ink-soft">They'll receive an email with a join link.</p>
+                <p className="mt-0.5 text-[0.82rem] text-ink-soft">
+                  {atCap
+                    ? `You've reached the ${capInfo.maxMembers}-member cap on ${capInfo.tier}.`
+                    : "They'll receive an email with a join link."}
+                </p>
               </div>
               <button
                 type="button"
@@ -492,44 +501,56 @@ function InviteModal({ open, onClose, onInvite, existingEmails }) {
               </button>
             </div>
             <div className="px-5 py-4 flex flex-col gap-3">
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Full name
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Anne Wanjiku"
-                  autoFocus
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Email address
-                <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white focus-within:border-forest transition">
-                  <Mail size={15} strokeWidth={2} className="text-ink-soft shrink-0" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@example.com"
-                    className="w-full outline-none text-[0.92rem] font-normal text-navy bg-transparent"
-                  />
-                </div>
-              </label>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Role
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value)}
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                >
-                  {ROLES.map((r) => <option key={r}>{r}</option>)}
-                </select>
-              </label>
-              {error && (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[0.82rem]">
+              {atCap ? (
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gold/15 text-[#8A6112] text-[0.84rem]">
                   <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
-                  {error}
+                  <span>
+                    Your <b>{capInfo.tier}</b> plan allows up to <b>{capInfo.maxMembers}</b> members.
+                    Upgrade your plan to invite more.
+                  </span>
                 </div>
+              ) : (
+                <>
+                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
+                    Full name
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Anne Wanjiku"
+                      autoFocus
+                      className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
+                    Email address
+                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white focus-within:border-forest transition">
+                      <Mail size={15} strokeWidth={2} className="text-ink-soft shrink-0" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="name@example.com"
+                        className="w-full outline-none text-[0.92rem] font-normal text-navy bg-transparent"
+                      />
+                    </div>
+                  </label>
+                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
+                    Role
+                    <select
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
+                    >
+                      {ROLES.map((r) => <option key={r}>{r}</option>)}
+                    </select>
+                  </label>
+                  {error && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[0.82rem]">
+                      <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
+                      {error}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
@@ -538,15 +559,17 @@ function InviteModal({ open, onClose, onInvite, existingEmails }) {
                 onClick={onClose}
                 className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
               >
-                Cancel
+                {atCap ? 'Close' : 'Cancel'}
               </button>
-              <button
-                type="submit"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
-              >
-                <Send size={14} strokeWidth={2} />
-                Send invite
-              </button>
+              {!atCap && (
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
+                >
+                  <Send size={14} strokeWidth={2} />
+                  Send invite
+                </button>
+              )}
             </div>
           </form>
         )}
@@ -556,7 +579,11 @@ function InviteModal({ open, onClose, onInvite, existingEmails }) {
 }
 
 export default function Members() {
-  const [members, setMembers] = useState(() => loadMembers())
+  // Members come from ChamaContext so the sidebar and this page stay in sync.
+  const { members, setMembers } = useChama()
+  // Tier info drives the member cap shown in the header and enforced on invite.
+  const { tier, config } = useTier()
+
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
   const [inviteOpen, setInviteOpen] = useState(false)
@@ -564,7 +591,10 @@ export default function Members() {
   const [roleTarget, setRoleTarget] = useState(null)
   const [confirm, setConfirm] = useState(null)
 
-  useEffect(() => { saveMembers(members) }, [members])
+  // Seed the chama once if the context has no members yet (fresh install)
+  useEffect(() => {
+    if (members.length === 0) setMembers(SEED_MEMBERS)
+  }, [members.length, setMembers])
 
   const rows = useMemo(() => {
     return members.filter((m) => {
@@ -594,6 +624,13 @@ export default function Members() {
     [members]
   )
 
+  // Members that count toward the tier cap (everyone except the inactive)
+  const capUsed = useMemo(
+    () => members.filter((m) => m.status !== 'inactive').length,
+    [members]
+  )
+  const atCap = capUsed >= config.maxMembers
+
   const existingEmails = useMemo(() => members.map((m) => m.email.toLowerCase()), [members])
 
   const updateMember = (id, patch) =>
@@ -608,6 +645,13 @@ export default function Members() {
   }
 
   const handleInvite = ({ name, email, role }) => {
+    // Enforce the tier member cap before appending
+    if (atCap) {
+      toast.error(
+        `Your ${tier} plan allows up to ${config.maxMembers} members. Upgrade to add more.`
+      )
+      return false
+    }
     const next = {
       id: `m${Date.now()}`,
       name,
@@ -617,9 +661,11 @@ export default function Members() {
       savings: 0,
       loan: 0,
       status: 'invited',
+      avatar: null,
     }
     setMembers((prev) => [next, ...prev])
     toast.success(`Invite sent to ${email}.`)
+    return true
   }
 
   const handleMenuAction = (key, member) => {
@@ -714,6 +760,10 @@ export default function Members() {
           <h1 className="font-display font-bold text-2xl text-navy">Members</h1>
           <p className="mt-1.5 text-ink-soft">
             {counts.active} active · {counts.invited} invited · {counts.arrears} in arrears
+            {' · '}
+            <span className={atCap ? 'text-[#8A6112] font-semibold' : ''}>
+              {capUsed}/{config.maxMembers} on {tier}
+            </span>
           </p>
         </div>
         <div className="flex gap-2">
@@ -726,7 +776,12 @@ export default function Members() {
           </button>
           <button
             onClick={() => setInviteOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-sm font-semibold hover:bg-forest-dark transition"
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+              atCap
+                ? 'bg-paper text-ink-soft border border-line hover:border-gold cursor-pointer'
+                : 'bg-forest text-white hover:bg-forest-dark'
+            }`}
+            title={atCap ? `You've reached your ${tier} member cap` : 'Invite a new member'}
           >
             <UserPlus size={15} strokeWidth={2} />
             Add member
@@ -782,9 +837,7 @@ export default function Members() {
                 <tr key={m.id} className="hover:bg-forest/[0.03] transition">
                   <td className="px-5 py-3.5 border-b border-line">
                     <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold text-[0.72rem] shrink-0">
-                        {initials(m.name)}
-                      </span>
+                      <MemberAvatar member={m} />
                       <span className="min-w-0">
                         <span className="block font-medium text-navy truncate">{m.name}</span>
                         <span className="block text-[0.76rem] text-ink-soft truncate">{m.email}</span>
@@ -830,6 +883,8 @@ export default function Members() {
         onClose={() => setInviteOpen(false)}
         onInvite={handleInvite}
         existingEmails={existingEmails}
+        atCap={atCap}
+        capInfo={{ tier, maxMembers: config.maxMembers }}
       />
 
       <ProfileModal

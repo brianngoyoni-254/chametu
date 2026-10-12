@@ -8,6 +8,8 @@
   --color-emerald: #10B981;
   --color-gold: #F5B942;
   --color-paper: #F3F6F9;
+  --color-card: #FFFFFF;
+  --color-tint: #E8F7F1;
   --color-line: #E3E9EF;
   --color-ink: #0B1F33;
   --color-ink-soft: #5B6B7B;
@@ -18,6 +20,25 @@
 
   --breakpoint-nav: 861px;
   --breakpoint-hero: 961px;
+}
+
+/* ------------------------------------------------------------------
+   DARK MODE — override the --color-* tokens that Tailwind utilities
+   are generated from. This is what makes bg-paper, text-navy, etc.
+   swap when data-theme="dark" is set on <html>.
+   ------------------------------------------------------------------ */
+:root[data-theme="dark"] {
+  --color-forest: #34D399;
+  --color-forest-dark: #10B981;
+  --color-navy: #EAF1F6;
+  --color-emerald: #10B981;
+  --color-gold: #F5B942;
+  --color-paper: #0A141E;
+  --color-card: #111F2E;
+  --color-tint: #12332F;
+  --color-line: #22384D;
+  --color-ink: #EAF1F6;
+  --color-ink-soft: #9DB0C0;
 }
 
 @layer base {
@@ -118,7 +139,7 @@
   }
 
   .card-v2 {
-    background: #fff;
+    background: var(--color-card);
     border: 1px solid var(--color-line);
     border-radius: 18px;
     padding: 22px;
@@ -198,6 +219,49 @@
       width: 46px;
     }
   }
+}
+
+/* ------------------------------------------------------------------
+   DARK MODE OVERRIDES FOR HARDCODED BACKGROUNDS
+
+   Tailwind v4 generates bg-white and arbitrary values as fixed
+   colors that don't read from CSS variables. These rules force
+   them to the themable card/paper tokens when data-theme=dark is
+   set on <html>. Written outside @layer so they beat the compiled
+   utilities on specificity.
+
+   !important is intentional — this is a theming shim, not a
+   regular style. Remove it if you later swap bg-white → bg-card
+   everywhere in the codebase.
+   ------------------------------------------------------------------ */
+[data-theme="dark"] .bg-white {
+  background-color: var(--color-card) !important;
+}
+
+[data-theme="dark"] .focus-within\:bg-white:focus-within {
+  background-color: var(--color-card) !important;
+}
+
+[data-theme="dark"] .bg-\[\#F8FAFC\] {
+  background-color: var(--color-paper) !important;
+}
+
+[data-theme="dark"] .bg-\[\#F8FAFC\]:focus-within {
+  background-color: var(--color-card) !important;
+}
+
+/* Translucent bg-white variants used on the auth left panels */
+[data-theme="dark"] .bg-white\/\[0\.08\] {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-theme="dark"] .bg-white\/\[0\.12\] {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Native form controls (checkbox, scrollbar, select) match the theme */
+[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 @media (prefers-reduced-motion: reduce) {
