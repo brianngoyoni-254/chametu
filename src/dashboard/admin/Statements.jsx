@@ -1,22 +1,29 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Download, FileText, Printer, Mail, CheckCircle2, AlertCircle,
+  Download, FileText, Printer, CheckCircle2, AlertCircle,
   Calendar, TrendingUp, Wallet, Bell,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logoUrl from '../../assets/logos.png'
+import { getChama } from '../../lib/chametuStorage'
 
 const MEMBERS_KEY = 'chametu_members_v2'
 const ISSUED_KEY = 'chametu_statements_issued_v1'
 
-const CHAMA = {
-  name: 'Umoja Investment Chama',
-  code: 'CHM-8F3K2P',
-  paybill: '174379',
-  currency: 'KSh',
+/* Real chama details, read at call time so renames propagate immediately */
+function buildChama() {
+  const c = getChama() || {}
+  return {
+    name: c.name || 'My Chama',
+    code: c.code || 'CHM-000000',
+    paybill: c.paybill || '174379',
+    currency: 'KSh',
+    due: c.due || 30,
+    amount: c.amount || 5000,
+    grace: c.grace || 3,
+  }
 }
 
-const MONTHLY_CONTRIBUTION = 5000
 const LOAN_MONTHLY_REPAY = 3500
 const LATE_FEE = 100
 
@@ -67,10 +74,6 @@ function fmtKsh(n) {
   return `KSh ${Number(n).toLocaleString('en-KE')}`
 }
 
-/**
- * Absolute URL for the logo so it resolves correctly inside
- * a window.open('', '_blank') context (which has about:blank base).
- */
 function absoluteLogo() {
   try {
     return new URL(logoUrl, window.location.origin).href
@@ -84,11 +87,12 @@ function absoluteLogo() {
  * Replace this with a real ledger lookup when the backend exists.
  */
 function monthDataFor(member, period) {
+  const CHAMA = buildChama()
   if (member.status === 'invited' || member.status === 'inactive') {
     return { contribution: 0, paid: 0, lateFee: 0, loanRepay: 0, isPaid: false }
   }
   const isArrears = member.status === 'arrears'
-  const contribution = MONTHLY_CONTRIBUTION
+  const contribution = CHAMA.amount
   const paid = isArrears ? 0 : contribution
   const lateFee = isArrears ? LATE_FEE : 0
   const loanRepay = member.loan > 0 && !isArrears ? LOAN_MONTHLY_REPAY : 0
@@ -98,9 +102,12 @@ function monthDataFor(member, period) {
 /* -print template- */
 
 function buildStatementHTML(member, period, data, summary) {
+  const CHAMA = buildChama()
   const monthLabel = fmtMonth(period)
   const generatedAt = new Date().toLocaleDateString('en-KE', {
-    day: 'numeric', month: 'long', year: 'numeric',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
   })
   const logoSrc = absoluteLogo()
 
@@ -110,22 +117,26 @@ function buildStatementHTML(member, period, data, summary) {
     ['Loan repayment', data.loanRepay, data.loanRepay],
   ]
 
-  const lineItems = rows
-    .filter(([_, due]) => due > 0)
-    .map(([label, due, paid]) => `
+  const lineItems =
+    rows
+      .filter(([_, due]) => due > 0)
+      .map(
+        ([label, due, paid]) => `
       <tr>
         <td>${label}</td>
         <td class="r">${fmtKsh(due)}</td>
         <td class="r">${fmtKsh(paid)}</td>
         <td class="r ${due - paid === 0 ? 'ok' : 'due'}">${due - paid === 0 ? 'Settled' : fmtKsh(due - paid)}</td>
       </tr>
-    `).join('') || `<tr><td colspan="4" class="empty">No activity this period</td></tr>`
+    `
+      )
+      .join('') || `<tr><td colspan="4" class="empty">No activity this period</td></tr>`
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>${member.name} — ${monthLabel} Statement</title>
+<title>${member.name} - ${monthLabel} Statement</title>
 <style>
   @page { size: A4; margin: 18mm; }
   * { box-sizing: border-box; }
@@ -170,7 +181,7 @@ function buildStatementHTML(member, period, data, summary) {
         <img src="${logoSrc}" alt="Chametu" class="brand-logo" />
         <div>
           <div class="brand-name">${CHAMA.name}</div>
-          <div class="brand-sub">Chama code ${CHAMA.code} · M-Pesa Paybill ${CHAMA.paybill}</div>
+          <div class="brand-sub">Chama code ${CHAMA.code} / M-Pesa Paybill ${CHAMA.paybill}</div>
         </div>
       </div>
     </div>
@@ -221,7 +232,7 @@ function buildStatementHTML(member, period, data, summary) {
   <div class="signatures">
     <div class="sig">
       <div class="sig-line"></div>
-      <div class="sig-label">Member signature · ${member.name}</div>
+      <div class="sig-label">Member signature / ${member.name}</div>
     </div>
     <div class="sig">
       <div class="sig-line"></div>
@@ -236,7 +247,7 @@ function buildStatementHTML(member, period, data, summary) {
 </html>`
 }
 
-function openPrint(html, title) {
+function openPrint(html) {
   const w = window.open('', '_blank')
   if (!w) {
     toast.error('Pop-up blocked. Allow pop-ups to download statements.')
@@ -253,11 +264,15 @@ function openPrint(html, title) {
 
 export default function Statements() {
   const [members] = useState(() => loadMembers())
-  const [period, setPeriod] = useState(recentMonths()[1]) // last completed month
+  const [period, setPeriod] = useState(recentMonths()[1])
   const [issued, setIssued] = useState(() => loadIssued())
   const [query, setQuery] = useState('')
 
-  useEffect(() => { saveIssued(issued) }, [issued])
+  const chama = useMemo(() => buildChama(), [])
+
+  useEffect(() => {
+    saveIssued(issued)
+  }, [issued])
 
   const months = useMemo(() => recentMonths(12), [])
 
@@ -297,7 +312,7 @@ export default function Statements() {
       savings: row.member.savings,
       loan: row.member.loan,
     })
-    const ok = openPrint(html, `${row.member.name} — ${fmtMonth(period)}`)
+    const ok = openPrint(html)
     if (ok) {
       markIssued(row.member.id)
       toast.success(`Statement ready for ${row.member.name.split(' ')[0]}`)
@@ -306,21 +321,19 @@ export default function Statements() {
 
   const handlePrintAll = () => {
     if (rows.length === 0) return toast.error('Nothing to print for this filter.')
-    const logoSrc = absoluteLogo()
     const pages = rows
       .map((row) => {
         const inner = buildStatementHTML(row.member, period, row.data, {
           savings: row.member.savings,
           loan: row.member.loan,
         })
-        // Extract body content from the single-statement HTML
         const body = inner.match(/<body[^>]*>([\s\S]*?)<\/body>/)?.[1] || ''
         return `<div class="statement-page">${body}</div>`
       })
       .join('')
 
     const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>Statements — ${fmtMonth(period)}</title>
+<html><head><meta charset="UTF-8"><title>Statements - ${fmtMonth(period)}</title>
 <style>
   @page { size: A4; margin: 18mm; }
   body { font-family: Inter, system-ui, sans-serif; margin: 0; }
@@ -356,10 +369,12 @@ export default function Statements() {
   .sig-label { font-size: 10px; color: #5B6B7B; }
 </style></head><body>${pages}</body></html>`
 
-    const ok = openPrint(html, `Statements — ${fmtMonth(period)}`)
+    const ok = openPrint(html)
     if (ok) {
       const next = { ...issued }
-      rows.forEach((r) => { next[issuedKey(r.member.id)] = Date.now() })
+      rows.forEach((r) => {
+        next[issuedKey(r.member.id)] = Date.now()
+      })
       setIssued(next)
       toast.success(`Generated ${rows.length} statements`)
     }
@@ -367,40 +382,45 @@ export default function Statements() {
 
   const handleRemindUnpaid = () => {
     const unpaid = rows.filter((r) => !r.data.isPaid && r.data.contribution > 0)
-    if (unpaid.length === 0) return toast.success('Howdy Everyone has paid this period ')
-    toast.info(`Reminder queued for ${unpaid.length} unpaid member${unpaid.length > 1 ? 's' : ''} (backend not connected)`)
+    if (unpaid.length === 0) return toast.success('Everyone has paid this period')
+    toast.info(
+      `Reminder queued for ${unpaid.length} unpaid member${unpaid.length > 1 ? 's' : ''} (backend not connected)`
+    )
   }
 
   const issuedCount = rows.filter((r) => isIssued(r.member.id)).length
 
   return (
-    <div className="max-w-[1180px] mx-auto">
+    <div className="mx-auto max-w-[1180px]">
       {/* Header */}
-      <header className="flex justify-between items-start gap-6 flex-wrap mb-5">
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-6">
         <div>
-          <h1 className="font-display font-bold text-2xl text-navy">Statements</h1>
-          <p className="mt-1.5 text-ink-soft max-w-[64ch]">
-            Generate print-ready statements per member for any month. Choose <b>Save as PDF</b> in the print dialog.
+          <h1 className="font-display text-2xl font-bold text-navy">Statements</h1>
+          <p className="mt-1.5 max-w-[64ch] text-ink-soft">
+            Generate print-ready statements for members of <b className="text-navy">{chama.name}</b>.
+            Choose <b>Save as PDF</b> in the print dialog.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-white">
-            <Calendar size={14} strokeWidth={2} className="text-ink-soft shrink-0" />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+            <Calendar size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="bg-transparent outline-none text-sm font-medium text-navy cursor-pointer pr-2"
+              className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none"
             >
               {months.map((m) => (
-                <option key={m} value={m}>{fmtMonth(m)}</option>
+                <option key={m} value={m}>
+                  {fmtMonth(m)}
+                </option>
               ))}
             </select>
           </div>
 
           <button
             onClick={handleRemindUnpaid}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-sm font-semibold hover:border-forest transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:border-forest"
           >
             <Bell size={15} strokeWidth={2} />
             Remind unpaid
@@ -408,7 +428,7 @@ export default function Statements() {
 
           <button
             onClick={handlePrintAll}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-sm font-semibold hover:bg-forest-dark transition"
+            className="inline-flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-forest-dark"
           >
             <Printer size={15} strokeWidth={2} />
             Download all
@@ -417,12 +437,12 @@ export default function Statements() {
       </header>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-1 hero:grid-cols-3 gap-3.5 mb-5">
+      <div className="mb-5 grid grid-cols-1 gap-3.5 hero:grid-cols-3">
         <StatCard
           icon={TrendingUp}
           label="Contributions collected"
           value={fmtKsh(totals.contribPaid)}
-          sub={`${fmtMonth(period)}`}
+          sub={fmtMonth(period)}
           tone="forest"
         />
         <StatCard
@@ -436,39 +456,47 @@ export default function Statements() {
           icon={AlertCircle}
           label="Outstanding"
           value={fmtKsh(totals.outstanding)}
-          sub={totals.outstanding > 0 ? `${rows.filter((r) => !r.data.isPaid && r.data.contribution > 0).length} unpaid` : 'All settled'}
+          sub={
+            totals.outstanding > 0
+              ? `${rows.filter((r) => !r.data.isPaid && r.data.contribution > 0).length} unpaid`
+              : 'All settled'
+          }
           tone={totals.outstanding > 0 ? 'warn' : 'forest'}
         />
       </div>
 
       {/* Search */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="text-[0.82rem] text-ink-soft">
-          {rows.length} member{rows.length !== 1 ? 's' : ''} · {issuedCount} issued this period
+          {rows.length} member{rows.length !== 1 ? 's' : ''} / {issuedCount} issued this period
         </div>
-        <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-white max-w-[260px]">
-          <FileText size={15} strokeWidth={2} className="text-ink-soft shrink-0" />
+        <div className="flex max-w-[260px] items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+          <FileText size={15} strokeWidth={2} className="shrink-0 text-ink-soft" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search member…"
-            className="outline-none text-sm bg-transparent w-full"
+            placeholder="Search member..."
+            className="w-full bg-transparent text-sm outline-none"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white border border-line rounded-2xl">
+      <div className="rounded-2xl border border-line bg-white">
         <div className="overflow-x-auto">
           <table className="w-full text-[0.88rem]">
             <thead>
-              <tr className="text-ink-soft text-[0.72rem] uppercase tracking-wider">
-                <th className="text-left px-5 py-3 border-b border-line font-semibold">Member</th>
-                <th className="text-left px-5 py-3 border-b border-line font-semibold">Role</th>
-                <th className="text-right px-5 py-3 border-b border-line font-semibold">Contribution</th>
-                <th className="text-right px-5 py-3 border-b border-line font-semibold">Loan repay</th>
-                <th className="text-left px-5 py-3 border-b border-line font-semibold">Status</th>
-                <th className="text-right px-5 py-3 border-b border-line font-semibold"></th>
+              <tr className="text-[0.72rem] uppercase tracking-wider text-ink-soft">
+                <th className="border-b border-line px-5 py-3 text-left font-semibold">Member</th>
+                <th className="border-b border-line px-5 py-3 text-left font-semibold">Role</th>
+                <th className="border-b border-line px-5 py-3 text-right font-semibold">
+                  Contribution
+                </th>
+                <th className="border-b border-line px-5 py-3 text-right font-semibold">
+                  Loan repay
+                </th>
+                <th className="border-b border-line px-5 py-3 text-left font-semibold">Status</th>
+                <th className="border-b border-line px-5 py-3 text-right font-semibold"></th>
               </tr>
             </thead>
             <tbody>
@@ -476,55 +504,71 @@ export default function Statements() {
                 const { member, data } = r
                 const issuedFlag = isIssued(member.id)
                 return (
-                  <tr key={member.id} className="hover:bg-forest/[0.03] transition">
-                    <td className="px-5 py-3.5 border-b border-line">
+                  <tr key={member.id} className="transition hover:bg-forest/[0.03]">
+                    <td className="border-b border-line px-5 py-3.5">
                       <div className="flex items-center gap-3">
-                        <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold text-[0.72rem] shrink-0">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-forest to-emerald font-display text-[0.72rem] font-bold text-white">
                           {initials(member.name)}
                         </span>
                         <span className="min-w-0">
-                          <span className="block font-medium text-navy truncate">{member.name}</span>
-                          <span className="block text-[0.76rem] text-ink-soft truncate">{member.email}</span>
+                          <span className="block truncate font-medium text-navy">
+                            {member.name}
+                          </span>
+                          <span className="block truncate text-[0.76rem] text-ink-soft">
+                            {member.email}
+                          </span>
                         </span>
                       </div>
                     </td>
-                    <td className="px-5 py-3.5 border-b border-line text-ink-soft">{member.role}</td>
-                    <td className={`px-5 py-3.5 border-b border-line text-right font-mono ${
-                      data.paid > 0 ? 'text-forest font-semibold' : data.contribution > 0 ? 'text-red-600' : 'text-ink-soft'
-                    }`}>
-                      {data.contribution === 0 ? '—' : (data.paid > 0 ? `+ ${data.paid.toLocaleString()}` : '—')}
+                    <td className="border-b border-line px-5 py-3.5 text-ink-soft">
+                      {member.role}
                     </td>
-                    <td className="px-5 py-3.5 border-b border-line text-right font-mono text-navy">
-                      {data.loanRepay > 0 ? data.loanRepay.toLocaleString() : '—'}
+                    <td
+                      className={`border-b border-line px-5 py-3.5 text-right font-mono ${
+                        data.paid > 0
+                          ? 'font-semibold text-forest'
+                          : data.contribution > 0
+                            ? 'text-red-600'
+                            : 'text-ink-soft'
+                      }`}
+                    >
+                      {data.contribution === 0
+                        ? 'None'
+                        : data.paid > 0
+                          ? `+ ${data.paid.toLocaleString()}`
+                          : 'None'}
                     </td>
-                    <td className="px-5 py-3.5 border-b border-line">
+                    <td className="border-b border-line px-5 py-3.5 text-right font-mono text-navy">
+                      {data.loanRepay > 0 ? data.loanRepay.toLocaleString() : 'None'}
+                    </td>
+                    <td className="border-b border-line px-5 py-3.5">
                       {data.contribution === 0 ? (
-                        <span className="inline-block px-2.5 py-1 rounded-full text-[0.7rem] font-bold uppercase tracking-wide bg-paper text-ink-soft">
+                        <span className="inline-block rounded-full bg-paper px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-ink-soft">
                           No activity
                         </span>
                       ) : data.isPaid ? (
-                        <span className="inline-block px-2.5 py-1 rounded-full text-[0.7rem] font-bold uppercase tracking-wide bg-emerald/10 text-forest">
+                        <span className="inline-block rounded-full bg-emerald/10 px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-forest">
                           Paid
                         </span>
                       ) : (
-                        <span className="inline-block px-2.5 py-1 rounded-full text-[0.7rem] font-bold uppercase tracking-wide bg-red-50 text-red-700">
+                        <span className="inline-block rounded-full bg-red-50 px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide text-red-700">
                           Unpaid
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3.5 border-b border-line text-right">
+                    <td className="border-b border-line px-5 py-3.5 text-right">
                       <div className="inline-flex items-center gap-1.5">
                         {issuedFlag && (
                           <CheckCircle2
                             size={14}
                             strokeWidth={2}
-                            className="text-forest shrink-0"
+                            className="shrink-0 text-forest"
                             aria-label="Issued"
                           />
                         )}
                         <button
                           onClick={() => handlePrintOne(r)}
-                          className="inline-flex items-center gap-1.5 text-[0.82rem] font-semibold text-forest hover:text-forest-dark transition"
+                          className="inline-flex items-center gap-1.5 text-[0.82rem] font-semibold text-forest transition hover:text-forest-dark"
                         >
                           <Download size={14} strokeWidth={2} />
                           Download
@@ -551,23 +595,23 @@ export default function Statements() {
   )
 }
 
-
 function StatCard({ icon: Icon, label, value, sub, tone }) {
-  const toneClass = {
-    forest: 'bg-emerald/10 text-forest',
-    emerald: 'bg-emerald/10 text-emerald',
-    warn: 'bg-gold/15 text-[#8A6112]',
-  }[tone] || 'bg-emerald/10 text-forest'
+  const toneClass =
+    {
+      forest: 'bg-emerald/10 text-forest',
+      emerald: 'bg-emerald/10 text-emerald',
+      warn: 'bg-gold/15 text-[#8A6112]',
+    }[tone] || 'bg-emerald/10 text-forest'
 
   return (
-    <div className="bg-white border border-line rounded-2xl p-5">
+    <div className="rounded-2xl border border-line bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-[0.78rem] text-ink-soft font-medium">{label}</div>
-          <div className="font-display font-extrabold text-2xl text-navy mt-2">{value}</div>
-          <div className="text-[0.76rem] text-ink-soft mt-1">{sub}</div>
+          <div className="text-[0.78rem] font-medium text-ink-soft">{label}</div>
+          <div className="mt-2 font-display text-2xl font-extrabold text-navy">{value}</div>
+          <div className="mt-1 text-[0.76rem] text-ink-soft">{sub}</div>
         </div>
-        <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${toneClass}`}>
+        <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${toneClass}`}>
           <Icon size={17} strokeWidth={2} />
         </span>
       </div>

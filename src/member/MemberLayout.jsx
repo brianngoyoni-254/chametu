@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Outlet, Navigate, useLocation } from 'react-router-dom'
 import { LogOut, Bell, Menu } from 'lucide-react'
 import MemberSidebar from './MemberSidebar'
-import { getMemberSession, clearMemberSession, getChama } from '../lib/chametuStorage'
+import { getMemberSession, clearMemberSession, getMemberChama } from '../lib/chametuStorage'
 
 const TITLES = {
   '': 'Overview',
@@ -32,10 +32,10 @@ export default function MemberLayout() {
 
   if (!session) return <Navigate to="/" replace />
 
-  const chama = getChama()
+  const chama = getMemberChama(session)
   const segment = location.pathname.split('/member/')[1] || ''
   const title = TITLES[segment] || 'Overview'
-  const subtitle = SUBTITLES[segment] || `${chama.name} · member account`
+  const subtitle = SUBTITLES[segment] || `${chama.name} / member account`
 
   function logout() {
     clearMemberSession()

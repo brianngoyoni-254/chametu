@@ -29,7 +29,6 @@ export const DEMO_PEOPLE = [
 
 const PASSWORD = 'demo'
 
-/** Creates a full demo environment: chama + 4 role accounts + member records. */
 export function setupDemoChama() {
   try {
     localStorage.setItem(CHAMA_KEY, JSON.stringify(DEMO_CHAMA))
@@ -43,6 +42,7 @@ export function setupDemoChama() {
     role: p.role,
     portal: p.portal,
     chamaCode: DEMO_CHAMA.code,
+    chamaName: DEMO_CHAMA.name,       // ← needed for the new login
     createdAt: Date.now(),
   }))
   try {
@@ -60,6 +60,7 @@ export function setupDemoChama() {
     status: 'active',
     joinedAt: Date.now(),
     avatar: null,
+    chamaCode: DEMO_CHAMA.code,
   }))
   try {
     localStorage.setItem(MEMBERS_KEY, JSON.stringify(members))
@@ -76,7 +77,6 @@ export function setupDemoChama() {
   return { chama: DEMO_CHAMA, accounts, password: PASSWORD }
 }
 
-/** Wipes everything this app stores in the browser. */
 export function resetAll() {
   const keys = [
     ACCOUNTS_KEY,

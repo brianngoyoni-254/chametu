@@ -1,5 +1,9 @@
 import { Mail, Phone, User as UserIcon, Calendar, Shield, Info } from 'lucide-react'
-import { getMemberSession, getChama, getMembers } from '../lib/chametuStorage'
+import {
+  getMemberSession,
+  getMemberChama,
+  getMembers,
+} from '../lib/chametuStorage'
 
 function initials(name) {
   return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
@@ -7,12 +11,12 @@ function initials(name) {
 
 export default function MemberProfile() {
   const session = getMemberSession()
-  const chama = getChama()
+  const chama = getMemberChama(session)
   const record = getMembers().find((m) => m.id === session.id)
 
   const fields = [
-    { icon: Mail, label: 'Email', value: record?.email || '—' },
-    { icon: Phone, label: 'Phone', value: record?.phone || '—' },
+    { icon: Mail, label: 'Email', value: record?.email || '-' },
+    { icon: Phone, label: 'Phone', value: record?.phone || '-' },
     { icon: Shield, label: 'Role', value: session.role, capitalize: true },
     {
       icon: Calendar,
@@ -23,7 +27,7 @@ export default function MemberProfile() {
             month: 'short',
             year: 'numeric',
           })
-        : '—',
+        : '-',
     },
   ]
 
@@ -36,7 +40,6 @@ export default function MemberProfile() {
         </p>
       </div>
 
-      {/* Identity card */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-[#0A2A3E] to-[#0A3D46] p-6 text-white shadow-lg sm:p-7">
         <div
           className="pointer-events-none absolute inset-0"
@@ -55,13 +58,12 @@ export default function MemberProfile() {
             </h2>
             <p className="mt-0.5 flex items-center gap-1.5 text-[0.82rem] capitalize text-white/70">
               <Shield size={12} />
-              {session.role} · {chama.name}
+              {session.role} / {chama.name}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Details */}
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
         <h3 className="mb-4 flex items-center gap-2 font-display text-sm font-semibold text-navy">
           <UserIcon size={14} className="text-ink-soft" />
@@ -96,8 +98,9 @@ export default function MemberProfile() {
       <div className="flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-4 py-3 text-[0.8rem] text-navy ring-1 ring-emerald/10">
         <Info size={15} className="mt-0.5 flex-none text-forest" />
         <span>
-          Need to update your name, email or phone? Contact your chama's treasurer or chairperson —
-          member profile edits are reviewed to keep group records accurate.
+          Need to update your name, email or phone? Contact your chama's treasurer
+          or chairperson. Member profile edits are reviewed to keep group records
+          accurate.
         </span>
       </div>
     </div>

@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   Sun, Moon, Eye, EyeOff, Check, Mail, Lock, User,
-  Building2, Phone, Hash, Gift, Smartphone, Vote, Star, Sparkles,
-  Crown, Wallet, FileText, User as UserIcon, ArrowLeft,
+  Building2, Phone, Gift, Smartphone, Vote, Star, Sparkles,
+  ArrowLeft, Crown, ShieldCheck,
 } from 'lucide-react'
-import { toast } from 'sonner'
-import { useAuth } from '../context/AuthContext'
 import { useChama } from '../context/ChamaContext'
 import { useTier } from '../context/TierContext'
-import { setMemberSession, getChama } from '../lib/chametuStorage'
 import { TIERS, ORDER } from '../lib/tiers'
 import logo from '../assets/logos.png'
 
@@ -21,46 +18,31 @@ const PLAN_META = {
 }
 
 const BENEFITS = [
-  { Icon: Smartphone, text: 'Members pay by Paybill or STK Push and the dashboard updates for everyone' },
-  { Icon: Vote,       text: 'Loan requests approved by member vote, with clear repayment tracking' },
-  { Icon: Star,       text: 'Earn Chametu Points for paying on time and redeem digital perks' },
+  { Icon: Smartphone, text: 'Members pay by Paybill or STK Push — the dashboard updates for everyone' },
+  { Icon: Vote,       text: 'Loan requests approved by member vote with clear repayment tracking' },
+  { Icon: Star,       text: 'Earn Chametu Points for on-time payments and redeem digital perks' },
 ]
 
-const JOIN_ROLES = [
-  { value: 'Treasurer', label: 'Treasurer', icon: Wallet,  tint: 'from-gold to-[#E8A21F]',  desc: 'Handles money & reconciliations' },
-  { value: 'Secretary', label: 'Secretary', icon: FileText, tint: 'from-navy to-[#0A2A3E]',  desc: 'Minutes, records & notices' },
-  { value: 'Member',    label: 'Member',    icon: UserIcon, tint: 'from-emerald to-[#0A7A5A]', desc: 'Full member account' },
-]
-
-function isValidEmail(v) { return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) }
-function isValidPhone(v) { return /^0[17]\d{8}$/.test(v.replace(/\s/g, '')) }
-function isValidCode(v)  { return /^CHM-[A-Z0-9]{4,}$/.test((v || '').trim().toUpperCase()) }
+const isValidEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
+const isValidPhone = (v) => /^0[17]\d{8}$/.test(v.replace(/\s/g, ''))
 
 export default function Register() {
-  const { register } = useAuth()
   const { joinChamaWithUser } = useChama()
-  const { setBaseTier, startTrial } = useTier()
   const navigate = useNavigate()
-  const location = useLocation()
 
-  const params = new URLSearchParams(location.search)
-  const initialMode = params.get('mode') === 'join' ? 'join' : 'create'
-  const initialRole = params.get('role') || 'Treasurer'
-
-  const [mode, setMode] = useState(initialMode)
-  const [joinRole, setJoinRole] = useState(initialRole)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [chamaName, setChamaName] = useState('')
   const [phone, setPhone] = useState('')
-  const [code, setCode] = useState('')
   const [selectedTier, setSelectedTier] = useState('Growth')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => { setError('') }, [mode])
+  useEffect(() => {
+    setError('')
+  }, [])
 
   const pwStrength = (() => {
     const v = password
@@ -74,71 +56,11 @@ export default function Register() {
   })()
 
   const submit = async (e) => {
-    e?.preventDefault()
+    e.preventDefault()
     setError('')
-
     if (name.trim().length < 2) return setError('Enter your full name.')
     if (!isValidEmail(email)) return setError('Enter a valid email address.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
-
-    /* ---------------- JOIN ---------------- */
-    if (mode === 'join') {
-      const trimmedCode = code.trim().toUpperCase()
-      if (!isValidCode(trimmedCode)) return setError('Enter the chama code, e.g. CHM-AB12CD.')
-
-      const existingChama = getChama()
-      if (!existingChama || !existingChama.code) {
-        return setError(
-          'No chama exists on this device yet. Ask your chairman to create it first.'
-        )
-      }
-      if (existingChama.code.toUpperCase() !== trimmedCode) {
-        return setError("That chama code doesn't match any chama on this device.")
-      }
-
-      setBusy(true)
-      try {
-        await register({
-          name,
-          email,
-          password,
-          role: joinRole,
-          chamaCode: trimmedCode,
-        })
-
-        // Add them to the chama's member list too
-        try {
-          joinChamaWithUser({ name, email, code: trimmedCode })
-        } catch {}
-
-        // If it's a member, wire the member-portal session
-        if (joinRole === 'Member') {
-          try {
-            setMemberSession({
-              id: 'm_' + Date.now(),
-              name: name.trim(),
-              email: email.trim().toLowerCase(),
-              role: 'Member',
-              chamaCode: trimmedCode,
-              joinedAt: Date.now(),
-            })
-          } catch {}
-          toast.success(`Welcome to ${existingChama.name}, ${name.split(' ')[0]}!`)
-          navigate('/member', { replace: true })
-          return
-        }
-
-        toast.success(`Welcome, ${joinRole} ${name.split(' ')[0]}!`)
-        navigate('/dashboard', { replace: true })
-      } catch (err) {
-        setError(err?.message || 'Could not join the chama.')
-      } finally {
-        setBusy(false)
-      }
-      return
-    }
-
-    /* ---------------- CREATE ---------------- */
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
     if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number.')
 
@@ -163,9 +85,9 @@ export default function Register() {
   const selectedPlan = TIERS[selectedTier]
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-paper hero:grid-cols-[minmax(340px,5fr)_7fr]">
+    <div className="grid min-h-screen grid-cols-1 bg-paper lg:grid-cols-[minmax(340px,5fr)_7fr]">
       {/* Left panel */}
-      <aside className="relative flex flex-col gap-4 overflow-hidden bg-navy p-7 text-white hero:sticky hero:top-0 hero:h-screen hero:gap-7 hero:p-11">
+      <aside className="relative flex flex-col gap-4 overflow-hidden bg-navy p-7 text-white lg:sticky lg:top-0 lg:h-screen lg:gap-7 lg:p-11">
         <div
           className="pointer-events-none absolute inset-0"
           style={{
@@ -178,50 +100,32 @@ export default function Register() {
           <span className="font-display text-[1.15rem] font-bold">Chametu</span>
         </Link>
 
-        <h2 className="relative max-w-[15ch] font-display text-[1.4rem] font-bold leading-[1.15] tracking-tight hero:text-[clamp(1.7rem,2.6vw,2.4rem)]">
-          {mode === 'create' ? (
-            <>Run your chama with <em className="not-italic text-gold">total clarity</em></>
-          ) : (
-            <>Join your chama in <em className="not-italic text-gold">under a minute</em></>
-          )}
+        <h2 className="relative max-w-[15ch] font-display text-[1.4rem] font-bold leading-[1.15] tracking-tight lg:text-[clamp(1.7rem,2.6vw,2.4rem)]">
+          Start your chama with{' '}
+          <em className="not-italic text-gold">total clarity</em>
         </h2>
 
-        <p className="relative hidden max-w-[38ch] leading-relaxed text-white/75 hero:block">
-          {mode === 'create'
-            ? 'Contributions, loans and payouts in one place, matched automatically from M-Pesa.'
-            : 'Enter the code your chairman shared and pick your role.'}
+        <p className="relative hidden max-w-[38ch] leading-relaxed text-white/75 lg:block">
+          You'll be the chairman. Invite your treasurer, secretary and members once
+          you're set up.
         </p>
 
-        {mode === 'create' && (
-          <ul className="relative m-0 hidden list-none gap-3 p-0 hero:grid">
-            {BENEFITS.map(({ Icon, text }) => (
-              <li key={text} className="flex items-start gap-3 text-[0.92rem] text-white/90">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.12]">
-                  <Icon size={14} strokeWidth={2} />
-                </span>
-                <span>{text}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="relative m-0 hidden list-none gap-3 p-0 lg:grid">
+          {BENEFITS.map(({ Icon, text }) => (
+            <li key={text} className="flex items-start gap-3 text-[0.92rem] text-white/90">
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.12]">
+                <Icon size={14} strokeWidth={2} />
+              </span>
+              <span>{text}</span>
+            </li>
+          ))}
+        </ul>
 
-        {mode === 'join' && (
-          <div className="relative hidden rounded-2xl border border-white/20 bg-white/[0.08] p-5 backdrop-blur hero:block">
-            <div className="text-[0.68rem] uppercase tracking-widest text-white/60">
-              Joining as
-            </div>
-            <div className="mt-2 font-display text-xl font-bold text-white">{joinRole}</div>
-            <p className="mt-2 text-[0.82rem] leading-relaxed text-white/70">
-              You'll get access to the right parts of your chama as soon as you sign in.
-            </p>
-          </div>
-        )}
-
-        <div className="relative mt-auto hidden items-start gap-2.5 rounded-2xl border border-white/20 bg-white/[0.07] p-4 text-[0.88rem] leading-relaxed hero:flex">
+        <div className="relative mt-auto hidden items-start gap-2.5 rounded-2xl border border-white/20 bg-white/[0.07] p-4 text-[0.88rem] leading-relaxed lg:flex">
           <Gift size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-gold" />
           <span>
-            <b className="text-gold">14 days free</b> with every plan. You get Gold features during
-            the trial.
+            <b className="text-gold">14 days free</b> with every plan. You get Gold
+            features during the trial.
           </span>
         </div>
       </aside>
@@ -235,57 +139,32 @@ export default function Register() {
               className="inline-flex items-center gap-1.5 font-semibold text-forest hover:underline"
             >
               <ArrowLeft size={14} strokeWidth={2} />
-              Back to log in
+              Back to login
             </Link>
             <ThemeToggle />
           </div>
 
-          <h1 className="font-display text-[2rem] font-bold tracking-tight text-navy">
-            {mode === 'create' ? 'Create your chama' : `Join as ${joinRole}`}
-          </h1>
-          <p className="mb-5 mt-2 leading-relaxed text-ink-soft">
-            {mode === 'create'
-              ? 'Pick a plan and start your chama. First 14 days are on us (Gold features).'
-              : 'Enter your details and the chama code from your chairman.'}
-          </p>
-
-          {/* Mode toggle */}
-          <div className="relative mb-5 grid grid-cols-2 rounded-2xl border border-line bg-white p-1.5">
-            <span
-              className={`absolute bottom-1.5 top-1.5 w-[calc(50%-6px)] rounded-xl bg-emerald/15 transition-transform ${
-                mode === 'join' ? 'translate-x-[calc(100%+6px)]' : 'translate-x-0'
-              }`}
-              aria-hidden="true"
-            />
-            <button
-              type="button"
-              onClick={() => setMode('create')}
-              className={`relative z-10 rounded-xl border-0 bg-transparent py-3 text-[0.92rem] font-semibold transition ${
-                mode === 'create' ? 'text-forest' : 'text-ink-soft'
-              }`}
-            >
-              <Crown size={14} className="mr-1.5 inline" />
-              Create chama
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('join')}
-              className={`relative z-10 rounded-xl border-0 bg-transparent py-3 text-[0.92rem] font-semibold transition ${
-                mode === 'join' ? 'text-forest' : 'text-ink-soft'
-              }`}
-            >
-              <Hash size={14} className="mr-1.5 inline" />
-              Join with code
-            </button>
+          {/* Chairman badge */}
+          <div className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-widest text-[#8A6417]">
+            <Crown size={11} />
+            Chairman signup
           </div>
 
+          <h1 className="mt-4 font-display text-[2rem] font-bold tracking-tight text-navy">
+            Create your chama
+          </h1>
+          <p className="mb-5 mt-2 leading-relaxed text-ink-soft">
+            You'll be set up as the chama's chairman. First 14 days are on us —
+            Gold features included.
+          </p>
+
           <form onSubmit={submit}>
-            <Field label="Full name">
+            <Field label="Your full name">
               <IconInput
                 icon={<User size={18} strokeWidth={1.8} />}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Anne Wanjiku"
+                placeholder="e.g. Daniel Muthui"
                 autoComplete="name"
               />
             </Field>
@@ -338,144 +217,83 @@ export default function Register() {
               </div>
             </Field>
 
-            {mode === 'create' ? (
-              <>
-                <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-                  <Field label="Chama name">
-                    <IconInput
-                      icon={<Building2 size={18} strokeWidth={1.8} />}
-                      value={chamaName}
-                      onChange={(e) => setChamaName(e.target.value)}
-                      placeholder="e.g. Umoja Investment Chama"
-                    />
-                  </Field>
-                  <Field label="M-Pesa phone">
-                    <IconInput
-                      inputMode="tel"
-                      icon={<Phone size={18} strokeWidth={1.8} />}
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0712345678"
-                    />
-                  </Field>
-                </div>
+            <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+              <Field label="Chama name">
+                <IconInput
+                  icon={<Building2 size={18} strokeWidth={1.8} />}
+                  value={chamaName}
+                  onChange={(e) => setChamaName(e.target.value)}
+                  placeholder="e.g. Umoja Investment Chama"
+                />
+              </Field>
+              <Field label="M-Pesa phone">
+                <IconInput
+                  inputMode="tel"
+                  icon={<Phone size={18} strokeWidth={1.8} />}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="0712345678"
+                />
+              </Field>
+            </div>
 
-                <div className="mb-3.5 mt-7 flex items-center justify-between">
-                  <b className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-ink-soft">
-                    Choose your plan
-                  </b>
-                  <span className="text-[0.76rem] text-ink-soft">
-                    Change anytime · 14 days free
-                  </span>
-                </div>
+            <div className="mb-3.5 mt-7 flex items-center justify-between">
+              <b className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-ink-soft">
+                Choose your plan
+              </b>
+              <span className="text-[0.76rem] text-ink-soft">
+                Change anytime · 14 days free
+              </span>
+            </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {ORDER.map((tierName) => (
-                    <PlanCard
-                      key={tierName}
-                      tierName={tierName}
-                      tier={TIERS[tierName]}
-                      meta={PLAN_META[tierName]}
-                      selected={selectedTier === tierName}
-                      onSelect={() => setSelectedTier(tierName)}
-                    />
-                  ))}
-                </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {ORDER.map((tierName) => (
+                <PlanCard
+                  key={tierName}
+                  tierName={tierName}
+                  tier={TIERS[tierName]}
+                  meta={PLAN_META[tierName]}
+                  selected={selectedTier === tierName}
+                  onSelect={() => setSelectedTier(tierName)}
+                />
+              ))}
+            </div>
 
-                <div className="mb-4 mt-4 flex items-center justify-between rounded-2xl border border-dashed border-line bg-white px-4 py-3.5 text-[0.86rem]">
-                  <div>
-                    <b>Due today</b>
-                    <br />
-                    <span className="text-ink-soft">
-                      14-day free trial, then KSh {selectedPlan.price.toLocaleString()}/mo
-                    </span>
-                  </div>
-                  <b className="font-mono text-[1.25rem] text-navy">KSh 0</b>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Role selector */}
-                <div className="mb-3.5">
-                  <div className="mb-1.5 text-[0.8rem] font-semibold text-navy">
-                    Your role in the chama
-                  </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    {JOIN_ROLES.map((r) => {
-                      const active = joinRole === r.value
-                      return (
-                        <button
-                          key={r.value}
-                          type="button"
-                          onClick={() => setJoinRole(r.value)}
-                          className={`flex flex-col items-start gap-1.5 rounded-xl border-[1.5px] px-3 py-3 text-left transition ${
-                            active
-                              ? 'border-forest bg-forest/[0.06] shadow-sm'
-                              : 'border-line bg-white hover:border-forest/50'
-                          }`}
-                        >
-                          <span
-                            className={`grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br ${r.tint} text-white shadow-sm`}
-                          >
-                            <r.icon size={13} strokeWidth={2} />
-                          </span>
-                          <div>
-                            <div
-                              className={`text-[0.82rem] font-semibold ${
-                                active ? 'text-forest' : 'text-navy'
-                              }`}
-                            >
-                              {r.label}
-                            </div>
-                            <div className="mt-0.5 text-[0.64rem] leading-tight text-ink-soft">
-                              {r.desc}
-                            </div>
-                          </div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                <Field label="Chama code">
-                  <IconInput
-                    icon={<Hash size={18} strokeWidth={1.8} />}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
-                    placeholder="CHM-XXXXXX"
-                    className="font-mono"
-                  />
-                  <p className="mt-2 text-[0.76rem] text-ink-soft">
-                    Ask your chairman for this code — it's the same one they created the chama with.
-                  </p>
-                </Field>
-              </>
-            )}
+            <div className="mb-4 mt-4 flex items-center justify-between rounded-2xl border border-dashed border-line bg-white px-4 py-3.5 text-[0.86rem]">
+              <div>
+                <b>Due today</b>
+                <br />
+                <span className="text-ink-soft">
+                  14-day free trial, then KSh {selectedPlan.price.toLocaleString()}/mo
+                </span>
+              </div>
+              <b className="font-mono text-[1.25rem] text-navy">KSh 0</b>
+            </div>
 
             <button
               type="submit"
               disabled={busy}
               className="mt-2 w-full cursor-pointer rounded-2xl border-0 bg-gradient-to-br from-forest to-emerald py-4 font-display text-base font-bold text-white shadow-[0_10px_24px_rgba(11,122,90,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:transform-none disabled:opacity-55"
             >
-              {busy
-                ? 'Creating…'
-                : mode === 'join'
-                  ? `Join as ${joinRole}`
-                  : `Continue to payment · ${selectedTier}`}
+              {busy ? 'Creating…' : `Continue to payment · ${selectedTier}`}
             </button>
 
             {error && (
               <div
                 role="alert"
-                className="mt-4 min-h-[1.2em] rounded-xl bg-red-50 px-3.5 py-2.5 text-center text-[0.84rem] text-red-600"
+                className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-center text-[0.84rem] text-red-600"
               >
                 {error}
               </div>
             )}
 
-            <p className="mt-3 text-center text-[0.76rem] leading-relaxed text-ink-soft">
-              By continuing you agree to the Terms and Privacy Policy.
-            </p>
+            <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-3.5 py-3 text-[0.76rem] leading-relaxed text-navy ring-1 ring-emerald/10">
+              <ShieldCheck size={14} className="mt-0.5 flex-none text-forest" />
+              <span>
+                <b>Not the chairman?</b> Your chairman creates your account and sends
+                you an invite link. Ask them to invite you.
+              </span>
+            </div>
           </form>
         </div>
       </main>
@@ -496,7 +314,9 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
           : 'border border-line bg-white hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(11,31,51,0.12)]'
       }`}
       style={
-        selected ? { background: 'linear-gradient(155deg, #0B1F33, #0A3D46)' } : undefined
+        selected
+          ? { background: 'linear-gradient(155deg, #0B1F33, #0A3D46)' }
+          : undefined
       }
     >
       {meta.popular && (
@@ -589,7 +409,9 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
 function Field({ label, children }) {
   return (
     <div className="mb-3.5">
-      <label className="mb-1.5 block text-[0.8rem] font-semibold text-navy">{label}</label>
+      <label className="mb-1.5 block text-[0.8rem] font-semibold text-navy">
+        {label}
+      </label>
       {children}
     </div>
   )
