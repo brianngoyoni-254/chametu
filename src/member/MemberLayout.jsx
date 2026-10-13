@@ -47,7 +47,7 @@ export default function MemberLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F9FB] lg:flex">
+    <div className="min-h-screen bg-paper lg:flex">
       <MemberSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -55,11 +55,11 @@ export default function MemberLayout() {
       />
 
       <main className="min-w-0 flex-1">
-        <div className="sticky top-0 z-30 border-b border-line/80 bg-white/85 backdrop-blur-xl">
+        <div className="sticky top-0 z-30 border-b border-line/80 bg-paper/85 backdrop-blur-xl">
           <div className="flex items-center gap-4 px-4 py-3.5 sm:px-6">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-line bg-white text-navy transition hover:border-forest hover:bg-forest/[0.04] lg:hidden"
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-line bg-card text-navy transition hover:border-forest hover:bg-forest/[0.04] lg:hidden"
               aria-label="Open menu"
             >
               <Menu size={16} />
@@ -73,13 +73,13 @@ export default function MemberLayout() {
             </div>
 
             <button
-              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-line bg-white text-ink-soft transition hover:border-forest hover:text-navy sm:flex"
+              className="hidden h-9 w-9 items-center justify-center rounded-xl border border-line bg-card text-ink-soft transition hover:border-forest hover:text-navy sm:flex"
               aria-label="Notifications"
             >
               <Bell size={15} />
             </button>
 
-            <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-white py-1.5 pl-1.5 pr-3">
+            <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-card py-1.5 pl-1.5 pr-3">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald font-display text-[0.7rem] font-bold text-white shadow-sm">
                 {initials(session.name)}
               </span>
@@ -93,7 +93,7 @@ export default function MemberLayout() {
               </div>
               <button
                 onClick={logout}
-                className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[0.68rem] font-semibold text-ink-soft transition hover:bg-red-50 hover:text-red-600"
+                className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[0.68rem] font-semibold text-ink-soft transition hover:bg-red-500/10 hover:text-red-600"
               >
                 <LogOut size={12} />
                 <span className="hidden sm:inline">Log out</span>

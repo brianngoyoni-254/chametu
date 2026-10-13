@@ -43,8 +43,16 @@ export default function MemberSidebar({ open, onClose, chamaName }) {
         />
       )}
 
+      {/*
+        Sidebar is a brand element — always dark, in both light and dark
+        themes. That's why the gradient uses a hardcoded #0B1F33 instead of
+        the themeable `from-navy` (which flips to a light colour in dark
+        mode). Everything inside the sidebar (text-white/*, bg-emerald/25,
+        bg-white/[0.06], etc.) is likewise hardcoded and does not respond
+        to the theme.
+      */}
       <aside
-        className={`fixed z-50 flex h-screen w-[272px] flex-col overflow-y-auto bg-gradient-to-b from-navy via-[#0A2A3E] to-[#08222A] p-4 text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${
+        className={`fixed z-50 flex h-screen w-[272px] flex-col overflow-y-auto bg-gradient-to-b from-[#0B1F33] via-[#0A2A3E] to-[#08222A] p-4 text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

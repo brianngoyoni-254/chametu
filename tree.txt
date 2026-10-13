@@ -8,7 +8,10 @@ src/
 |-- auth
 |   |-- ForgotPassword.jsx
 |   |-- Login.jsx
-|   `-- Register.jsx
+|   |-- MemberJoin.jsx
+|   |-- Payment.jsx
+|   |-- Register.jsx
+|   `-- ResetPassword.jsx
 |-- components
 |   |-- Badge.jsx
 |   |-- Button.jsx
@@ -18,27 +21,37 @@ src/
 |   `-- StatCard.jsx
 |-- context
 |   |-- AuthContext.jsx
+|   |-- ChamaContext.jsx
 |   |-- PointsContext.jsx
 |   `-- TierContext.jsx
 |-- dashboard
 |   |-- DashboardLayout.jsx
+|   |-- ProfileModal.jsx
 |   |-- Sidebar.jsx
 |   |-- Topbar.jsx
 |   `-- admin
 |       |-- Assets.jsx
 |       |-- Contributions.jsx
+|       |-- InviteMembers.jsx
 |       |-- Loans.jsx
 |       |-- Meetings.jsx
 |       |-- Members.jsx
 |       |-- MyChama.jsx
+|       |-- NoAccess.jsx
 |       |-- Overview.jsx
+|       |-- Payments.jsx
+|       |-- Payouts.jsx
 |       |-- Portfolio.jsx
 |       |-- Reports.jsx
 |       |-- RolesPermissions.jsx
 |       |-- Savings.jsx
+|       |-- Statements.jsx
 |       |-- Transactions.jsx
+|       |-- Upgrade.jsx
 |       |-- Voting.jsx
-|       `-- Welfare.jsx
+|       |-- Welfare.jsx
+|       `-- data
+|           `-- adminData.js
 |-- home
 |   |-- CtaBand.jsx
 |   |-- Edge.jsx
@@ -50,15 +63,36 @@ src/
 |   |-- HowRewardsWork.jsx
 |   |-- Join.jsx
 |   |-- Navbar.jsx
+|   |-- Reveal.jsx
 |   |-- Rewards.jsx
+|   |-- ScrollToTop.jsx
 |   |-- Security.jsx
 |   `-- TrustBar.jsx
 |-- index.css
 |-- lib
 |   |-- catalog.js
+|   |-- chametuShared.js
+|   |-- chametuStorage.js
+|   |-- permissions.js
 |   |-- pointsStore.js
+|   |-- setupDemo.js
 |   `-- tiers.js
 |-- main.jsx
+|-- member
+|   |-- DemoMemberEntry.jsx
+|   |-- MemberAssets.jsx
+|   |-- MemberContributions.jsx
+|   |-- MemberLayout.jsx
+|   |-- MemberLoans.jsx
+|   |-- MemberMeetings.jsx
+|   |-- MemberOverview.jsx
+|   |-- MemberProfile.jsx
+|   |-- MemberRotation.jsx
+|   |-- MemberSavings.jsx
+|   |-- MemberSidebar.jsx
+|   |-- MemberTransactions.jsx
+|   |-- MemberVoting.jsx
+|   `-- MemberWelfare.jsx
 |-- rewards
 |   |-- Points.jsx
 |   |-- Rewards.jsx
@@ -69,8 +103,10 @@ src/
 |       `-- PerkCard.jsx
 |-- routes
 |   |-- AppRoutes.jsx
-|   `-- ProtectedRoute.jsx
+|   |-- ProtectedRoute.jsx
+|   |-- RequirePermission.jsx
+|   `-- RequireTier.jsx
 `-- utils
     `-- formatCurrency.js
 
-13 directories, 61 files
+15 directories, 95 files

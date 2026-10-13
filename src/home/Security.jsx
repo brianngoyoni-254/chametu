@@ -17,7 +17,14 @@ export default function Security() {
   return (
     <section id="security" className="py-16">
       <div className="wrap">
-        <Reveal className="relative overflow-hidden rounded-[14px] bg-navy px-6 py-8 text-white sm:rounded-[20px] sm:px-11 sm:py-12">
+        {/*
+          Security panel is a fixed "product highlight" surface — the
+          audit-trail preview is designed as light text on dark navy and
+          should look the same in both themes. Hardcoded #0B1F33 keeps it
+          dark; using `bg-navy` would flip it to light in dark mode and
+          hide the pale content.
+        */}
+        <Reveal className="relative overflow-hidden rounded-[14px] bg-[#0B1F33] px-6 py-8 text-white sm:rounded-[20px] sm:px-11 sm:py-12">
           <div className="pointer-events-none absolute -bottom-[70px] -right-[70px] h-60 w-60 rounded-full bg-[rgba(18,166,106,.18)]" />
 
           <div className="relative grid grid-cols-1 items-center gap-[26px] nav:grid-cols-2 nav:gap-10">
