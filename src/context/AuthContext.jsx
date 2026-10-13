@@ -1,90 +1,156 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useContext, useState } from 'react'
+
+const ACCOUNTS_KEY = 'chametu_accounts_v1'
+const SESSION_KEY = 'chametu_auth_session_v1'
 
 const AuthContext = createContext(null)
 
-const STORAGE_KEY = 'auth_user'
+const ADMIN_ROLES = ['Chairman', 'Treasurer', 'Secretary']
 
-function readStoredUser() {
+export function portalForRole(role) {
+  return ADMIN_ROLES.includes(role) ? 'admin' : 'member'
+}
+
+/* ---------- storage ---------- */
+
+function readAccounts() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(ACCOUNTS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+function writeAccounts(list) {
+  try {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list))
+  } catch {}
+}
+function readSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
   }
 }
+function writeSession(s) {
+  try {
+    if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s))
+    else localStorage.removeItem(SESSION_KEY)
+  } catch {}
+}
+
+/* ---------- provider ---------- */
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState(() => readSession())
+  const [loading, setLoading] = useState(false)
 
-  // Restore session on first load
-  useEffect(() => {
-    // TODO(backend): replace with GET /auth/me using the stored token
-    setUser(readStoredUser())
-    setLoading(false)
-  }, [])
-
-  const persist = useCallback((nextUser) => {
-    setUser(nextUser)
+  const login = async ({ email, password }) => {
+    setLoading(true)
     try {
-      if (nextUser) localStorage.setItem(STORAGE_KEY, JSON.stringify(nextUser))
-      else localStorage.removeItem(STORAGE_KEY)
-    } catch {
-      // storage unavailable — keep in-memory state only
+      await new Promise((r) => setTimeout(r, 300))
+      const target = (email || '').trim().toLowerCase()
+      const accounts = readAccounts()
+      const found = accounts.find((a) => a.email.toLowerCase() === target)
+
+      if (!found) {
+        throw new Error(
+          'No account found with that email. Ask your chairman for an invite, or create your own chama.'
+        )
+      }
+      if (found.password && password && found.password !== password) {
+        throw new Error('Incorrect password.')
+      }
+
+      const session = {
+        id: found.id,
+        name: found.name,
+        email: found.email,
+        role: found.role,
+        portal: found.portal || portalForRole(found.role),
+        chamaCode: found.chamaCode || null,
+      }
+      writeSession(session)
+      setUser(session)
+      return session
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }
 
-  const login = useCallback(
-    async ({ email, password }) => {
-      // TODO(backend): POST /auth/login { email, password } -> { user, token }
-      // Placeholder only: accepts any credentials so the UI can be built.
-      const nextUser = { id: 'local-dev', email, name: email.split('@')[0] }
-      persist(nextUser)
-      return nextUser
-    },
-    [persist]
-  )
+  const register = async ({ name, email, password, role = 'Chairman', chamaCode = null }) => {
+    const target = (email || '').trim().toLowerCase()
+    const accounts = readAccounts()
+    const existing = accounts.find((a) => a.email.toLowerCase() === target)
+    if (existing) throw new Error('An account with that email already exists. Try logging in.')
 
-  const register = useCallback(
-    async ({ name, email, password }) => {
-      // TODO(backend): POST /auth/register { name, email, password } -> { user, token }
-      const nextUser = { id: 'local-dev', email, name: name || email.split('@')[0] }
-      persist(nextUser)
-      return nextUser
-    },
-    [persist]
-  )
+    const account = {
+      id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      name: (name || '').trim(),
+      email: target,
+      password,
+      role,
+      portal: portalForRole(role),
+      chamaCode,
+      createdAt: Date.now(),
+    }
+    writeAccounts([...accounts, account])
 
-  const logout = useCallback(async () => {
-    // TODO(backend): POST /auth/logout (invalidate token / clear cookie)
-    persist(null)
-  }, [persist])
+    const session = {
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      role: account.role,
+      portal: account.portal,
+      chamaCode: account.chamaCode,
+    }
+    writeSession(session)
+    setUser(session)
+    return session
+  }
 
-  const forgotPassword = useCallback(async (email) => {
-    // TODO(backend): POST /auth/forgot-password { email }
-    return { ok: true, email }
-  }, [])
+  const logout = () => {
+    writeSession(null)
+    setUser(null)
+  }
 
-  const value = useMemo(
-    () => ({
-      user,
-      loading,
-      isAuthenticated: Boolean(user),
-      login,
-      register,
-      logout,
-      forgotPassword,
-    }),
-    [user, loading, login, register, logout, forgotPassword]
-  )
+  const listAccounts = () => readAccounts()
+
+  const findAccount = (email) => {
+    const target = (email || '').trim().toLowerCase()
+    return readAccounts().find((a) => a.email.toLowerCase() === target) || null
+  }
+
+  const deleteAccount = (id) => {
+    writeAccounts(readAccounts().filter((a) => a.id !== id))
+  }
+
+  const clearAllAccounts = () => {
+    writeAccounts([])
+    writeSession(null)
+    setUser(null)
+  }
+
+  const value = {
+    user,
+    isAuthenticated: !!user,
+    loading,
+    login,
+    register,
+    logout,
+    listAccounts,
+    findAccount,
+    deleteAccount,
+    clearAllAccounts,
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
+  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
   return ctx
 }
-
-export default AuthContext

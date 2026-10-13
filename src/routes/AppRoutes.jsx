@@ -7,10 +7,9 @@ import ForgotPassword from '../auth/ForgotPassword'
 import ResetPassword from '../auth/ResetPassword'
 import Payment from '../auth/Payment'
 import HowRewardsWork from '../home/HowRewardsWork'
+import MemberJoin from '../auth/MemberJoin'
 
 import ProtectedRoute from './ProtectedRoute'
-import RequirePermission from './RequirePermission'
-import RequireTier from './RequireTier'
 import DashboardLayout from '../dashboard/DashboardLayout'
 
 import Rewards from '../rewards/Rewards'
@@ -41,13 +40,30 @@ import Voting from '../dashboard/admin/Voting'
 
 // People & Reports
 import Members from '../dashboard/admin/Members'
-import RolesPermissions from '../dashboard/admin/RolesPermissions'
 import Statements from '../dashboard/admin/Statements'
 import Reports from '../dashboard/admin/Reports'
 
-// Utility
-import NoAccess from '../dashboard/admin/NoAccess'
-import Upgrade from '../dashboard/admin/Upgrade'
+// Member account
+import MemberLayout from '../member/MemberLayout'
+import MemberOverview from '../member/MemberOverview'
+import MemberLoans from '../member/MemberLoans'
+import MemberContributions from '../member/MemberContributions'
+import MemberSavings from '../member/MemberSavings'
+import MemberWelfare from '../member/MemberWelfare'
+import MemberTransactions from '../member/MemberTransactions'
+import MemberProfile from '../member/MemberProfile'
+import MemberAssets from '../member/MemberAssets'
+import MemberMeetings from '../member/MemberMeetings'
+import MemberRotation from '../member/MemberRotation'
+import MemberVoting from '../member/MemberVoting'
+import DemoMemberEntry from '../member/DemoMemberEntry'
+
+const Soon = ({ title }) => (
+  <div className="mx-auto max-w-[1180px]">
+    <h1 className="font-display text-2xl font-bold text-navy">{title}</h1>
+    <p className="mt-2 text-ink-soft">Coming soon.</p>
+  </div>
+)
 
 export default function AppRoutes() {
   return (
@@ -56,56 +72,62 @@ export default function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/payment" element={<Payment />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/payment" element={<Payment />} />
       <Route path="/rewards/how-it-works" element={<HowRewardsWork />} />
 
-      {/* Protected */}
+      {/* Member invite link */}
+      <Route path="/join/:chamaCode/:token" element={<MemberJoin />} />
+
+      {/* Local preview */}
+      <Route path="/demo/member" element={<DemoMemberEntry />} />
+
+      {/* Admin — protected */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
-          {/* Utility pages (outside guards so they can render regardless) */}
-          <Route path="/dashboard/no-access" element={<NoAccess />} />
-          <Route path="/dashboard/upgrade" element={<Upgrade />} />
-
-          {/* Main — open to any authenticated member */}
           <Route path="/dashboard" element={<Overview />} />
+          <Route path="/dashboard/invite" element={<InviteMembers />} />
           <Route path="/dashboard/chama" element={<MyChama />} />
 
-          {/* Permission-gated area */}
-          <Route element={<RequirePermission />}>
-            <Route path="/dashboard/invite" element={<InviteMembers />} />
+          <Route path="/dashboard/payments" element={<Payments />} />
+          <Route path="/dashboard/transactions" element={<Transactions />} />
+          <Route path="/dashboard/contributions" element={<Contributions />} />
+          <Route path="/dashboard/savings" element={<Savings />} />
+          <Route path="/dashboard/loans" element={<Loans />} />
+          <Route path="/dashboard/welfare" element={<Welfare />} />
 
-            {/* Finance — no tier requirement */}
-            <Route path="/dashboard/payments" element={<Payments />} />
-            <Route path="/dashboard/transactions" element={<Transactions />} />
-            <Route path="/dashboard/contributions" element={<Contributions />} />
-            <Route path="/dashboard/savings" element={<Savings />} />
-            <Route path="/dashboard/loans" element={<Loans />} />
-            <Route path="/dashboard/welfare" element={<Welfare />} />
+          <Route path="/dashboard/portfolio" element={<Portfolio />} />
+          <Route path="/dashboard/assets" element={<Assets />} />
 
-            {/* People */}
-            <Route path="/dashboard/members" element={<Members />} />
+          <Route path="/dashboard/payouts" element={<Payouts />} />
+          <Route path="/dashboard/meetings" element={<Meetings />} />
+          <Route path="/dashboard/voting" element={<Voting />} />
 
-            {/* Tier-gated group — must also pass RequireTier */}
-            <Route element={<RequireTier />}>
-              <Route path="/dashboard/portfolio" element={<Portfolio />} />
-              <Route path="/dashboard/assets" element={<Assets />} />
-              <Route path="/dashboard/statements" element={<Statements />} />
-              <Route path="/dashboard/reports" element={<Reports />} />
+          <Route path="/dashboard/members" element={<Members />} />
+          <Route path="/dashboard/roles" element={<Soon title="Roles & Permissions" />} />
+          <Route path="/dashboard/statements" element={<Statements />} />
+          <Route path="/dashboard/reports" element={<Reports />} />
 
-              <Route path="/dashboard/voting" element={<Voting />} />
-              <Route path="/dashboard/payouts" element={<Payouts />} />
-              <Route path="/dashboard/meetings" element={<Meetings />} />
-              <Route path="/dashboard/roles" element={<RolesPermissions />} />
-            </Route>
-          </Route>
-
-          {/* Rewards */}
           <Route path="/rewards" element={<Rewards />} />
           <Route path="/rewards/points" element={<Points />} />
           <Route path="/rewards/plans" element={<TierComparison />} />
         </Route>
+      </Route>
+
+      {/* Member portal */}
+      <Route path="/member" element={<MemberLayout />}>
+        <Route index element={<MemberOverview />} />
+        <Route path="contributions" element={<MemberContributions />} />
+        <Route path="savings" element={<MemberSavings />} />
+        <Route path="loans" element={<MemberLoans />} />
+        <Route path="transactions" element={<MemberTransactions />} />
+        <Route path="assets" element={<MemberAssets />} />
+        <Route path="meetings" element={<MemberMeetings />} />
+        <Route path="rotation" element={<MemberRotation />} />
+        <Route path="voting" element={<MemberVoting />} />
+        <Route path="welfare" element={<MemberWelfare />} />
+        <Route path="profile" element={<MemberProfile />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
