@@ -5,13 +5,19 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logoUrl from '../../assets/logos.png'
+import { getChama } from '../../lib/chametuStorage'
 
 const MEMBERS_KEY = 'chametu_members_v2'
 
-const CHAMA = {
-  name: 'Umoja Investment Chama',
-  code: 'CHM-8F3K2P',
-  currency: 'KSh',
+/* Real chama details, read at call time so renames propagate immediately */
+function buildChama() {
+  const c = getChama() || {}
+  return {
+    name: c.name || 'My Chama',
+    code: c.code || 'CHM-000000',
+    paybill: c.paybill || '174379',
+    currency: 'KSh',
+  }
 }
 
 const MONTHLY_CONTRIBUTION = 5000
@@ -55,7 +61,7 @@ const REPORTS = [
   {
     id: 'attendance',
     icon: CalendarCheck,
-    title: 'Attendance & voting',
+    title: 'Attendance and voting',
     desc: 'Meeting attendance and resolution history.',
     tag: 'Governance',
     periodType: 'quarter',
@@ -88,8 +94,8 @@ function fmtMonth(ym) {
   })
 }
 
-function fmtKsh(n) {
-  return `${CHAMA.currency} ${Number(n).toLocaleString('en-KE')}`
+function fmtKsh(n, currency = 'KSh') {
+  return `${currency} ${Number(n).toLocaleString('en-KE')}`
 }
 
 function recentMonths(n = 12) {
@@ -130,10 +136,6 @@ function initials(name) {
     .toUpperCase()
 }
 
-/**
- * Absolute URL for the logo so it resolves correctly inside
- * a window.open('', '_blank') context (which has about:blank base).
- */
 function absoluteLogo() {
   try {
     return new URL(logoUrl, window.location.origin).href
@@ -178,6 +180,7 @@ function table(headers, rows, totalsRow = null) {
 }
 
 function reportHTML(title, period, bodyTable, summary) {
+  const CHAMA = buildChama()
   const generatedAt = new Date().toLocaleDateString('en-KE', {
     day: 'numeric',
     month: 'long',
@@ -186,7 +189,7 @@ function reportHTML(title, period, bodyTable, summary) {
   const logoSrc = absoluteLogo()
 
   return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"><title>${title} — ${period}</title>
+<html lang="en"><head><meta charset="UTF-8"><title>${title} - ${period}</title>
 <style>
   @page { size: A4; margin: 18mm; }
   body { font-family: Inter, system-ui, sans-serif; color: #0B1F33; margin: 0; font-size: 12px; line-height: 1.5; }
@@ -248,6 +251,7 @@ function openPrint(html) {
 /* -report builders- */
 
 function buildIncomeReport(period, members) {
+  const CHAMA = buildChama()
   const rows = members
     .filter((m) => m.status !== 'invited')
     .map((m) => {
@@ -262,16 +266,16 @@ function buildIncomeReport(period, members) {
   const totals = ['Total', '', sum(2), sum(3), sum(4), sum(5)]
 
   return {
-    title: `Income statement — ${fmtMonth(period)}`,
+    title: `Income statement - ${fmtMonth(period)}`,
     html: reportHTML(
       'Income statement',
       fmtMonth(period),
       table(headers, rows, totals),
       [
-        ['Expected contributions', fmtKsh(sum(2))],
-        ['Collected', fmtKsh(sum(3))],
-        ['Late fees', fmtKsh(sum(4))],
-        ['Net position', fmtKsh(sum(3) + sum(4))],
+        ['Expected contributions', fmtKsh(sum(2), CHAMA.currency)],
+        ['Collected', fmtKsh(sum(3), CHAMA.currency)],
+        ['Late fees', fmtKsh(sum(4), CHAMA.currency)],
+        ['Net position', fmtKsh(sum(3) + sum(4), CHAMA.currency)],
       ]
     ),
     csv: toCSV(headers, rows),
@@ -280,6 +284,7 @@ function buildIncomeReport(period, members) {
 }
 
 function buildLoanReport(period, members) {
+  const CHAMA = buildChama()
   const borrowers = members.filter((m) => m.loan > 0)
   const rows = borrowers.map((m) => {
     const isOverdue = m.status === 'arrears'
@@ -296,7 +301,7 @@ function buildLoanReport(period, members) {
   const totalLoan = borrowers.reduce((a, m) => a + m.loan, 0)
 
   return {
-    title: `Loan portfolio — ${fmtMonth(period)}`,
+    title: `Loan portfolio - ${fmtMonth(period)}`,
     html: reportHTML(
       'Loan portfolio',
       fmtMonth(period),
@@ -305,7 +310,7 @@ function buildLoanReport(period, members) {
         : `<p style="text-align:center;color:#5B6B7B;font-style:italic;padding:20px">No active loans this period.</p>`,
       [
         ['Active borrowers', String(borrowers.length)],
-        ['Total outstanding', fmtKsh(totalLoan)],
+        ['Total outstanding', fmtKsh(totalLoan, CHAMA.currency)],
         ['Overdue accounts', String(borrowers.filter((m) => m.status === 'arrears').length)],
         [
           'Repayment rate',
@@ -313,7 +318,7 @@ function buildLoanReport(period, members) {
             ? `${Math.round(
                 (1 - borrowers.filter((m) => m.status === 'arrears').length / borrowers.length) * 100
               )}%`
-            : '—',
+            : 'None',
         ],
       ]
     ),
@@ -323,13 +328,14 @@ function buildLoanReport(period, members) {
 }
 
 function buildActivityReport(period, members) {
+  const CHAMA = buildChama()
   const headers = ['Member', 'Role', 'Status', 'Savings', 'Loan', 'Last activity']
   const rows = members
     .filter((m) => m.status !== 'invited')
     .map((m) => [m.name, m.role, m.status, m.savings, m.loan, fmtMonth(period)])
 
   return {
-    title: `Member activity — ${fmtMonth(period)}`,
+    title: `Member activity - ${fmtMonth(period)}`,
     html: reportHTML(
       'Member activity',
       fmtMonth(period),
@@ -338,7 +344,7 @@ function buildActivityReport(period, members) {
         ['Active members', String(members.filter((m) => m.status === 'active').length)],
         ['In arrears', String(members.filter((m) => m.status === 'arrears').length)],
         ['Inactive', String(members.filter((m) => m.status === 'inactive').length)],
-        ['Total savings', fmtKsh(members.reduce((a, m) => a + m.savings, 0))],
+        ['Total savings', fmtKsh(members.reduce((a, m) => a + m.savings, 0), CHAMA.currency)],
       ]
     ),
     csv: toCSV(headers, rows),
@@ -347,25 +353,26 @@ function buildActivityReport(period, members) {
 }
 
 function buildInvestmentReport(quarter) {
+  const CHAMA = buildChama()
   const rows = [
     ['Kiambu Land Project', 'Land', 1200000, 1500000, 300000, '+25.0%'],
     ['Money Market Fund', 'MMF', 900000, 980000, 80000, '+8.9%'],
-    ['Treasury Bills — 91 day', 'T-Bill', 600000, 620000, 20000, '+3.3%'],
+    ['Treasury Bills 91 day', 'T-Bill', 600000, 620000, 20000, '+3.3%'],
   ]
   const headers = ['Investment', 'Type', 'Invested', 'Current value', 'Gain', 'Return']
   const totalInvested = rows.reduce((a, r) => a + r[2], 0)
   const totalValue = rows.reduce((a, r) => a + r[3], 0)
 
   return {
-    title: `Investment performance — ${fmtQuarter(quarter)}`,
+    title: `Investment performance - ${fmtQuarter(quarter)}`,
     html: reportHTML(
       'Investment performance',
       fmtQuarter(quarter),
       table(headers, rows),
       [
-        ['Total invested', fmtKsh(totalInvested)],
-        ['Current value', fmtKsh(totalValue)],
-        ['Unrealised gain', fmtKsh(totalValue - totalInvested)],
+        ['Total invested', fmtKsh(totalInvested, CHAMA.currency)],
+        ['Current value', fmtKsh(totalValue, CHAMA.currency)],
+        ['Unrealised gain', fmtKsh(totalValue - totalInvested, CHAMA.currency)],
         ['Overall return', `${Math.round(((totalValue - totalInvested) / totalInvested) * 100)}%`],
       ]
     ),
@@ -375,6 +382,7 @@ function buildInvestmentReport(quarter) {
 }
 
 function buildAttendanceReport(quarter) {
+  const CHAMA = buildChama()
   const headers = ['Meeting', 'Date', 'Attendance', 'Quorum', 'Resolutions']
   const rows = [
     ['Monthly General Meeting', 'Sep 28, 2026', '72 / 84', 'Yes', 3],
@@ -384,9 +392,9 @@ function buildAttendanceReport(quarter) {
   ]
 
   return {
-    title: `Attendance & voting — ${fmtQuarter(quarter)}`,
+    title: `Attendance and voting - ${fmtQuarter(quarter)}`,
     html: reportHTML(
-      'Attendance & voting',
+      'Attendance and voting',
       fmtQuarter(quarter),
       table(headers, rows),
       [
@@ -407,33 +415,28 @@ function buildAttendanceReport(quarter) {
 }
 
 function buildMemberStatementReport(period, member) {
+  const CHAMA = buildChama()
   const isArrears = member.status === 'arrears'
   const paid = isArrears ? 0 : MONTHLY_CONTRIBUTION
   const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance']
   const rows = [
-    [
-      fmtMonth(period),
-      'Contribution',
-      MONTHLY_CONTRIBUTION,
-      paid,
-      MONTHLY_CONTRIBUTION - paid,
-    ],
+    [fmtMonth(period), 'Contribution', MONTHLY_CONTRIBUTION, paid, MONTHLY_CONTRIBUTION - paid],
     [fmtMonth(period), 'Savings', '', '', member.savings],
-    [fmtMonth(period), 'Loan balance', member.loan || '—', '', member.loan || '—'],
+    [fmtMonth(period), 'Loan balance', member.loan || 'None', '', member.loan || 'None'],
   ]
 
   return {
-    title: `Member statement — ${member.name}`,
+    title: `Member statement - ${member.name}`,
     html: reportHTML(
-      `Member statement — ${member.name}`,
+      `Member statement - ${member.name}`,
       fmtMonth(period),
       table(headers, rows),
       [
         ['Member', member.name],
         ['Role', member.role],
         ['Status', member.status],
-        ['Savings balance', fmtKsh(member.savings)],
-        ['Loan balance', member.loan > 0 ? fmtKsh(member.loan) : '—'],
+        ['Savings balance', fmtKsh(member.savings, CHAMA.currency)],
+        ['Loan balance', member.loan > 0 ? fmtKsh(member.loan, CHAMA.currency) : 'None'],
       ]
     ),
     csv: toCSV(headers, rows),
@@ -480,31 +483,31 @@ function PickMemberModal({ open, onClose, members, onPick }) {
     })
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="bg-white border border-line rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-4 border-b border-line">
-          <h3 className="font-display font-semibold text-navy text-[1.05rem]">Select a member</h3>
+        <div className="border-b border-line px-5 py-4">
+          <h3 className="font-display text-[1.05rem] font-semibold text-navy">Select a member</h3>
           <p className="mt-0.5 text-[0.82rem] text-ink-soft">
             Choose whose statement you want to generate.
           </p>
         </div>
 
-        <div className="px-5 py-3 border-b border-line">
+        <div className="border-b border-line px-5 py-3">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search member…"
+            placeholder="Search member..."
             autoFocus
-            className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] text-navy outline-none focus:border-forest transition"
+            className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.92rem] text-navy outline-none transition focus:border-forest"
           />
         </div>
 
         <div className="max-h-[340px] overflow-y-auto">
           {list.length === 0 ? (
-            <div className="px-5 py-10 text-center text-ink-soft text-[0.86rem]">
+            <div className="px-5 py-10 text-center text-[0.86rem] text-ink-soft">
               No members match.
             </div>
           ) : (
@@ -512,25 +515,25 @@ function PickMemberModal({ open, onClose, members, onPick }) {
               <button
                 key={m.id}
                 onClick={() => onPick(m)}
-                className="w-full flex items-center gap-3 px-5 py-3 text-left border-b border-line last:border-b-0 hover:bg-forest/[0.03] transition"
+                className="flex w-full items-center gap-3 border-b border-line px-5 py-3 text-left transition last:border-b-0 hover:bg-forest/[0.03]"
               >
-                <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold text-[0.72rem] shrink-0">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-forest to-emerald font-display text-[0.72rem] font-bold text-white">
                   {initials(m.name)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-navy truncate">{m.name}</span>
-                  <span className="block text-[0.76rem] text-ink-soft truncate">{m.email}</span>
+                  <span className="block truncate font-medium text-navy">{m.name}</span>
+                  <span className="block truncate text-[0.76rem] text-ink-soft">{m.email}</span>
                 </span>
-                <User size={14} strokeWidth={2} className="text-ink-soft shrink-0" />
+                <User size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
               </button>
             ))
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
+        <div className="flex justify-end gap-2 border-t border-line bg-paper/40 px-5 py-3.5">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
+            className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy transition hover:border-navy"
           >
             Cancel
           </button>
@@ -540,12 +543,13 @@ function PickMemberModal({ open, onClose, members, onPick }) {
   )
 }
 
-
 export default function Reports() {
   const [members] = useState(() => loadMembers())
   const [month, setMonth] = useState(recentMonths(12)[1])
   const [quarter, setQuarter] = useState(recentQuarters(4)[0])
   const [pickFor, setPickFor] = useState(null)
+
+  const chama = useMemo(() => buildChama(), [])
 
   const months = useMemo(() => recentMonths(12), [])
   const quarters = useMemo(() => recentQuarters(4), [])
@@ -584,77 +588,82 @@ export default function Reports() {
   }
 
   return (
-    <div className="max-w-[1180px] mx-auto">
-      <header className="flex justify-between items-start gap-6 flex-wrap mb-5">
+    <div className="mx-auto max-w-[1180px]">
+      <header className="mb-5 flex flex-wrap items-start justify-between gap-6">
         <div>
-          <h1 className="font-display font-bold text-2xl text-navy">Reports</h1>
-          <p className="mt-1.5 text-ink-soft max-w-[64ch]">
-            Generate any report for the current or previous periods. Every report opens in a print-ready view and exports as CSV.
+          <h1 className="font-display text-2xl font-bold text-navy">Reports</h1>
+          <p className="mt-1.5 max-w-[64ch] text-ink-soft">
+            Generate any report for <b className="text-navy">{chama.name}</b> for the current or
+            previous periods. Every report opens in a print-ready view and exports as CSV.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-white">
-            <Calendar size={14} strokeWidth={2} className="text-ink-soft shrink-0" />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+            <Calendar size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="bg-transparent outline-none text-sm font-medium text-navy cursor-pointer pr-2"
+              className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none"
             >
               {months.map((m) => (
-                <option key={m} value={m}>{fmtMonth(m)}</option>
+                <option key={m} value={m}>
+                  {fmtMonth(m)}
+                </option>
               ))}
             </select>
           </div>
 
-          <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-white">
-            <Calendar size={14} strokeWidth={2} className="text-ink-soft shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
+            <Calendar size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
             <select
               value={quarter}
               onChange={(e) => setQuarter(e.target.value)}
-              className="bg-transparent outline-none text-sm font-medium text-navy cursor-pointer pr-2"
+              className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none"
             >
               {quarters.map((q) => (
-                <option key={q} value={q}>{fmtQuarter(q)}</option>
+                <option key={q} value={q}>
+                  {fmtQuarter(q)}
+                </option>
               ))}
             </select>
           </div>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 hero:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 gap-3.5 hero:grid-cols-3">
         {REPORTS.map((r) => {
           const Icon = r.icon
           return (
             <div
               key={r.id}
-              className="bg-white border border-line rounded-2xl p-5 flex flex-col gap-3 hover:border-forest/60 hover:-translate-y-0.5 transition"
+              className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-5 transition hover:-translate-y-0.5 hover:border-forest/60"
             >
               <div className="flex items-start justify-between">
-                <span className="w-9 h-9 rounded-xl bg-emerald/10 text-forest grid place-items-center">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-forest">
                   <Icon size={17} strokeWidth={2} />
                 </span>
-                <span className="text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft bg-paper px-2.5 py-1 rounded-full">
+                <span className="rounded-full bg-paper px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft">
                   {r.tag}
                 </span>
               </div>
 
-              <h3 className="font-display font-semibold text-navy text-[1rem] leading-snug">
+              <h3 className="font-display text-[1rem] font-semibold leading-snug text-navy">
                 {r.title}
               </h3>
-              <p className="text-[0.86rem] text-ink-soft leading-relaxed">{r.desc}</p>
+              <p className="text-[0.86rem] leading-relaxed text-ink-soft">{r.desc}</p>
 
-              <div className="mt-auto pt-2 flex items-center gap-2">
+              <div className="mt-auto flex items-center gap-2 pt-2">
                 <button
                   onClick={() => handleGenerate(r, 'print')}
-                  className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-forest text-white text-[0.82rem] font-semibold hover:bg-forest-dark transition"
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-forest px-3 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-forest-dark"
                 >
                   <Printer size={13} strokeWidth={2} />
                   Generate
                 </button>
                 <button
                   onClick={() => handleGenerate(r, 'csv')}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-line bg-white text-navy text-[0.82rem] font-semibold hover:border-forest transition"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[0.82rem] font-semibold text-navy transition hover:border-forest"
                   aria-label="Export CSV"
                 >
                   <Download size={13} strokeWidth={2} />
@@ -666,10 +675,11 @@ export default function Reports() {
         })}
       </div>
 
-      <div className="mt-5 flex items-start gap-2.5 px-4 py-3 rounded-xl bg-emerald/10 text-navy text-[0.84rem]">
-        <ArrowUpRight size={16} strokeWidth={2} className="text-forest mt-0.5 shrink-0" />
+      <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-emerald/10 px-4 py-3 text-[0.84rem] text-navy">
+        <ArrowUpRight size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-forest" />
         <span>
-          Reports open in a new tab. Use <b>Save as PDF</b> in the print dialog to keep a copy. Allow pop-ups for this site to avoid the block.
+          Reports open in a new tab. Use <b>Save as PDF</b> in the print dialog to keep a copy.
+          Allow pop-ups for this site to avoid the block.
         </span>
       </div>
 

@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { Gauge, CheckCircle2, Info, X } from 'lucide-react'
-import { getMemberSession, getChama, getMemberFinance } from '../lib/chametuStorage'
+import {
+  getMemberSession,
+  getMemberChama,
+  getMemberFinance,
+} from '../lib/chametuStorage'
 
 function fmt(n) {
   return 'KSh ' + Math.round(n).toLocaleString('en-KE')
@@ -15,7 +19,7 @@ const label = { active: 'Active', new: 'Awaiting approval', overdue: 'Overdue' }
 
 export default function MemberLoans() {
   const session = getMemberSession()
-  const chama = getChama()
+  const chama = getMemberChama(session)
   const finance = getMemberFinance(session)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', purpose: '' })
@@ -42,11 +46,10 @@ export default function MemberLoans() {
       <div>
         <h1 className="font-display text-xl font-bold text-navy">My Loan</h1>
         <p className="mt-1 text-[0.86rem] text-ink-soft">
-          Based on {chama.maxLoanMultiple || 3}× your savings, per {chama.name}'s rules
+          Based on {chama.maxLoanMultiple || 3}x your savings, per {chama.name}'s rules
         </p>
       </div>
 
-      {/* Loan limit hero */}
       <div className="relative overflow-hidden rounded-3xl border border-line bg-white p-6 shadow-sm">
         <div
           className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full opacity-40"
@@ -83,7 +86,9 @@ export default function MemberLoans() {
       {finance.loan ? (
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="font-display text-sm font-semibold text-navy">Current loan</h3>
+            <h3 className="font-display text-sm font-semibold text-navy">
+              Current loan
+            </h3>
             <span
               className={`rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide ${
                 badge[finance.loan.status]
@@ -111,14 +116,17 @@ export default function MemberLoans() {
               className="h-full rounded-full bg-gradient-to-r from-forest to-emerald"
               style={{
                 width: `${Math.round(
-                  ((finance.loan.amount - finance.loan.balance) / finance.loan.amount) * 100
+                  ((finance.loan.amount - finance.loan.balance) /
+                    finance.loan.amount) *
+                    100
                 )}%`,
               }}
             />
           </div>
           <div className="mt-1.5 text-[0.7rem] text-ink-soft">
             {Math.round(
-              ((finance.loan.amount - finance.loan.balance) / finance.loan.amount) * 100
+              ((finance.loan.amount - finance.loan.balance) / finance.loan.amount) *
+                100
             )}
             % repaid
           </div>
@@ -134,13 +142,13 @@ export default function MemberLoans() {
                 Application submitted
               </h3>
               <p className="mt-1 text-[0.84rem] text-ink-soft">
-                Awaiting treasurer approval. You'll see it here once reviewed.
+                Awaiting treasurer approval. You will see it here once reviewed.
               </p>
             </>
           ) : (
             <>
               <p className="text-[0.86rem] text-ink-soft">
-                You don't have an active loan right now.
+                You do not have an active loan right now.
               </p>
               <button
                 onClick={() => setOpen(true)}
@@ -153,7 +161,6 @@ export default function MemberLoans() {
         </div>
       )}
 
-      {/* Application form */}
       {open && (
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
@@ -210,8 +217,8 @@ export default function MemberLoans() {
       <div className="flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-4 py-3 text-[0.8rem] text-navy ring-1 ring-emerald/10">
         <Info size={15} className="mt-0.5 flex-none text-forest" />
         <span>
-          Loan applications are reviewed by your treasurer and committee. Approval usually takes
-          2–3 working days.
+          Loan applications are reviewed by your treasurer and committee. Approval
+          usually takes 2 to 3 working days.
         </span>
       </div>
     </div>

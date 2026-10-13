@@ -1,5 +1,5 @@
 /* ============================================================
-   chametuStorage.js — local-only persistence layer
+   chametuStorage.js - local-only persistence layer
    Holds: chama, invites, members, member sessions, member ledger.
    This is the ONLY file that should touch these localStorage keys.
    ============================================================ */
@@ -35,9 +35,8 @@ function uid(prefix = '') {
   )
 }
 
-/** Cryptographically-random token (falls back to Math.random if unavailable). */
 function makeToken(len = 32) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1 to avoid confusion
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
   let out = ''
   try {
     const buf = new Uint32Array(len)
@@ -65,8 +64,28 @@ export function saveChama(chama) {
   return chama
 }
 
+/**
+ * Returns the chama object scoped to the given member session.
+ * Prioritises the session's own chamaName and chamaCode so a member
+ * always sees the exact chama they were invited to, even if another
+ * chama's record happens to be in localStorage.
+ *
+ * Config (amount, due, grace, maxLoanMultiple) still comes from the
+ * locally stored chama record.
+ */
+export function getMemberChama(session) {
+  const local = getChama() || {}
+  const name = session?.chamaName || local.name || 'My Chama'
+  const code = session?.chamaCode || local.code || ''
+  return {
+    ...local,
+    name,
+    code,
+  }
+}
+
 /* ============================================================
-   INVITES — the security core
+   INVITES
    ============================================================ */
 
 export function getInvites() {
@@ -77,34 +96,29 @@ function saveInvites(list) {
   write(INVITES_KEY, list)
 }
 
-/**
- * Create a fresh invite bound to the current chama.
- * Called by the admin from InviteMembers.jsx.
- */
 export function createInvite({ contact, method, role = 'Member' }) {
   const chama = getChama()
   if (!chama) throw new Error('No chama exists yet. Create a chama first.')
 
   const invite = {
     id: uid('inv_'),
-    token: makeToken(32),               // ← gate #1
-    chamaCode: chama.code,              // ← gate #2
+    token: makeToken(32),
+    chamaCode: chama.code,
     chamaName: chama.name,
     contact: contact.trim(),
-    method,                             // 'email' | 'phone'
+    method,
     role,
-    status: 'pending',                  // 'pending' | 'joined' | 'expired'
+    status: 'pending',
     createdAt: Date.now(),
-    expiresAt: Date.now() + INVITE_TTL_DAYS * DAY_MS, // ← gate #4
+    expiresAt: Date.now() + INVITE_TTL_DAYS * DAY_MS,
     joinedAt: null,
-    joinedAs: null,                     // member id once used
+    joinedAs: null,
   }
 
   saveInvites([invite, ...getInvites()])
   return invite
 }
 
-/** Re-issue an expired invite: new token, new 7-day window, status back to pending. */
 export function resendInvite(id) {
   const list = getInvites()
   const next = list.map((inv) =>
@@ -124,12 +138,10 @@ export function resendInvite(id) {
   return next.find((i) => i.id === id) || null
 }
 
-/** Permanently delete an invite. */
 export function cancelInvite(id) {
   saveInvites(getInvites().filter((i) => i.id !== id))
 }
 
-/** Full local URL the invitee should open. */
 export function inviteLink(invite) {
   const path = `/join/${invite.chamaCode}/${invite.token}`
   try {
@@ -139,34 +151,28 @@ export function inviteLink(invite) {
   }
 }
 
-/**
- * Validate an incoming invite. Returns:
- *   { ok: true, invite, chama }
- *   { ok: false, reason: 'wrong-chama' | 'not-found' | 'used' | 'expired' }
- *
- * This is the function that decides whether someone is allowed in.
- */
 export function findValidInvite(chamaCode, token) {
   const chama = getChama()
   if (!chama) return { ok: false, reason: 'wrong-chama' }
   if (!chamaCode || chama.code.toUpperCase() !== String(chamaCode).toUpperCase()) {
-    return { ok: false, reason: 'wrong-chama' }     // ← gate #2
+    return { ok: false, reason: 'wrong-chama' }
   }
 
   const invite = getInvites().find((i) => i.token === token)
-  if (!invite) return { ok: false, reason: 'not-found' }   // ← gate #1
+  if (!invite) return { ok: false, reason: 'not-found' }
 
   if (invite.chamaCode.toUpperCase() !== chama.code.toUpperCase()) {
-    return { ok: false, reason: 'wrong-chama' }     // ← gate #2 double-check
+    return { ok: false, reason: 'wrong-chama' }
   }
-  if (invite.status === 'joined') return { ok: false, reason: 'used' }   // ← gate #3
+  if (invite.status === 'joined') return { ok: false, reason: 'used' }
 
   if (invite.expiresAt && Date.now() > invite.expiresAt) {
-    // Mark expired on disk so UI can show "Resend"
     saveInvites(
-      getInvites().map((i) => (i.id === invite.id ? { ...i, status: 'expired' } : i))
+      getInvites().map((i) =>
+        i.id === invite.id ? { ...i, status: 'expired' } : i
+      )
     )
-    return { ok: false, reason: 'expired' }         // ← gate #4
+    return { ok: false, reason: 'expired' }
   }
 
   return { ok: true, invite, chama }
@@ -184,10 +190,6 @@ function saveMembers(list) {
   write(MEMBERS_KEY, list)
 }
 
-/**
- * Contact-match check. Used in MemberJoin to block duplicate signups.
- * Accepts email OR phone.
- */
 export function findMemberByContact(chamaCode, contact) {
   const target = (contact || '').trim().toLowerCase()
   return (
@@ -199,17 +201,13 @@ export function findMemberByContact(chamaCode, contact) {
   )
 }
 
-/**
- * Consume an invite and create a member record.
- * Called from MemberJoin.jsx with the verified invite.
- */
 export function createMemberFromInvite({ invite, chama, name, contact, password }) {
   const isEmail = (contact || '').includes('@')
   const member = {
     id: uid('m_'),
     name: name.trim(),
-    email: isEmail ? contact.trim().toLowerCase() : '—',
-    phone: isEmail ? '—' : contact.trim(),
+    email: isEmail ? contact.trim().toLowerCase() : '-',
+    phone: isEmail ? '-' : contact.trim(),
     role: invite.role || 'Member',
     savings: 0,
     loan: 0,
@@ -218,13 +216,12 @@ export function createMemberFromInvite({ invite, chama, name, contact, password 
     joinedAt: Date.now(),
     inviteId: invite.id,
     chamaCode: chama.code,
-    // NOTE: demo only. In production, hash this server-side.
+    chamaName: chama.name,
     password,
   }
 
   saveMembers([member, ...getMembers()])
 
-  // Mark invite as joined — this burns the link.
   saveInvites(
     getInvites().map((i) =>
       i.id === invite.id
@@ -254,7 +251,6 @@ export function clearMemberSession() {
   } catch {}
 }
 
-/** Used by MemberJoin's "I already have an account" tab. */
 export function loginMember(chamaCode, contact, password) {
   const member = findMemberByContact(chamaCode, contact)
   if (!member) return null
@@ -265,6 +261,7 @@ export function loginMember(chamaCode, contact, password) {
     email: member.email,
     role: member.role,
     chamaCode: member.chamaCode || chamaCode,
+    chamaName: member.chamaName || getChama()?.name || '',
     joinedAt: member.joinedAt,
   })
   return member
@@ -282,18 +279,20 @@ function writeLedger(map) {
   write(MEMBER_LEDGER_KEY, map)
 }
 
-/** Deterministic per-member finance snapshot. Replace with a real ledger later. */
 export function getMemberFinance(session) {
-  const chama = getChama() || {}
+  const scopedChama = getMemberChama(session)
   const ledger = readLedger()
   const key = session?.id || session?.email || 'anon'
 
   if (ledger[key]) return ledger[key]
 
-  // Seed something reasonable so the portal isn't empty on first login
   const seed = {
     savings: 45000,
-    contributions: { expected: chama.amount || 5000, paid: 0, status: 'pending' },
+    contributions: {
+      expected: scopedChama.amount || 5000,
+      paid: 0,
+      status: 'pending',
+    },
     loan: null,
   }
   ledger[key] = seed
@@ -316,10 +315,7 @@ export function getMemberTransactions(session) {
 }
 
 /* ============================================================
-   UTIL — used by admin's "Join chama with code" flow
+   UTIL
    ============================================================ */
 
-export function joinChamaWithUserStore() {
-  // Placeholder: the ChamaContext handles joining. Kept here so
-  // MemberJoin and Register both have a stable hook to call.
-}
+export function joinChamaWithUserStore() {}

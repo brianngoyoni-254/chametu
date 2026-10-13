@@ -3,9 +3,21 @@
 // The other pages keep their data in component state, so their seed data is mirrored here.
 // When a backend exists, replace these loaders with API calls.
 
+import { getChama } from '../../../lib/chametuStorage'
+
 export const MEMBERS_KEY = 'chametu_members_v2'
 
-export const CHAMA_NAME = 'Umoja Investment Chama'
+/** Live chama name. Prefer this function over the legacy constant. */
+export function getChamaName() {
+  return getChama()?.name || 'My Chama'
+}
+
+/**
+ * Legacy constant. Evaluated once at import time, so it can go stale if the
+ * chama is created or renamed after this module loads. Kept only for any
+ * remaining imports; prefer getChamaName() in new code.
+ */
+export const CHAMA_NAME = getChamaName()
 
 const SEED_MEMBERS = [
   { id: 'm1', name: 'Daniel Muthui', role: 'Chairman', savings: 85000, loan: 20000, status: 'active' },
@@ -42,19 +54,20 @@ export const LOANS = [
 ]
 
 export const TRANSACTIONS = [
-  { date: 'Sep 24', desc: 'Contribution — Jane W.', debit: 0, credit: 5000 },
-  { date: 'Sep 23', desc: 'Loan repayment — David O.', debit: 0, credit: 9167 },
-  { date: 'Sep 22', desc: 'Expense — meeting venue', debit: 2000, credit: 0 },
-  { date: 'Sep 20', desc: 'Loan disbursed — Mary N.', debit: 40000, credit: 0 },
-  { date: 'Sep 18', desc: 'Investment income — MMF', debit: 0, credit: 12400 },
-  { date: 'Sep 12', desc: 'Contribution — Kevin M.', debit: 0, credit: 5000 },
+  { date: 'Sep 24', desc: 'Contribution / Jane W.', debit: 0, credit: 5000 },
+  { date: 'Sep 23', desc: 'Loan repayment / David O.', debit: 0, credit: 9167 },
+  { date: 'Sep 22', desc: 'Expense / meeting venue', debit: 2000, credit: 0 },
+  { date: 'Sep 20', desc: 'Loan disbursed / Mary N.', debit: 40000, credit: 0 },
+  { date: 'Sep 18', desc: 'Investment income / MMF', debit: 0, credit: 12400 },
+  { date: 'Sep 12', desc: 'Contribution / Kevin M.', debit: 0, credit: 5000 },
 ]
+
 const OPENING_BALANCE = 1415333
 
 export const PORTFOLIO = [
   { id: 1, name: 'Kiambu Land Project', type: 'Land', invested: 1200000, value: 1500000 },
   { id: 2, name: 'Money Market Fund', type: 'MMF', invested: 900000, value: 980000 },
-  { id: 3, name: 'Treasury Bills — 91 day', type: 'T-Bill', invested: 600000, value: 620000 },
+  { id: 3, name: 'Treasury Bills 91 day', type: 'T-Bill', invested: 600000, value: 620000 },
 ]
 
 export const PAYMENTS = [
@@ -67,7 +80,7 @@ export const PAYMENTS = [
 
 export const PROPOSALS = [
   { id: 'kilifi', title: 'Kilifi Property Purchase', amount: 'KSh 4,500,000', closes: 'Oct 2' },
-  { id: 'raise', title: 'Increase monthly contribution', amount: 'KSh 5,000 → KSh 6,000', closes: 'Oct 10' },
+  { id: 'raise', title: 'Increase monthly contribution', amount: 'KSh 5,000 to KSh 6,000', closes: 'Oct 10' },
 ]
 
 export const MEETINGS = [
@@ -76,28 +89,35 @@ export const MEETINGS = [
     date: 'Sep 28, 2026',
     time: '2:00 PM',
     title: 'Monthly General Meeting',
-    agenda: 'Financial report · Loan applications · Investment proposal · Welfare',
+    agenda: 'Financial report / Loan applications / Investment proposal / Welfare',
     locked: false,
   },
 ]
 
-export const WELFARE = { start: 340000, claims: [
-  { amount: 4500, status: 'pending' },
-  { amount: 15000, status: 'paid' },
-  { amount: 6000, status: 'paid' },
-] }
+export const WELFARE = {
+  start: 340000,
+  claims: [
+    { amount: 4500, status: 'pending' },
+    { amount: 15000, status: 'paid' },
+    { amount: 6000, status: 'paid' },
+  ],
+}
 
 /** Everything Overview needs, derived in one place. */
 export function getOverviewData() {
   const members = loadMembers()
   const sum = (arr, f) => arr.reduce((s, x) => s + f(x), 0)
 
-  // Ledger (newest first) with running balance — same maths as Transactions.jsx
+  // Ledger (newest first) with running balance, same maths as Transactions.jsx
   let bal = OPENING_BALANCE
-  const ledger = [...TRANSACTIONS].reverse().map((t) => {
-    bal = bal + t.credit - t.debit
-    return { ...t, balance: bal }
-  }).reverse()
+  const ledger = [...TRANSACTIONS]
+    .reverse()
+    .map((t) => {
+      bal = bal + t.credit - t.debit
+      return { ...t, balance: bal }
+    })
+    .reverse()
+
   const groupBalance = ledger[0]?.balance ?? OPENING_BALANCE
   const moneyIn = sum(TRANSACTIONS, (t) => t.credit)
   const moneyOut = sum(TRANSACTIONS, (t) => t.debit)
@@ -126,7 +146,10 @@ export function getOverviewData() {
     }, {})
   ).sort((a, b) => b.value - a.value)
 
-  const welfarePaid = sum(WELFARE.claims.filter((c) => c.status === 'paid'), (c) => c.amount)
+  const welfarePaid = sum(
+    WELFARE.claims.filter((c) => c.status === 'paid'),
+    (c) => c.amount
+  )
   const welfareBalance = WELFARE.start - welfarePaid
   const welfarePending = WELFARE.claims.filter((c) => c.status === 'pending').length
 
@@ -138,12 +161,30 @@ export function getOverviewData() {
       invited: members.filter((m) => m.status === 'invited').length,
       total: members.length,
     },
-    memberSavings: sum(members.filter((m) => m.status !== 'invited'), (m) => m.savings),
-    groupBalance, moneyIn, moneyOut, ledger,
-    expected, collected, contribPct, unpaid, overdueContrib,
-    outstanding, overdueLoans, overdueAmount, pendingLoans, liveLoans,
-    invested, portfolioValue, gain, allocation,
-    welfareBalance, welfarePending,
+    memberSavings: sum(
+      members.filter((m) => m.status !== 'invited'),
+      (m) => m.savings
+    ),
+    groupBalance,
+    moneyIn,
+    moneyOut,
+    ledger,
+    expected,
+    collected,
+    contribPct,
+    unpaid,
+    overdueContrib,
+    outstanding,
+    overdueLoans,
+    overdueAmount,
+    pendingLoans,
+    liveLoans,
+    invested,
+    portfolioValue,
+    gain,
+    allocation,
+    welfareBalance,
+    welfarePending,
     unmatchedPayments: PAYMENTS.filter((p) => p.status === 'unmatched').length,
     openProposals: PROPOSALS,
     nextMeeting: MEETINGS.find((m) => !m.locked) || null,
