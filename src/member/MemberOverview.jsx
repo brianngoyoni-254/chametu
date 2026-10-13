@@ -293,7 +293,7 @@ export default function MemberOverview() {
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
           <div className="grid gap-0 md:grid-cols-[220px_1fr]">
             <div className="relative overflow-hidden bg-gradient-to-br from-forest to-emerald p-6 text-white">
               <div
@@ -362,14 +362,14 @@ export default function MemberOverview() {
                         title={`${m.name} / ${m.role}`}
                         className={`grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br ${
                           AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]
-                        } font-display text-[0.7rem] font-bold text-white ring-2 ring-white`}
+                        } font-display text-[0.7rem] font-bold text-white ring-2 ring-card`}
                       >
                         {initials(m.name)}
                       </span>
                     ))}
                   </div>
                   {extraCount > 0 && (
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-paper font-display text-[0.7rem] font-bold text-ink-soft ring-2 ring-white">
+                    <span className="grid h-10 w-10 place-items-center rounded-full bg-paper font-display text-[0.7rem] font-bold text-ink-soft ring-2 ring-card">
                       +{extraCount}
                     </span>
                   )}
@@ -471,7 +471,7 @@ export default function MemberOverview() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-display text-sm font-bold text-navy">
@@ -508,7 +508,7 @@ export default function MemberOverview() {
                       className={`grid h-8 w-8 flex-none place-items-center rounded-lg ${
                         t.amount > 0
                           ? 'bg-emerald/10 text-forest'
-                          : 'bg-red-50 text-red-600'
+                          : 'bg-red-500/15 text-red-600'
                       }`}
                     >
                       <ArrowRightLeft size={13} />
@@ -535,7 +535,7 @@ export default function MemberOverview() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+          <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
             <div className="flex items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-soft">
               <Bell size={12} className="text-gold" />
               Next contribution
@@ -566,7 +566,7 @@ export default function MemberOverview() {
           </div>
 
           {finance.loan && (
-            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+            <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="flex items-center gap-1.5 font-display text-sm font-bold text-navy">
                   <TrendingUp size={14} className="text-forest" />
@@ -610,7 +610,7 @@ export default function MemberOverview() {
 
           <Link
             to="/member/meetings"
-            className="group rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+            className="group rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
           >
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald text-white shadow-sm">
@@ -664,7 +664,7 @@ function PersonalCard({ to, icon: Icon, label, value, sub, accent, success }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+      className="group relative overflow-hidden rounded-2xl border border-line bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
     >
       <div className="flex items-start justify-between">
         <span className="text-[0.72rem] font-semibold text-ink-soft">
@@ -712,7 +712,7 @@ function SnapshotCard({
   }[tone]
 
   return (
-    <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-md">
+    <div className="rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-md">
       <div className="flex items-start justify-between">
         <span className="text-[0.72rem] font-semibold text-ink-soft">
           {label}
@@ -751,7 +751,7 @@ function UpdateCard({ to, icon: Icon, gradient, label, title, sub, badge }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-2xl border border-line bg-white p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+      className="group relative overflow-hidden rounded-2xl border border-line bg-card p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
     >
       {badge && (
         <span className="absolute right-3.5 top-3.5 rounded-full bg-red-500 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm">

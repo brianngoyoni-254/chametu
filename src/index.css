@@ -224,16 +224,18 @@
 /* ------------------------------------------------------------------
    DARK MODE OVERRIDES FOR HARDCODED BACKGROUNDS
 
-   Tailwind v4 generates bg-white and arbitrary values as fixed
+   Tailwind v4 generates bg-white and arbitrary hex values as fixed
    colors that don't read from CSS variables. These rules force
    them to the themable card/paper tokens when data-theme=dark is
    set on <html>. Written outside @layer so they beat the compiled
    utilities on specificity.
 
    !important is intentional — this is a theming shim, not a
-   regular style. Remove it if you later swap bg-white → bg-card
-   everywhere in the codebase.
+   regular style. Remove it if you later swap these utilities to
+   bg-card / bg-paper everywhere in the codebase.
    ------------------------------------------------------------------ */
+
+/* Solid white surfaces (cards, modals, inputs) */
 [data-theme="dark"] .bg-white {
   background-color: var(--color-card) !important;
 }
@@ -242,7 +244,11 @@
   background-color: var(--color-card) !important;
 }
 
-[data-theme="dark"] .bg-\[\#F8FAFC\] {
+/* Pale page and input backgrounds used on auth pages */
+[data-theme="dark"] .bg-\[\#F5F7F9\],
+[data-theme="dark"] .bg-\[\#F6F8FA\],
+[data-theme="dark"] .bg-\[\#F8FAFC\],
+[data-theme="dark"] .bg-\[\#F3F6F9\] {
   background-color: var(--color-paper) !important;
 }
 
@@ -250,13 +256,118 @@
   background-color: var(--color-card) !important;
 }
 
-/* Translucent bg-white variants used on the auth left panels */
+/* Translucent white used on the dark left panels of auth pages */
 [data-theme="dark"] .bg-white\/\[0\.08\] {
   background-color: rgba(255, 255, 255, 0.06) !important;
 }
 
 [data-theme="dark"] .bg-white\/\[0\.12\] {
   background-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Translucent white used for segmented controls and hover states */
+[data-theme="dark"] .bg-white\/5 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-theme="dark"] .bg-white\/10 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme="dark"] .bg-white\/15 {
+  background-color: rgba(255, 255, 255, 0.10) !important;
+}
+
+/* Pale tint badges used in admin tables and stat cards */
+[data-theme="dark"] .bg-\[\#E9F5EF\] {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+
+[data-theme="dark"] .bg-\[\#FBF1E0\],
+[data-theme="dark"] .bg-\[\#FBF1DA\] {
+  background-color: rgba(245, 185, 66, 0.16) !important;
+}
+
+[data-theme="dark"] .bg-\[\#FBEAE8\] {
+  background-color: rgba(229, 72, 77, 0.16) !important;
+}
+
+[data-theme="dark"] .bg-\[\#EAF1F7\] {
+  background-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+/* Pale amber text used inside tint badges — brighten for readability */
+[data-theme="dark"] .text-\[\#8A6417\],
+[data-theme="dark"] .text-\[\#8A6112\] {
+  color: var(--color-gold) !important;
+}
+
+/* Brighten fixed reds and greens on dark tints */
+[data-theme="dark"] .text-red-600 {
+  color: #F87171 !important;
+}
+
+/* ------------------------------------------------------------------
+   DARK MODE OVERRIDES FOR LANDING PAGE SECTIONS
+
+   Landing sections (Hero mock card, Security "Everyone knows where
+   the money is") use pale hardcoded backgrounds that don't flip
+   with the theme. These rules catch the common variants.
+   ------------------------------------------------------------------ */
+
+/* Pale neutral backgrounds used as section wrappers */
+[data-theme="dark"] .bg-\[\#F0F4F2\],
+[data-theme="dark"] .bg-\[\#F0F6F4\],
+[data-theme="dark"] .bg-\[\#EFF5F2\],
+[data-theme="dark"] .bg-\[\#F0F5F3\],
+[data-theme="dark"] .bg-\[\#F6F8F7\],
+[data-theme="dark"] .bg-\[\#F4F7F5\],
+[data-theme="dark"] .bg-\[\#EFF4F7\],
+[data-theme="dark"] .bg-\[\#EDF2F7\] {
+  background-color: var(--color-card) !important;
+}
+
+/* Tailwind palette 50 tints used as landing section backgrounds */
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] .bg-gray-50,
+[data-theme="dark"] .bg-zinc-50,
+[data-theme="dark"] .bg-neutral-50,
+[data-theme="dark"] .bg-stone-50,
+[data-theme="dark"] .bg-emerald-50,
+[data-theme="dark"] .bg-green-50,
+[data-theme="dark"] .bg-teal-50,
+[data-theme="dark"] .bg-cyan-50,
+[data-theme="dark"] .bg-blue-50,
+[data-theme="dark"] .bg-indigo-50,
+[data-theme="dark"] .bg-violet-50,
+[data-theme="dark"] .bg-purple-50,
+[data-theme="dark"] .bg-pink-50,
+[data-theme="dark"] .bg-rose-50,
+[data-theme="dark"] .bg-red-50,
+[data-theme="dark"] .bg-orange-50,
+[data-theme="dark"] .bg-amber-50,
+[data-theme="dark"] .bg-yellow-50,
+[data-theme="dark"] .bg-lime-50 {
+  background-color: var(--color-card) !important;
+}
+
+/* Landing section headings — sometimes rendered on pale bg with light text */
+[data-theme="dark"] .bg-card h1,
+[data-theme="dark"] .bg-card h2,
+[data-theme="dark"] .bg-card h3 {
+  color: var(--color-navy) !important;
+}
+
+/* Landing section paragraphs on card backgrounds */
+[data-theme="dark"] .bg-card p {
+  color: var(--color-ink-soft) !important;
+}
+
+/* Inline em (accent colour inside headings) stays readable */
+[data-theme="dark"] h1 em,
+[data-theme="dark"] h2 em,
+[data-theme="dark"] h3 em {
+  color: var(--color-emerald) !important;
 }
 
 /* Native form controls (checkbox, scrollbar, select) match the theme */

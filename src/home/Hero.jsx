@@ -100,8 +100,15 @@ export default function Hero() {
           </div>
         </Reveal>
 
+        {/*
+          The mock dashboard card is a fixed "product preview" surface —
+          it must look the same in light and dark mode, like a screenshot
+          of the product. So its background is hardcoded (#0B1F33) rather
+          than themed via `bg-navy` (which flips to a light colour in dark
+          mode and would make the pale text invisible).
+        */}
         <Reveal
-          className="relative min-w-0 overflow-hidden rounded-2xl bg-navy p-[22px] text-white shadow-[0_30px_60px_-20px_rgba(16,42,67,.42)]"
+          className="relative min-w-0 overflow-hidden rounded-2xl bg-[#0B1F33] p-[22px] text-white shadow-[0_30px_60px_-20px_rgba(16,42,67,.42)]"
           direction="up"
           delay={120}
         >
