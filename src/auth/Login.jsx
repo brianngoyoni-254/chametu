@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
 import {
-  Sun, Moon, Eye, EyeOff, Mail, ArrowRight,
+  ArrowLeft, Eye, EyeOff, Mail, ArrowRight,
   Sparkles, ShieldCheck, RotateCcw, X,
   Crown, Banknote, BookOpen, UserRound, Users,
   Building2, KeyRound, Fingerprint, BadgeCheck, ArrowUpRight,
@@ -11,6 +11,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import { setMemberSession, getChama } from '../lib/chametuStorage'
 import { setupDemoChama, resetAll, DEMO_CHAMA } from '../lib/setupDemo'
+import ThemeToggle from '../components/ThemeToggle'
 import logo from '../assets/logos.png'
 
 /* ============================================================
@@ -303,29 +304,29 @@ export default function Login() {
       {/* ================= RIGHT: Login form ================= */}
       <main className="flex min-h-screen items-start justify-center px-4 py-6 sm:px-8 sm:py-10 lg:items-center">
         <div className="w-full max-w-[440px]">
-          {/* Mobile brand row */}
-          <div className="mb-6 flex items-center justify-between lg:hidden">
-            <Link to="/" className="flex items-center gap-2 no-underline">
-              <img
-                src={logo}
-                alt="Chametu"
-                className="h-7 w-7 rounded-lg object-contain sm:h-8 sm:w-8"
-              />
-              <span className="font-display text-[0.98rem] font-bold text-navy sm:text-[1.05rem]">
-                Chametu
-              </span>
+          {/* Top bar: back to homepage + theme toggle */}
+          <div className="mb-5 flex items-center justify-between border-b border-line pb-4 sm:mb-6">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[0.78rem] font-semibold text-navy no-underline transition hover:border-forest hover:bg-forest/[0.04] sm:text-[0.82rem]"
+            >
+              <ArrowLeft size={14} strokeWidth={2.4} aria-hidden="true" />
+              Back home
             </Link>
             <ThemeToggle />
           </div>
 
-          {/* Desktop top row */}
-          <div className="mb-6 hidden items-center justify-between lg:flex">
-            <div className="text-[0.82rem] text-ink-soft">
-              Have an account?{' '}
-              <span className="font-semibold text-navy">Sign in below</span>
-            </div>
-            <ThemeToggle />
-          </div>
+          {/* Mobile brand */}
+          <Link to="/" className="mb-6 flex items-center gap-2 no-underline lg:hidden">
+            <img
+              src={logo}
+              alt="Chametu"
+              className="h-7 w-7 rounded-lg object-contain sm:h-8 sm:w-8"
+            />
+            <span className="font-display text-[0.98rem] font-bold text-navy sm:text-[1.05rem]">
+              Chametu
+            </span>
+          </Link>
 
           {/* ============ DYNAMIC HEADER ============ */}
           <div key={activeRole} className="animate-fade-in">
@@ -837,43 +838,5 @@ function DemoModal({ accounts, onClose, onPick }) {
         </div>
       </div>
     </div>
-  )
-}
-
-/* ============================================================
-   Theme toggle
-   ============================================================ */
-function ThemeToggle() {
-  const [dark, setDark] = useState(
-    typeof document !== 'undefined' &&
-      document.documentElement.getAttribute('data-theme') === 'dark'
-  )
-  const toggle = () => {
-    const html = document.documentElement
-    const next = dark ? 'light' : 'dark'
-    html.setAttribute('data-theme', next)
-    try {
-      localStorage.setItem('chametu_theme', next)
-    } catch {}
-    setDark(!dark)
-  }
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      className="grid h-8 w-8 place-items-center rounded-xl border border-line bg-white text-navy transition hover:border-forest hover:bg-forest/[0.04] sm:h-9 sm:w-9"
-      aria-label="Toggle theme"
-    >
-      {dark ? (
-        <Sun size={14} strokeWidth={2} className="sm:hidden" />
-      ) : (
-        <Moon size={14} strokeWidth={2} className="sm:hidden" />
-      )}
-      {dark ? (
-        <Sun size={15} strokeWidth={2} className="hidden sm:inline" />
-      ) : (
-        <Moon size={15} strokeWidth={2} className="hidden sm:inline" />
-      )}
-    </button>
   )
 }

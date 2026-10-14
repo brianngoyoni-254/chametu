@@ -1,8 +1,8 @@
 import Navbar from './Navbar'
-import Hero from './Hero'
+import HeroCartoon from './HeroCartoon'
 import TrustBar from './TrustBar'
+import CartoonExplainer from './CartoonExplainer'
 import Features from './Features'
-import Join from './Join'
 import Edge from './Edge'
 import Rewards from './Rewards'
 import HowItWorks from './HowItWorks'
@@ -15,10 +15,12 @@ export default function Home() {
   return (
     <>
       <Navbar />
-      <Hero />
-      <TrustBar />
+      <HeroCartoon />
+      <div id="trust-bar">
+        <TrustBar />
+      </div>
+      <CartoonExplainer />
       <Features />
-      <Join />
       <Edge />
       <Rewards />
       <HowItWorks />

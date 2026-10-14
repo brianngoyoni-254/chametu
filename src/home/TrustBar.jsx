@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { FiUsers, FiUserCheck, FiDollarSign, FiActivity } from 'react-icons/fi'
+import { FiUsers, FiUserCheck, FiTrendingUp, FiActivity } from 'react-icons/fi'
 import Reveal from './Reveal'
 
 const STATS = [
-  { icon: FiUsers, target: 1284, suffix: '', label: 'Chamas on Chametu' },
-  { icon: FiUserCheck, target: 18420, suffix: '', label: 'Active members' },
-  { icon: FiDollarSign, target: 1400, suffix: 'M', label: 'KSh managed' },
+  { icon: FiUsers, target: 1284, label: 'Chamas on Chametu' },
+  { icon: FiUserCheck, target: 18420, label: 'Active members' },
+  { icon: FiTrendingUp, target: 1.4, decimals: 1, prefix: 'KSh ', suffix: 'B', label: 'Managed on the platform' },
+  { icon: FiActivity, target: 99.98, decimals: 2, suffix: '%', label: 'Platform uptime' },
 ]
 
 function useCountUp(target, active) {
@@ -19,12 +20,12 @@ function useCountUp(target, active) {
       return
     }
     const start = performance.now()
-    const duration = 900
+    const duration = 1100
     let frame
 
     function step(now) {
       const p = Math.min(1, (now - start) / duration)
-      setValue(Math.round(target * (1 - Math.pow(1 - p, 3))))
+      setValue(target * (1 - Math.pow(1 - p, 3)))
       if (p < 1) frame = requestAnimationFrame(step)
     }
     frame = requestAnimationFrame(step)
@@ -34,18 +35,26 @@ function useCountUp(target, active) {
   return value
 }
 
-function Stat({ icon: Icon, target, suffix, label, active }) {
+function Stat({ icon: Icon, target, decimals = 0, prefix = '', suffix = '', label, active }) {
   const value = useCountUp(target, active)
+  const text = value.toLocaleString('en-KE', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest">
-        <Icon size={15} strokeWidth={2.2} aria-hidden="true" />
+    <div className="flex items-center gap-3.5 px-5 py-5 sm:px-6 sm:py-6">
+      <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-forest/10 text-forest">
+        <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
       </span>
-      <b className="font-display text-[1.3rem] font-bold leading-tight text-navy">
-        {value.toLocaleString()}
-        {suffix}
-      </b>
-      <span className="text-[.76rem] text-ink-soft">{label}</span>
+      <div className="min-w-0">
+        <b className="block font-display text-[1.35rem] font-bold leading-none tracking-tight tabular-nums text-navy sm:text-[1.6rem]">
+          {prefix}
+          {text}
+          {suffix}
+        </b>
+        <span className="mt-1.5 block text-[.78rem] leading-tight text-ink-soft">{label}</span>
+      </div>
     </div>
   )
 }
@@ -77,21 +86,16 @@ export default function TrustBar() {
   }, [])
 
   return (
-    <div className="wrap">
+    // Overlaps the bottom edge of the hero so the stats read as part of the first screen.
+    <div className="wrap relative z-20 -mt-10 sm:-mt-14">
       <Reveal direction="fade">
-        <div ref={ref} className="border-y border-line py-[22px]">
-          <div className="grid grid-cols-2 gap-[22px] text-center sm:grid-cols-4 sm:gap-[18px]">
-            {STATS.map((s) => (
-              <Stat key={s.label} {...s} active={active} />
-            ))}
-            <div className="flex flex-col items-center gap-1">
-              <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest">
-                <FiActivity size={15} strokeWidth={2.2} aria-hidden="true" />
-              </span>
-              <b className="font-display text-[1.3rem] font-bold leading-tight text-navy">99.98%</b>
-              <span className="text-[.76rem] text-ink-soft">Platform uptime</span>
-            </div>
-          </div>
+        <div
+          ref={ref}
+          className="grid grid-cols-1 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-[0_30px_60px_-30px_rgba(11,31,51,0.35)] min-[560px]:grid-cols-2 min-[560px]:divide-y-0 lg:grid-cols-4 lg:divide-x"
+        >
+          {STATS.map((s) => (
+            <Stat key={s.label} {...s} active={active} />
+          ))}
         </div>
       </Reveal>
     </div>

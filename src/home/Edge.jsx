@@ -26,28 +26,32 @@ const EDGE = [
 
 export default function Edge() {
   return (
-    <section id="edge" className="pb-2.5 pt-[70px]">
-      <div className="wrap">
-        <Reveal className="max-w-[60ch]">
-          <h2 className="max-w-[22ch] text-[clamp(1.6rem,3vw,2.2rem)]">Built for how chamas actually run</h2>
-          <p className="mt-2.5">
+    <section id="edge" className="border-y border-line bg-card py-20 sm:py-24">
+      <div className="wrap grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+        <Reveal className="lg:sticky lg:top-28 lg:self-start">
+          <h2 className="max-w-[18ch] font-display text-[1.9rem] font-bold leading-tight tracking-tight text-navy sm:text-[2.4rem]">
+            Built for how chamas actually run
+          </h2>
+          <p className="mt-3 max-w-[40ch] text-[1rem] leading-relaxed text-ink-soft">
             Everything Kenyan chamas do by WhatsApp, notebooks and guesswork, now in one place.
           </p>
         </Reveal>
 
-        <div className="mt-7 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
-          {EDGE.map(([Icon, title, desc], i) => (
-            <Reveal key={title} delay={i * 70} className="h-full">
-              <div className="card-v2 h-full">
-                <span className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-[#E9F5EF] text-forest">
+        <Reveal>
+          <ul className="divide-y divide-line border-y border-line">
+            {EDGE.map(([Icon, title, desc]) => (
+              <li key={title} className="flex gap-4 py-6 sm:gap-5">
+                <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-forest/10 text-forest">
                   <Icon size={19} strokeWidth={2.2} aria-hidden="true" />
                 </span>
-                <h3 className="mb-1.5 text-[1.02rem]">{title}</h3>
-                <p className="text-[.9rem]">{desc}</p>
-              </div>
-            </Reveal>
-          ))}
-        </div>
+                <div className="min-w-0">
+                  <h3 className="font-display text-[1.08rem] font-semibold text-navy">{title}</h3>
+                  <p className="mt-1.5 max-w-[52ch] text-[.92rem] leading-relaxed text-ink-soft">{desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Reveal>
       </div>
     </section>
   )

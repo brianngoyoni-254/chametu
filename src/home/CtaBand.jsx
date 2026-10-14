@@ -4,31 +4,42 @@ import Reveal from './Reveal'
 
 export default function CtaBand() {
   return (
-    <section className="py-16">
+    <section className="pb-20 pt-4 sm:pb-24">
       <div className="wrap">
-        <Reveal className="relative flex flex-wrap items-center justify-between gap-[26px] overflow-hidden rounded-[14px] bg-forest px-6 py-8 sm:rounded-[20px] sm:px-11 sm:py-[50px]">
-          <div className="pointer-events-none absolute -left-10 -top-[60px] h-[200px] w-[200px] rounded-full bg-[rgba(217,164,65,.16)]" />
-          <div className="pointer-events-none absolute -bottom-[80px] -right-[60px] h-[220px] w-[220px] rounded-full bg-[rgba(255,255,255,.06)]" />
+        <Reveal className="relative overflow-hidden rounded-3xl bg-[linear-gradient(135deg,#0B7A5A,#075540)] px-6 py-10 sm:px-12 sm:py-14">
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.08]"
+            style={{
+              backgroundImage:
+                'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+              maskImage: 'radial-gradient(ellipse 60% 100% at 100% 0%, #000, transparent 70%)',
+              WebkitMaskImage: 'radial-gradient(ellipse 60% 100% at 100% 0%, #000, transparent 70%)',
+            }}
+          />
+          <div className="pointer-events-none absolute -left-16 -top-20 h-56 w-56 rounded-full bg-[rgba(245,185,66,.18)] blur-xl" />
 
-          <div className="relative min-w-0">
-            <h2 className="max-w-[15ch] text-[1.7rem] text-white">
-              Bring your chama onto Chametu.
-            </h2>
-            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[#D7EBE0]">
-              <FiCheckCircle size={14} className="shrink-0 text-gold" aria-hidden="true" />
-              <span>Set up in minutes. Every contribution, loan and meeting in one secure ledger.</span>
-            </p>
-          </div>
+          <div className="relative flex flex-wrap items-center justify-between gap-8">
+            <div className="min-w-0">
+              <h2 className="max-w-[16ch] font-display text-[1.9rem] font-bold leading-tight tracking-tight text-white sm:text-[2.4rem]">
+                Bring your chama onto Chametu.
+              </h2>
+              <p className="mt-3 flex max-w-[52ch] items-start gap-2 text-[.98rem] leading-relaxed text-[#D7EBE0]">
+                <FiCheckCircle size={16} className="mt-[3px] shrink-0 text-gold" aria-hidden="true" />
+                <span>Set up in minutes. Every contribution, loan and meeting in one secure ledger.</span>
+              </p>
+            </div>
 
-          <div className="relative flex flex-wrap gap-3 max-sm:w-full">
-            <Link to="/register" className="btn btn-gold max-sm:flex-auto">
-              Create your chama
-              <FiArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
-            </Link>
-            <Link to="/login" className="btn btn-outline max-sm:flex-auto">
-              <FiLogIn size={15} strokeWidth={2.5} aria-hidden="true" />
-              Log in
-            </Link>
+            <div className="flex flex-wrap gap-3 max-sm:w-full">
+              <Link to="/register" className="btn btn-gold max-sm:flex-auto">
+                Create your chama
+                <FiArrowRight size={15} strokeWidth={2.5} aria-hidden="true" />
+              </Link>
+              <Link to="/login" className="btn btn-outline max-sm:flex-auto">
+                <FiLogIn size={15} strokeWidth={2.5} aria-hidden="true" />
+                Log in
+              </Link>
+            </div>
           </div>
         </Reveal>
       </div>
