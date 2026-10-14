@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
 @import "tailwindcss";
 
 @theme {
@@ -17,16 +17,46 @@
   --font-display: "Sora", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Instrument Serif", Georgia, serif;
 
   --breakpoint-nav: 861px;
   --breakpoint-hero: 961px;
+
+  /* Cartoon + hero animations */
+  --animate-float: float 5s ease-in-out infinite;
+  --animate-pop-in: pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-bubble-in: bubble-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  --animate-bounce-soft: bounce-soft 2.6s ease-in-out infinite;
+  --animate-fade-up: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ------------------------------------------------------------------
-   DARK MODE — override the --color-* tokens that Tailwind utilities
-   are generated from. This is what makes bg-paper, text-navy, etc.
-   swap when data-theme="dark" is set on <html>.
-   ------------------------------------------------------------------ */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes pop-in {
+  0% { opacity: 0; transform: scale(0.85) translateY(10px); }
+  60% { opacity: 1; transform: scale(1.03) translateY(0); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+@keyframes bubble-in {
+  0% { opacity: 0; transform: translateY(8px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes bounce-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(14px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Dark mode overrides */
 :root[data-theme="dark"] {
   --color-forest: #34D399;
   --color-forest-dark: #10B981;
@@ -54,9 +84,7 @@
     background-repeat: no-repeat;
   }
 
-  h1,
-  h2,
-  h3 {
+  h1, h2, h3 {
     font-family: var(--font-display);
     font-weight: 700;
     color: var(--color-navy);
@@ -75,9 +103,7 @@
     padding-inline: 18px;
   }
   @media (min-width: 641px) {
-    .wrap {
-      padding-inline: 28px;
-    }
+    .wrap { padding-inline: 28px; }
   }
 
   .btn {
@@ -93,41 +119,31 @@
     cursor: pointer;
     transition: all 0.15s;
   }
-  .btn:active {
-    transform: translateY(1px);
-  }
+  .btn:active { transform: translateY(1px); }
 
   .btn-primary {
     background: linear-gradient(135deg, #0B7A5A, #10B981);
     color: #fff;
   }
-  .btn-primary:hover {
-    box-shadow: 0 6px 18px rgba(11, 93, 59, 0.32);
-  }
+  .btn-primary:hover { box-shadow: 0 6px 18px rgba(11, 93, 59, 0.32); }
 
   .btn-ghost {
     color: var(--color-navy);
     border-color: var(--color-line);
   }
-  .btn-ghost:hover {
-    border-color: var(--color-navy);
-  }
+  .btn-ghost:hover { border-color: var(--color-navy); }
 
   .btn-gold {
     background: var(--color-gold);
     color: #3A2A08;
   }
-  .btn-gold:hover {
-    box-shadow: 0 6px 18px rgba(217, 164, 65, 0.4);
-  }
+  .btn-gold:hover { box-shadow: 0 6px 18px rgba(217, 164, 65, 0.4); }
 
   .btn-outline {
     color: #fff;
     border-color: rgba(255, 255, 255, 0.35);
   }
-  .btn-outline:hover {
-    border-color: #fff;
-  }
+  .btn-outline:hover { border-color: #fff; }
 
   .btn-white {
     background: #fff;
@@ -146,9 +162,7 @@
     box-shadow: 0 1px 2px rgba(11, 31, 51, 0.05), 0 8px 24px rgba(11, 31, 51, 0.05);
     transition: transform 0.15s;
   }
-  .card-v2:hover {
-    transform: translateY(-3px);
-  }
+  .card-v2:hover { transform: translateY(-3px); }
 
   /* Scroll reveal */
   .reveal {
@@ -159,18 +173,10 @@
       transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
     backface-visibility: hidden;
   }
-  .reveal-left {
-    transform: translate3d(-22px, 0, 0);
-  }
-  .reveal-right {
-    transform: translate3d(22px, 0, 0);
-  }
-  .reveal-down {
-    transform: translate3d(0, -22px, 0);
-  }
-  .reveal-fade {
-    transform: none;
-  }
+  .reveal-left { transform: translate3d(-22px, 0, 0); }
+  .reveal-right { transform: translate3d(22px, 0, 0); }
+  .reveal-down { transform: translate3d(0, -22px, 0); }
+  .reveal-fade { transform: none; }
   .reveal.is-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0);
@@ -205,12 +211,8 @@
     transform: translateY(0) scale(1);
     pointer-events: auto;
   }
-  .scroll-top:hover {
-    box-shadow: 0 14px 30px -8px rgba(11, 93, 59, 0.65);
-  }
-  .scroll-top:active {
-    transform: translateY(1px) scale(0.98);
-  }
+  .scroll-top:hover { box-shadow: 0 14px 30px -8px rgba(11, 93, 59, 0.65); }
+  .scroll-top:active { transform: translateY(1px) scale(0.98); }
   @media (min-width: 641px) {
     .scroll-top {
       right: 28px;
@@ -219,103 +221,114 @@
       width: 46px;
     }
   }
+
+  /* Fullscreen hero video */
+  .hero-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .hero-veil {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    background:
+      radial-gradient(900px 600px at 20% 10%, rgba(11, 122, 90, 0.34), transparent 60%),
+      radial-gradient(800px 500px at 90% 100%, rgba(245, 185, 66, 0.18), transparent 60%),
+      linear-gradient(180deg, rgba(7, 20, 16, 0.5) 0%, rgba(7, 20, 16, 0.32) 45%, rgba(7, 20, 16, 0.82) 100%);
+  }
+
+  /* Animated hamburger lines */
+  .hamburger-line {
+    display: block;
+    height: 2px;
+    border-radius: 999px;
+    transition:
+      transform 0.5s cubic-bezier(0.76, 0, 0.24, 1),
+      opacity 0.35s ease,
+      width 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+  }
+
+  /* Cartoon speech bubble tail */
+  .bubble-tail-left::after,
+  .bubble-tail-right::after {
+    content: "";
+    position: absolute;
+    top: 22px;
+    width: 12px;
+    height: 12px;
+    transform: rotate(45deg);
+    background: inherit;
+    border: inherit;
+    border-radius: 2px;
+  }
+  .bubble-tail-left::after {
+    left: -7px;
+    border-right: none;
+    border-top: none;
+  }
+  .bubble-tail-right::after {
+    right: -7px;
+    border-left: none;
+    border-bottom: none;
+  }
 }
 
-/* ------------------------------------------------------------------
-   DARK MODE OVERRIDES FOR HARDCODED BACKGROUNDS
-
-   Tailwind v4 generates bg-white and arbitrary hex values as fixed
-   colors that don't read from CSS variables. These rules force
-   them to the themable card/paper tokens when data-theme=dark is
-   set on <html>. Written outside @layer so they beat the compiled
-   utilities on specificity.
-
-   !important is intentional — this is a theming shim, not a
-   regular style. Remove it if you later swap these utilities to
-   bg-card / bg-paper everywhere in the codebase.
-   ------------------------------------------------------------------ */
-
-/* Solid white surfaces (cards, modals, inputs) */
+/* Dark mode overrides for hardcoded backgrounds */
 [data-theme="dark"] .bg-white {
   background-color: var(--color-card) !important;
 }
-
 [data-theme="dark"] .focus-within\:bg-white:focus-within {
   background-color: var(--color-card) !important;
 }
-
-/* Pale page and input backgrounds used on auth pages */
 [data-theme="dark"] .bg-\[\#F5F7F9\],
 [data-theme="dark"] .bg-\[\#F6F8FA\],
 [data-theme="dark"] .bg-\[\#F8FAFC\],
 [data-theme="dark"] .bg-\[\#F3F6F9\] {
   background-color: var(--color-paper) !important;
 }
-
 [data-theme="dark"] .bg-\[\#F8FAFC\]:focus-within {
   background-color: var(--color-card) !important;
 }
-
-/* Translucent white used on the dark left panels of auth pages */
 [data-theme="dark"] .bg-white\/\[0\.08\] {
   background-color: rgba(255, 255, 255, 0.06) !important;
 }
-
 [data-theme="dark"] .bg-white\/\[0\.12\] {
   background-color: rgba(255, 255, 255, 0.10) !important;
 }
-
-/* Translucent white used for segmented controls and hover states */
 [data-theme="dark"] .bg-white\/5 {
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
-
 [data-theme="dark"] .bg-white\/10 {
   background-color: rgba(255, 255, 255, 0.08) !important;
 }
-
 [data-theme="dark"] .bg-white\/15 {
   background-color: rgba(255, 255, 255, 0.10) !important;
 }
-
-/* Pale tint badges used in admin tables and stat cards */
 [data-theme="dark"] .bg-\[\#E9F5EF\] {
   background-color: rgba(16, 185, 129, 0.14) !important;
 }
-
 [data-theme="dark"] .bg-\[\#FBF1E0\],
 [data-theme="dark"] .bg-\[\#FBF1DA\] {
   background-color: rgba(245, 185, 66, 0.16) !important;
 }
-
 [data-theme="dark"] .bg-\[\#FBEAE8\] {
   background-color: rgba(229, 72, 77, 0.16) !important;
 }
-
 [data-theme="dark"] .bg-\[\#EAF1F7\] {
   background-color: rgba(148, 163, 184, 0.12) !important;
 }
-
-/* Pale amber text used inside tint badges — brighten for readability */
 [data-theme="dark"] .text-\[\#8A6417\],
 [data-theme="dark"] .text-\[\#8A6112\] {
   color: var(--color-gold) !important;
 }
-
-/* Brighten fixed reds and greens on dark tints */
 [data-theme="dark"] .text-red-600 {
   color: #F87171 !important;
 }
 
-/* ------------------------------------------------------------------
-   DARK MODE OVERRIDES FOR LANDING PAGE SECTIONS
-
-   Landing sections (Hero mock card, Security "Everyone knows where
-   the money is") use pale hardcoded backgrounds that don't flip
-   with the theme. These rules catch the common variants.
-   ------------------------------------------------------------------ */
-
-/* Pale neutral backgrounds used as section wrappers */
 [data-theme="dark"] .bg-\[\#F0F4F2\],
 [data-theme="dark"] .bg-\[\#F0F6F4\],
 [data-theme="dark"] .bg-\[\#EFF5F2\],
@@ -327,7 +340,6 @@
   background-color: var(--color-card) !important;
 }
 
-/* Tailwind palette 50 tints used as landing section backgrounds */
 [data-theme="dark"] .bg-slate-50,
 [data-theme="dark"] .bg-gray-50,
 [data-theme="dark"] .bg-zinc-50,
@@ -351,26 +363,22 @@
   background-color: var(--color-card) !important;
 }
 
-/* Landing section headings — sometimes rendered on pale bg with light text */
 [data-theme="dark"] .bg-card h1,
 [data-theme="dark"] .bg-card h2,
 [data-theme="dark"] .bg-card h3 {
   color: var(--color-navy) !important;
 }
 
-/* Landing section paragraphs on card backgrounds */
 [data-theme="dark"] .bg-card p {
   color: var(--color-ink-soft) !important;
 }
 
-/* Inline em (accent colour inside headings) stays readable */
 [data-theme="dark"] h1 em,
 [data-theme="dark"] h2 em,
 [data-theme="dark"] h3 em {
   color: var(--color-emerald) !important;
 }
 
-/* Native form controls (checkbox, scrollbar, select) match the theme */
 [data-theme="dark"] {
   color-scheme: dark;
 }
