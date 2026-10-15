@@ -286,6 +286,41 @@ export default function HeroCartoon() {
   const [saved, setSaved] = useState(1250000)
   const [ready, setReady] = useState(false)
 
+  /* ---------- Viewport awareness (all phone types) ---------- */
+  const [vp, setVp] = useState(() => {
+    if (typeof window === 'undefined') return { w: 1200, h: 800 }
+    return { w: window.innerWidth, h: window.innerHeight }
+  })
+  useEffect(() => {
+    let raf = null
+    const update = () => {
+      if (raf) cancelAnimationFrame(raf)
+      raf = requestAnimationFrame(() =>
+        setVp({ w: window.innerWidth, h: window.innerHeight })
+      )
+    }
+    window.addEventListener('resize', update)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('orientationchange', update)
+      if (raf) cancelAnimationFrame(raf)
+    }
+  }, [])
+
+  const vw = vp.w
+  const vh = vp.h
+  const aspect = vw / Math.max(1, vh)
+  const isTinyPhone = vw < 380
+
+  /* ---------- Layout modes ----------
+     stack   : portrait phones / small tablets. Copy on top, the FULL
+               16:9 scene underneath (never cropped).
+     side    : short landscape phones. Copy left, FULL scene right.
+     overlay : desktop / wide screens. Scene fills hero, copy on top.   */
+  const sideMode = vh < 520 && aspect >= 1.1 && vw < 1100
+  const stackMode = !sideMode && (vw < 768 || aspect < 1.1)
+  const mode = stackMode ? 'stack' : sideMode ? 'side' : 'overlay'
   useEffect(() => {
     const t = setTimeout(() => setReady(true), 200)
     return () => clearTimeout(t)
@@ -306,18 +341,13 @@ export default function HeroCartoon() {
   }, [phase])
 
   // Phase helpers
-  const inExterior = phase === 'walk-in' || phase === 'arrive' || phase === 'walk-out' || phase === 'reset'
+  const inExterior =
+    phase === 'walk-in' || phase === 'arrive' || phase === 'walk-out' || phase === 'reset'
   const inInterior = phase === 'interior'
   const walking = phase === 'walk-in' || phase === 'walk-out'
   const celebrating = inInterior || phase === 'walk-out'
   const holdingCoin = phase === 'walk-in'
   const doorOpen = phase === 'arrive' || phase === 'interior' || phase === 'exit'
-
-  // Interior stage sub-timings
-  const stage = (() => {
-    if (!inInterior) return 'idle'
-    return 'sequence'
-  })()
 
   // Character class for the exterior animation
   const extCharClass =
@@ -328,9 +358,6 @@ export default function HeroCartoon() {
         : phase === 'reset'
           ? 'ext-reset'
           : 'ext-at-door'
-
-  // Teller mode based on interior sub-timing (driven by CSS animation delays)
-  const tellerMode = inInterior ? 'sequence' : 'idle'
 
   // Hero text visible whenever we are NOT inside the bank
   const textVisible = !inInterior
@@ -343,17 +370,94 @@ export default function HeroCartoon() {
     if (next) next.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  /* ---------- Scene geometry (scene space is 1600 x 900) ---------- */
+  // stack/side use "meet" so the whole scene is always visible.
+  // overlay uses "slice" anchored right so the bank is never cropped away.
+  const visW = mode === 'overlay' ? Math.min(1600, (vw * 900) / Math.max(1, vh)) : 1600
+  const leftCrop = mode === 'overlay' ? 1600 - visW : 0
+
+  // The bank door sits at a fixed spot in scene space (~x 1170), so the
+  // walker always stops there, whatever the screen size.
+  const DOOR_STOP_X = 1020
+  const walkInFromScene = leftCrop - 240
+  const walkInToScene = DOOR_STOP_X
+  const walkOutToScene = 1720
+
+  const walkInFrom = `${walkInFromScene}px`
+  const walkInTo = `${walkInToScene}px`
+  const walkOutTo = `${walkOutToScene}px`
+  const doorX = walkInToScene
+
+  const exteriorAspect = mode === 'overlay' ? 'xMaxYMid slice' : 'xMidYMid meet'
+  const interiorAspect = mode === 'overlay' ? 'xMidYMid slice' : 'xMidYMid meet'
+
+  // Speech bubbles shrink with the scene on phones; scale them back up
+  const pxPerUnit =
+    mode === 'overlay'
+      ? Math.max(vw / 1600, vh / 900)
+      : mode === 'stack'
+        ? vw / 1600
+        : Math.min(vw * 0.6, (vh - 24) * (16 / 9)) / 1600
+  const bubbleK = Math.min(2.4, Math.max(1, 9 / (13 * pxPerUnit)))
+
+  const sectionStyle =
+    mode === 'stack'
+      ? { minHeight: '100svh', background: '#0E3B3F', display: 'flex', flexDirection: 'column' }
+      : mode === 'side'
+        ? {
+            height: '100svh',
+            minHeight: '340px',
+            background: '#0E3B3F',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
+          }
+        : { height: '100svh', minHeight: '560px' }
+
+  const sceneBoxStyle =
+    mode === 'stack'
+      ? { position: 'relative', width: '100%', aspectRatio: '16 / 9', order: 2, flexShrink: 0 }
+      : mode === 'side'
+        ? {
+            position: 'relative',
+            width: 'min(60vw, calc((100svh - 1.5rem) * 16 / 9))',
+            aspectRatio: '16 / 9',
+            order: 2,
+            flexShrink: 0,
+          }
+        : { position: 'absolute', inset: 0 }
+
+  const copyClass =
+    mode === 'overlay'
+      ? 'pointer-events-none absolute inset-0 z-10 flex flex-col'
+      : mode === 'stack'
+        ? 'relative z-10 flex flex-1 flex-col'
+        : 'relative z-10 flex h-full flex-1 flex-col'
+
+  const copyPadding =
+    mode === 'overlay'
+      ? {
+          paddingTop: 'max(6rem, calc(env(safe-area-inset-top, 0px) + 5.5rem))',
+          paddingBottom: 'calc(12svh + env(safe-area-inset-bottom, 0px))',
+        }
+      : mode === 'stack'
+        ? {
+            paddingTop: 'max(5.5rem, calc(env(safe-area-inset-top, 0px) + 5rem))',
+            paddingBottom: '1.5rem',
+          }
+        : { paddingTop: '4.5rem', paddingBottom: '1rem' }
+
   return (
-    <section className="relative h-screen min-h-[600px] w-full overflow-hidden bg-navy">
+    <section className="relative w-full overflow-hidden bg-navy" style={sectionStyle}>
       <style>{`
         /* ---------- Walking ---------- */
         @keyframes walkIn {
-          from { transform: translateX(-320px); }
-          to   { transform: translateX(1000px); }
+          from { transform: translateX(${walkInFrom}); }
+          to   { transform: translateX(${walkInTo}); }
         }
         @keyframes walkOut {
-          from { transform: translateX(1000px); }
-          to   { transform: translateX(2200px); }
+          from { transform: translateX(${walkInTo}); }
+          to   { transform: translateX(${walkOutTo}); }
         }
         @keyframes legNear {
           0%, 100% { transform: rotate(-24deg); }
@@ -388,8 +492,8 @@ export default function HeroCartoon() {
 
         .ext-walk-in  { animation: walkIn  4.8s linear forwards; }
         .ext-walk-out { animation: walkOut 4.2s linear forwards; }
-        .ext-at-door  { transform: translateX(1000px); }
-        .ext-reset    { transform: translateX(-320px); opacity: 0; }
+        .ext-at-door  { transform: translateX(${doorX}px); }
+        .ext-reset    { transform: translateX(${walkInFrom}); opacity: 0; }
 
         /* ---------- Exterior ambience ---------- */
         @keyframes cloudDriftSlow {
@@ -418,7 +522,6 @@ export default function HeroCartoon() {
         }
 
         /* ---------- Interior: cinematic deposit ---------- */
-        /* Character hand lifts with cash */
         @keyframes cashLift {
           0%   { transform: translate(0, 0); }
           100% { transform: translate(34px, -36px); }
@@ -426,12 +529,10 @@ export default function HeroCartoon() {
         @keyframes cashHide {
           to { opacity: 0; }
         }
-        /* Cash bundle travels across the counter */
         @keyframes cashAcross {
           0%   { transform: translate(0, 0); opacity: 1; }
           100% { transform: translate(360px, 0); opacity: 1; }
         }
-        /* Teller leans forward */
         @keyframes tellerReach {
           0%   { transform: translate(0, 0); }
           100% { transform: translate(-58px, -10px); }
@@ -446,26 +547,22 @@ export default function HeroCartoon() {
           50%  { transform: translate(-58px, -10px); }
           100% { transform: translate(0, 0); }
         }
-        /* Cash fades as teller collects */
         @keyframes cashCollect {
           0%   { transform: translate(360px, 0) scale(1); opacity: 1; }
           100% { transform: translate(410px, -6px) scale(0.55); opacity: 0; }
         }
-        /* Register drawer pops open and closes */
         @keyframes drawerOpen {
           0%   { transform: translateY(0); }
           45%  { transform: translateY(22px); }
           55%  { transform: translateY(22px); }
           100% { transform: translateY(0); }
         }
-        /* Receipt slides back to character */
         @keyframes receiptBack {
           0%   { transform: translate(360px, 0) scale(0.9); opacity: 0; }
           10%  { transform: translate(360px, 0) scale(0.9); opacity: 1; }
           100% { transform: translate(0, 0) scale(1); opacity: 1; }
         }
 
-        /* Timeline anchoring for the interior sequence */
         .t-hand-lift  { animation: cashLift 600ms cubic-bezier(0.4, 0, 0.2, 1) 300ms both, cashHide 120ms linear 880ms forwards; }
         .t-cash-a     { animation: cashAcross 900ms cubic-bezier(0.35, 0, 0.2, 1) 900ms both; }
         .t-teller-a   { animation: tellerReach 500ms cubic-bezier(0.4, 0, 0.2, 1) 1800ms both; }
@@ -506,6 +603,7 @@ export default function HeroCartoon() {
         }
       `}</style>
 
+      <div style={sceneBoxStyle}>
       {/* ==========================================================
           EXTERIOR
       ========================================================== */}
@@ -516,7 +614,7 @@ export default function HeroCartoon() {
       >
         <svg
           viewBox="0 0 1600 900"
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio={exteriorAspect}
           className="absolute inset-0 h-full w-full"
           aria-hidden="true"
         >
@@ -819,40 +917,40 @@ export default function HeroCartoon() {
 
           {/* Speech bubble at the door */}
           {phase === 'arrive' && (
-            <g transform="translate(760, 320)">
-<g
-              style={{ animation: 'bubblePop 0.5s cubic-bezier(0.34,1.56,0.64,1) both' }}
-            >
-              <path
-                d="M0 0 Q0 -20 20 -20 L200 -20 Q220 -20 220 0 L220 40 Q220 60 200 60 L40 60 L20 82 L28 60 L20 60 Q0 60 0 40 Z"
-                fill="#FFFFFF"
-                stroke="#E3E9EF"
-                strokeWidth="2"
-              />
-              <text
-                x="110"
-                y="16"
-                textAnchor="middle"
-                fontFamily="Inter, system-ui"
-                fontSize="13"
-                fontWeight="600"
-                fill="#0B1F33"
+            <g transform={`translate(780, 402) scale(${bubbleK}) translate(-20, -82)`}>
+              <g
+                style={{ animation: 'bubblePop 0.5s cubic-bezier(0.34,1.56,0.64,1) both' }}
               >
-                Time to save
-              </text>
-              <text
-                x="110"
-                y="36"
-                textAnchor="middle"
-                fontFamily="Inter, system-ui"
-                fontSize="13"
-                fontWeight="600"
-                fill="#0B1F33"
-              >
-                for the chama!
-              </text>
+                <path
+                  d="M0 0 Q0 -20 20 -20 L200 -20 Q220 -20 220 0 L220 40 Q220 60 200 60 L40 60 L20 82 L28 60 L20 60 Q0 60 0 40 Z"
+                  fill="#FFFFFF"
+                  stroke="#E3E9EF"
+                  strokeWidth="2"
+                />
+                <text
+                  x="110"
+                  y="16"
+                  textAnchor="middle"
+                  fontFamily="Inter, system-ui"
+                  fontSize="13"
+                  fontWeight="600"
+                  fill="#0B1F33"
+                >
+                  Time to save
+                </text>
+                <text
+                  x="110"
+                  y="36"
+                  textAnchor="middle"
+                  fontFamily="Inter, system-ui"
+                  fontSize="13"
+                  fontWeight="600"
+                  fill="#0B1F33"
+                >
+                  for the chama!
+                </text>
+              </g>
             </g>
-</g>
           )}
         </svg>
       </div>
@@ -867,7 +965,7 @@ export default function HeroCartoon() {
       >
         <svg
           viewBox="0 0 1600 900"
-          preserveAspectRatio="xMidYMid slice"
+          preserveAspectRatio={interiorAspect}
           className="absolute inset-0 h-full w-full"
           aria-hidden="true"
         >
@@ -942,11 +1040,9 @@ export default function HeroCartoon() {
             <g transform="translate(140, 380)">
               <rect x="0" y="0" width="200" height="220" rx="10" fill="#2B2E33" />
               <rect x="10" y="10" width="180" height="200" rx="8" fill="#4A4D52" />
-              {/* Vault door circle */}
               <circle cx="100" cy="110" r="70" fill="#6B6E73" />
               <circle cx="100" cy="110" r="58" fill="#8B8E93" />
               <circle cx="100" cy="110" r="40" fill="#5A5D62" />
-              {/* Vault wheel */}
               <circle cx="100" cy="110" r="30" fill="none" stroke="#F5B942" strokeWidth="5" />
               <line x1="100" y1="82" x2="100" y2="138" stroke="#F5B942" strokeWidth="4" />
               <line x1="72" y1="110" x2="128" y2="110" stroke="#F5B942" strokeWidth="4" />
@@ -954,7 +1050,6 @@ export default function HeroCartoon() {
               <line x1="120" y1="90" x2="80" y2="130" stroke="#F5B942" strokeWidth="4" />
               <circle cx="100" cy="110" r="10" fill="#F5B942" />
               <circle cx="100" cy="110" r="4" fill="#3A2A08" />
-              {/* Sign */}
               <rect x="60" y="-30" width="80" height="20" rx="4" fill="#0B1F33" />
               <text
                 x="100"
@@ -1018,7 +1113,7 @@ export default function HeroCartoon() {
               <rect key={x} x={x} y="300" width="4" height="260" fill="#0B1F33" />
             ))}
 
-            {/* Teller window opening (where the deposit happens) */}
+            {/* Teller window opening */}
             <rect x="1010" y="380" width="230" height="150" fill="#EFE4C4" />
             <rect
               x="1010"
@@ -1031,7 +1126,7 @@ export default function HeroCartoon() {
             />
             <rect x="1010" y="524" width="230" height="6" fill="#0B1F33" />
 
-            {/* Cash tray on the counter between character and teller */}
+            {/* Cash tray on the counter */}
             <g transform="translate(880, 545)">
               <rect x="-46" y="-8" width="92" height="18" rx="4" fill="#2B2E33" />
               <rect x="-42" y="-6" width="84" height="14" rx="3" fill="#0B1F33" />
@@ -1066,13 +1161,7 @@ export default function HeroCartoon() {
 
             {/* Teller */}
             <g transform="translate(1020, 390)">
-              <TellerBody
-                mode={
-                  !inInterior
-                    ? 'idle'
-                    : 'sequence' // the internal CSS keyframes handle the phases
-                }
-              />
+              <TellerBody mode={!inInterior ? 'idle' : 'sequence'} />
             </g>
 
             {/* Teller nameplate */}
@@ -1172,7 +1261,7 @@ export default function HeroCartoon() {
               <circle cx="38" cy="-36" r="17" fill="#0E8E68" />
             </g>
 
-            {/* Interior savings LED (behind character) */}
+            {/* Interior savings LED */}
             <g transform="translate(340, 500)">
               <rect
                 x="-150"
@@ -1226,7 +1315,6 @@ export default function HeroCartoon() {
                 }}
               >
                 <CharacterBody offering={inInterior} celebrating={inInterior} />
-                {/* Cash lifted in the forward hand, hands over to the counter animation */}
                 {inInterior && (
                   <g className="t-hand-lift">
                     <g transform="translate(142, 196) rotate(-6)">
@@ -1254,14 +1342,53 @@ export default function HeroCartoon() {
             {/* ============ CASH BUNDLE CROSSING THE COUNTER ============ */}
             {inInterior && (
               <g transform="translate(660, 555)">
-<g className="t-cash-a">
-                <g>
+                <g className="t-cash-a">
+                  <g>
+                    <g transform="rotate(-6)">
+                      <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#7A5230" />
+                      <rect x="-30" y="-12" width="60" height="24" rx="3" fill="#10B981" />
+                      <rect x="-22" y="-6" width="44" height="4" rx="2" fill="#F5B942" opacity="0.8" />
+                      <rect x="-22" y="0" width="30" height="3" rx="1.5" fill="#F5B942" opacity="0.6" />
+                      <rect x="-22" y="5" width="36" height="3" rx="1.5" fill="#F5B942" opacity="0.5" />
+                      <text
+                        x="0"
+                        y="4"
+                        textAnchor="middle"
+                        fontFamily="Sora, system-ui"
+                        fontSize="7"
+                        fontWeight="800"
+                        fill="#0B1F33"
+                      >
+                        KSh 5,000
+                      </text>
+                    </g>
+                    <g transform="translate(28, -18)">
+                      <circle cx="0" cy="0" r="9" fill="#F5B942" stroke="#E8A21F" strokeWidth="1.4" />
+                      <text
+                        x="0"
+                        y="3.5"
+                        textAnchor="middle"
+                        fontFamily="Sora, system-ui"
+                        fontSize="9"
+                        fontWeight="800"
+                        fill="#7A5313"
+                      >
+                        K
+                      </text>
+                    </g>
+                  </g>
+                </g>
+              </g>
+            )}
+
+            {/* Second layer: cash being collected */}
+            {inInterior && (
+              <g transform="translate(1020, 555)">
+                <g className="t-cash-b">
                   <g transform="rotate(-6)">
                     <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#7A5230" />
                     <rect x="-30" y="-12" width="60" height="24" rx="3" fill="#10B981" />
                     <rect x="-22" y="-6" width="44" height="4" rx="2" fill="#F5B942" opacity="0.8" />
-                    <rect x="-22" y="0" width="30" height="3" rx="1.5" fill="#F5B942" opacity="0.6" />
-                    <rect x="-22" y="5" width="36" height="3" rx="1.5" fill="#F5B942" opacity="0.5" />
                     <text
                       x="0"
                       y="4"
@@ -1274,126 +1401,87 @@ export default function HeroCartoon() {
                       KSh 5,000
                     </text>
                   </g>
-                  <g transform="translate(28, -18)">
-                    <circle cx="0" cy="0" r="9" fill="#F5B942" stroke="#E8A21F" strokeWidth="1.4" />
-                    <text
-                      x="0"
-                      y="3.5"
-                      textAnchor="middle"
-                      fontFamily="Sora, system-ui"
-                      fontSize="9"
-                      fontWeight="800"
-                      fill="#7A5313"
-                    >
-                      K
-                    </text>
-                  </g>
                 </g>
               </g>
-</g>
-            )}
-
-            {/* Second layer: cash being collected (fades out at teller's hand) */}
-            {inInterior && (
-              <g transform="translate(1020, 555)">
-<g className="t-cash-b">
-                <g transform="rotate(-6)">
-                  <rect x="-30" y="-14" width="60" height="28" rx="4" fill="#7A5230" />
-                  <rect x="-30" y="-12" width="60" height="24" rx="3" fill="#10B981" />
-                  <rect x="-22" y="-6" width="44" height="4" rx="2" fill="#F5B942" opacity="0.8" />
-                  <text
-                    x="0"
-                    y="4"
-                    textAnchor="middle"
-                    fontFamily="Sora, system-ui"
-                    fontSize="7"
-                    fontWeight="800"
-                    fill="#0B1F33"
-                  >
-                    KSh 5,000
-                  </text>
-                </g>
-              </g>
-</g>
             )}
 
             {/* Receipt returning to character */}
             {inInterior && (
               <g transform="translate(660, 555)">
-<g className="t-receipt">
-                <rect
-                  x="-24"
-                  y="-34"
-                  width="48"
-                  height="68"
-                  rx="3"
-                  fill="#FFFFFF"
-                  stroke="#E3E9EF"
-                  strokeWidth="1.4"
-                />
-                <rect x="-16" y="-26" width="32" height="4" rx="2" fill="#0B7A5A" />
-                <rect x="-16" y="-18" width="24" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
-                <rect x="-16" y="-12" width="28" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
-                <rect x="-16" y="-6" width="20" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
-                <rect x="-16" y="2" width="30" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
-                <rect x="-16" y="8" width="24" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
-                <rect x="-16" y="16" width="34" height="6" rx="3" fill="#F5B942" />
-                <text
-                  x="1"
-                  y="21"
-                  textAnchor="middle"
-                  fontFamily="JetBrains Mono, ui-monospace, monospace"
-                  fontSize="6"
-                  fontWeight="700"
-                  fill="#3A2A08"
-                >
-                  PAID
-                </text>
+                <g className="t-receipt">
+                  <rect
+                    x="-24"
+                    y="-34"
+                    width="48"
+                    height="68"
+                    rx="3"
+                    fill="#FFFFFF"
+                    stroke="#E3E9EF"
+                    strokeWidth="1.4"
+                  />
+                  <rect x="-16" y="-26" width="32" height="4" rx="2" fill="#0B7A5A" />
+                  <rect x="-16" y="-18" width="24" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
+                  <rect x="-16" y="-12" width="28" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
+                  <rect x="-16" y="-6" width="20" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
+                  <rect x="-16" y="2" width="30" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
+                  <rect x="-16" y="8" width="24" height="3" rx="1.5" fill="#5B6B7B" opacity="0.6" />
+                  <rect x="-16" y="16" width="34" height="6" rx="3" fill="#F5B942" />
+                  <text
+                    x="1"
+                    y="21"
+                    textAnchor="middle"
+                    fontFamily="JetBrains Mono, ui-monospace, monospace"
+                    fontSize="6"
+                    fontWeight="700"
+                    fill="#3A2A08"
+                  >
+                    PAID
+                  </text>
+                </g>
               </g>
-</g>
             )}
 
-            {/* Speech bubble (visible during the whole interior) */}
+            {/* Speech bubble (interior) */}
             {inInterior && (
-              <g transform="translate(440, 392)">
-<g
-                style={{
-                  animation: 'bubblePop 0.5s cubic-bezier(0.34,1.56,0.64,1) 300ms both',
-                }}
-              >
-                <path
-                  d="M0 0 Q0 -20 20 -20 L240 -20 Q260 -20 260 0 L260 40 Q260 60 240 60 L40 60 L18 84 L26 60 L20 60 Q0 60 0 40 Z"
-                  fill="#FFFFFF"
-                  stroke="#E3E9EF"
-                  strokeWidth="2"
-                />
-                <text
-                  x="130"
-                  y="16"
-                  textAnchor="middle"
-                  fontFamily="Inter, system-ui"
-                  fontSize="13"
-                  fontWeight="600"
-                  fill="#0B1F33"
+              <g transform={`translate(458, 476) scale(${bubbleK}) translate(-18, -84)`}>
+                <g
+                  style={{
+                    animation: 'bubblePop 0.5s cubic-bezier(0.34,1.56,0.64,1) 300ms both',
+                  }}
                 >
-                  Depositing KSh 5,000
-                </text>
-                <text
-                  x="130"
-                  y="36"
-                  textAnchor="middle"
-                  fontFamily="Inter, system-ui"
-                  fontSize="13"
-                  fontWeight="600"
-                  fill="#0B1F33"
-                >
-                  for the chama today!
-                </text>
+                  <path
+                    d="M0 0 Q0 -20 20 -20 L240 -20 Q260 -20 260 0 L260 40 Q260 60 240 60 L40 60 L18 84 L26 60 L20 60 Q0 60 0 40 Z"
+                    fill="#FFFFFF"
+                    stroke="#E3E9EF"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x="130"
+                    y="16"
+                    textAnchor="middle"
+                    fontFamily="Inter, system-ui"
+                    fontSize="13"
+                    fontWeight="600"
+                    fill="#0B1F33"
+                  >
+                    Depositing KSh 5,000
+                  </text>
+                  <text
+                    x="130"
+                    y="36"
+                    textAnchor="middle"
+                    fontFamily="Inter, system-ui"
+                    fontSize="13"
+                    fontWeight="600"
+                    fill="#0B1F33"
+                  >
+                    for the chama today!
+                  </text>
+                </g>
               </g>
-</g>
             )}
 
-            {/* Gold sparkles during receipt */}
+            {/* Gold sparkles */}
             {inInterior &&
               [
                 { x: 640, y: 420, d: 4700 },
@@ -1401,27 +1489,29 @@ export default function HeroCartoon() {
                 { x: 540, y: 480, d: 5000 },
                 { x: 900, y: 440, d: 5150 },
               ].map((s, i) => (
-                <g
-                  key={i} transform={`translate(${s.x}, ${s.y})`}>
-<g
-                  style={{
-                    animation: `sparklePop 1.4s ease-out ${s.d}ms infinite`,
-                    transformBox: 'fill-box',
-                    transformOrigin: 'center',
-                  }}
-                >
-                  <path
-                    d="M0 -12 L3 -3 L12 0 L3 3 L0 12 L-3 3 L-12 0 L-3 -3 Z"
-                    fill="#F5B942"
-                  />
+                <g key={i} transform={`translate(${s.x}, ${s.y})`}>
+                  <g
+                    style={{
+                      animation: `sparklePop 1.4s ease-out ${s.d}ms infinite`,
+                      transformBox: 'fill-box',
+                      transformOrigin: 'center',
+                    }}
+                  >
+                    <path
+                      d="M0 -12 L3 -3 L12 0 L3 3 L0 12 L-3 3 L-12 0 L-3 -3 Z"
+                      fill="#F5B942"
+                    />
+                  </g>
                 </g>
-</g>
               ))}
           </g>
         </svg>
       </div>
 
-      {/* ============ GRADE + READABILITY ============ */}
+      </div>
+
+      {/* ============ GRADE + READABILITY (overlay mode only) ============ */}
+      {mode === 'overlay' && (<>
       <div
         className="pointer-events-none absolute inset-0 z-[3]"
         style={{
@@ -1431,33 +1521,48 @@ export default function HeroCartoon() {
             'radial-gradient(ellipse 70% 62% at 16% 36%, rgba(6,22,26,0.82) 0%, rgba(6,22,26,0.6) 45%, rgba(6,22,26,0) 100%), linear-gradient(180deg, rgba(6,22,26,0.6) 0%, rgba(6,22,26,0) 22%, rgba(6,22,26,0) 80%, rgba(6,22,26,0.5) 100%)',
         }}
       />
-      {/* On narrow screens the copy spans the full width, so flatten the scene behind it */}
+      {/* Phones: stronger grade + bottom fade so text always reads */}
       <div
-        className="pointer-events-none absolute inset-0 z-[3] bg-[#06161A]/35 transition-opacity duration-500 lg:hidden"
-        style={{ opacity: textVisible ? 1 : 0 }}
+        className="pointer-events-none absolute inset-0 z-[3] transition-opacity duration-500 md:hidden"
+        style={{
+          opacity: textVisible ? 1 : 0,
+          background:
+            'linear-gradient(180deg, rgba(6,22,26,0.55) 0%, rgba(6,22,26,0.35) 30%, rgba(6,22,26,0.55) 70%, rgba(6,22,26,0.85) 100%)',
+        }}
       />
 
-      {/* ============ HERO COPY (fades while the scene is inside the bank) ============ */}
+      </>)}
+
+      {/* ============ HERO COPY ============ */}
       <div
-        className="pointer-events-none absolute inset-0 z-10 flex flex-col"
-        style={{ opacity: textVisible ? 1 : 0, transition: 'opacity 500ms ease' }}
+        className={copyClass}
+        style={{
+          order: 1,
+          opacity: mode !== 'overlay' || textVisible ? 1 : 0,
+          transition: 'opacity 500ms ease',
+        }}
       >
-        <div className="wrap pointer-events-auto flex w-full flex-1 flex-col justify-center pb-[22vh] pt-28 sm:pt-32">
+        <div
+          className="wrap pointer-events-auto flex w-full flex-1 flex-col justify-center"
+          style={copyPadding}
+        >
           <div className="max-w-[640px]">
             <div
-              className={`inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/[0.08] px-3.5 py-1.5 text-[0.8rem] sm:rounded-full font-medium text-white/90 backdrop-blur-md transition-all duration-700 ${
+              className={`${mode === 'side' ? '!hidden' : 'inline-flex'} max-w-full items-center gap-2 rounded-2xl border border-white/20 bg-white/[0.08] px-3 py-1.5 text-[0.7rem] font-medium text-white/90 backdrop-blur-md transition-all duration-700 sm:rounded-full sm:px-3.5 sm:text-[0.8rem] ${
                 ready ? 'translate-y-0 opacity-100' : 'translate-y-3 opacity-0'
               }`}
             >
-              <span className="relative flex h-1.5 w-1.5">
+              <span className="relative flex h-1.5 w-1.5 shrink-0">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald opacity-70" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald" />
               </span>
-              Built for chamas, SACCOs and investment groups
+              <span className="truncate">Built for chamas, SACCOs &amp; investment groups</span>
             </div>
 
             <h1
-              className={`mt-6 font-display text-[2.5rem] font-bold leading-[1.04] tracking-[-0.03em] text-white transition-all duration-700 delay-100 sm:text-[3.4rem] lg:text-[4.2rem] ${
+              style={mode === 'side' ? { fontSize: 'clamp(1.4rem, 8vh, 2.4rem)', marginTop: 0 } : undefined}
+              className={`mt-5 font-display font-bold leading-[1.05] tracking-[-0.03em] text-white transition-all duration-700 delay-100 sm:mt-6
+                text-[clamp(1.75rem,7.5vw,4.2rem)] ${
                 ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
               }`}
             >
@@ -1466,7 +1571,7 @@ export default function HeroCartoon() {
             </h1>
 
             <p
-              className={`mt-5 max-w-[46ch] text-[1.02rem] leading-relaxed text-white/80 transition-all duration-700 delay-200 sm:text-[1.08rem] ${
+              className={`${mode === 'side' ? 'hidden' : ''} mt-4 max-w-[46ch] text-[clamp(0.9rem,2.6vw,1.08rem)] leading-relaxed text-white/85 transition-all duration-700 delay-200 sm:mt-5 ${
                 ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
               }`}
             >
@@ -1475,13 +1580,14 @@ export default function HeroCartoon() {
             </p>
 
             <div
-              className={`mt-8 flex flex-col gap-3 transition-all duration-700 delay-300 sm:flex-row sm:items-center ${
+              style={mode === 'side' ? { flexDirection: 'column', alignItems: 'flex-start', marginTop: '1rem' } : undefined}
+              className={`mt-6 flex flex-col gap-2.5 transition-all duration-700 delay-300 sm:mt-8 sm:flex-row sm:items-center sm:gap-3 ${
                 ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
               }`}
             >
               <Link
                 to="/register"
-                className="group inline-flex items-center justify-center gap-2 rounded-full !bg-[#F5B942] !text-[#2E2200] px-7 py-3.5 text-[0.92rem] font-semibold shadow-[0_14px_34px_-10px_rgba(0,0,0,0.55)] transition hover:-translate-y-0.5 hover:!bg-[#FFC857] hover:shadow-[0_18px_40px_-10px_rgba(0,0,0,0.6)]"
+                className="group inline-flex items-center justify-center gap-2 rounded-full !bg-[#F5B942] !text-[#2E2200] px-6 py-3 text-[0.88rem] font-semibold shadow-[0_14px_34px_-10px_rgba(0,0,0,0.55)] transition hover:-translate-y-0.5 hover:!bg-[#FFC857] hover:shadow-[0_18px_40px_-10px_rgba(0,0,0,0.6)] sm:px-7 sm:py-3.5 sm:text-[0.92rem]"
               >
                 Create your chama
                 <FiArrowRight
@@ -1493,7 +1599,7 @@ export default function HeroCartoon() {
               </Link>
               <Link
                 to="/login"
-                className="group inline-flex items-center justify-center gap-2 rounded-full border border-white/35 bg-white/[0.08] px-7 py-3.5 text-[0.92rem] font-semibold text-white backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/[0.14]"
+                className="group inline-flex items-center justify-center gap-2 rounded-full border border-white/35 bg-white/[0.08] px-6 py-3 text-[0.88rem] font-semibold text-white backdrop-blur-md transition hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/[0.14] sm:px-7 sm:py-3.5 sm:text-[0.92rem]"
               >
                 <FiPlayCircle size={16} strokeWidth={2.4} aria-hidden="true" />
                 See a live dashboard
@@ -1505,7 +1611,13 @@ export default function HeroCartoon() {
         <button
           type="button"
           onClick={scrollNext}
-          className="relative z-10 mx-auto mb-14 inline-flex sm:mb-16 flex-col items-center gap-1 text-[0.78rem] font-medium text-white/70 transition hover:text-white"
+          className={`${mode === 'side' ? 'hidden' : 'inline-flex'} relative z-10 mx-auto flex-col items-center gap-1 text-[0.74rem] font-medium text-white/70 transition hover:text-white sm:text-[0.78rem]`}
+          style={{
+            marginBottom:
+              mode === 'overlay'
+                ? 'max(20px, calc(env(safe-area-inset-bottom, 0px) + 16px))'
+                : '1.25rem',
+          }}
           aria-label="Scroll to see how it works"
         >
           See how it works
@@ -1513,11 +1625,12 @@ export default function HeroCartoon() {
         </button>
       </div>
 
-      {/* ============ LIVE LEDGER CHIP (always visible, follows the scene) ============ */}
+      {/* ============ LIVE LEDGER CHIP (desktop only) ============ */}
       <div
-        className={`absolute bottom-16 right-5 z-10 hidden transition-opacity duration-700 sm:block lg:right-10 ${
-          ready ? 'opacity-100' : 'opacity-0'
-        }`}
+        className={`absolute right-4 z-10 hidden transition-opacity duration-700 lg:block lg:right-10 ${
+          isTinyPhone || mode !== 'overlay' ? '!hidden' : ''
+        } ${ready ? 'opacity-100' : 'opacity-0'}`}
+        style={{ bottom: 'max(4.5rem, calc(env(safe-area-inset-bottom, 0px) + 4.5rem))' }}
       >
         <div className="rounded-2xl border border-white/15 bg-[#06161A]/60 px-4 py-3 text-white shadow-[0_24px_40px_-18px_rgba(0,0,0,0.7)] backdrop-blur-xl">
           <div className="flex items-center gap-2 text-[0.74rem] text-white/65">
@@ -1527,7 +1640,7 @@ export default function HeroCartoon() {
             </span>
             Live chama ledger
           </div>
-          <div className="mt-1 font-mono text-[1.15rem] font-semibold tabular-nums">
+          <div className="mt-1 font-mono text-[1.05rem] font-semibold tabular-nums sm:text-[1.15rem]">
             {formatKsh(saved)}
           </div>
           <div className="mt-0.5 text-[0.72rem] text-[#7CF0C0]">

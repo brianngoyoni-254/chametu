@@ -226,7 +226,7 @@ function SpeechBubble({ text, tone = 'light', side = 'left', delay = 0 }) {
   const cls = BUBBLE_TONES[tone] || BUBBLE_TONES.light
   return (
     <div
-      className={`relative max-w-[280px] rounded-2xl border-2 px-4 py-3 text-[0.85rem] font-medium leading-snug shadow-[0_14px_28px_rgba(11,31,51,0.12)] animate-bubble-in ${
+      className={`relative max-w-full rounded-2xl border-2 px-3.5 py-2.5 text-[0.82rem] font-medium leading-snug shadow-[0_14px_28px_rgba(11,31,51,0.12)] animate-bubble-in sm:max-w-[280px] sm:px-4 sm:py-3 sm:text-[0.85rem] ${
         side === 'left' ? 'bubble-tail-left' : 'bubble-tail-right'
       } ${cls}`}
       style={{ animationDelay: `${delay}ms` }}
@@ -289,9 +289,9 @@ const STEPS = [
 
 function SceneRegister() {
   return (
-    <div className="relative flex h-full w-full items-end justify-center gap-3">
-      <Character variant="chairman" size={180} delay={0} />
-      <div className="mb-12 hidden animate-float sm:block" style={{ animationDelay: '600ms' }}>
+    <div className="relative flex h-full w-full items-end justify-center gap-2 sm:gap-3">
+      <Character variant="chairman" size={150} delay={0} className="max-h-full" />
+      <div className="mb-10 hidden animate-float sm:mb-12 sm:block" style={{ animationDelay: '600ms' }}>
         <ChartProp />
       </div>
     </div>
@@ -300,35 +300,35 @@ function SceneRegister() {
 
 function SceneInvite() {
   return (
-    <div className="relative flex h-full w-full items-end justify-center gap-2">
-      <Character variant="chairman" size={160} delay={0} />
-      <div className="mb-8 hidden sm:block">
+    <div className="relative flex h-full w-full items-end justify-center gap-1.5 sm:gap-2">
+      <Character variant="chairman" size={130} delay={0} className="max-h-full" />
+      <div className="mb-6 hidden sm:mb-8 sm:block">
         <InviteProp className="animate-float" />
       </div>
-      <Character variant="treasurer" size={140} delay={300} className="hidden sm:block" />
-      <Character variant="secretary" size={140} delay={550} className="hidden md:block" />
+      <Character variant="treasurer" size={115} delay={300} className="hidden max-h-full sm:block" />
+      <Character variant="secretary" size={115} delay={550} className="hidden max-h-full md:block" />
     </div>
   )
 }
 
 function SceneContribute() {
   return (
-    <div className="relative flex h-full w-full items-end justify-center gap-3">
-      <Character variant="member" size={150} delay={0} />
-      <div className="mb-8 flex flex-col items-center gap-2">
+    <div className="relative flex h-full w-full items-end justify-center gap-2 sm:gap-3">
+      <Character variant="member" size={125} delay={0} className="max-h-full" />
+      <div className="mb-6 flex flex-col items-center gap-2 sm:mb-8">
         <CoinProp className="animate-float" />
         <PhoneProp className="animate-float" />
       </div>
-      <Character variant="treasurer" size={150} delay={350} className="hidden sm:block" />
+      <Character variant="treasurer" size={125} delay={350} className="hidden max-h-full sm:block" />
     </div>
   )
 }
 
 function SceneGrow() {
   return (
-    <div className="relative flex h-full w-full items-end justify-center gap-4">
-      <Character variant="treasurer" size={180} delay={0} />
-      <div className="mb-6">
+    <div className="relative flex h-full w-full items-end justify-center gap-2 sm:gap-4">
+      <Character variant="treasurer" size={150} delay={0} className="max-h-full" />
+      <div className="mb-4 sm:mb-6">
         <ChartProp />
       </div>
     </div>
@@ -370,7 +370,10 @@ export default function CartoonExplainer() {
   const Icon = step.icon
 
   return (
-    <section id="cartoon" className="relative overflow-hidden pb-20 pt-20 sm:pb-24 sm:pt-24">
+    <section
+      id="cartoon"
+      className="relative overflow-hidden py-16 sm:py-20 md:py-24"
+    >
       {/* Soft themed wash */}
       <div
         className="pointer-events-none absolute inset-0 -z-10 opacity-70"
@@ -383,20 +386,20 @@ export default function CartoonExplainer() {
       <div className="wrap">
         {/* Heading */}
         <div className="mx-auto max-w-[60ch] text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-[0.8rem] font-semibold text-forest">
+          <div className="inline-flex items-center gap-2 rounded-full border border-line bg-card px-3.5 py-1.5 text-[0.76rem] font-semibold text-forest sm:text-[0.8rem]">
             <span className="h-1.5 w-1.5 rounded-full bg-gold" />
             How Chametu works
           </div>
-          <h2 className="mt-4 font-display text-[1.9rem] font-bold leading-tight tracking-tight text-navy sm:text-[2.4rem] md:text-[2.6rem]">
+          <h2 className="mt-4 font-display text-[clamp(1.5rem,4.6vw,2.6rem)] font-bold leading-tight tracking-tight text-navy">
             Watch your chama come to life
           </h2>
-          <p className="mx-auto mt-3 max-w-[52ch] text-[0.96rem]">
+          <p className="mx-auto mt-3 max-w-[52ch] text-[0.94rem] sm:text-[0.96rem]">
             Meet your chairman, treasurer, secretary and members. Every step of Chametu, explained in their own words.
           </p>
         </div>
 
         {/* Timeline tabs */}
-        <div className="mx-auto mt-10 grid max-w-[920px] grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+        <div className="mx-auto mt-8 grid max-w-[920px] grid-cols-2 gap-2 sm:mt-10 sm:grid-cols-4 sm:gap-3">
           {STEPS.map((s, i) => {
             const TabIcon = s.icon
             const isActive = i === active
@@ -406,14 +409,14 @@ export default function CartoonExplainer() {
                 type="button"
                 onClick={() => jump(i)}
                 aria-pressed={isActive}
-                className={`group relative flex flex-col items-start gap-2 rounded-2xl border p-3.5 text-left transition-all sm:flex-row sm:items-center sm:gap-3 ${
+                className={`group relative flex flex-col items-start gap-2 overflow-hidden rounded-2xl border p-3 text-left transition-all sm:flex-row sm:items-center sm:gap-3 sm:p-3.5 ${
                   isActive
                     ? 'border-forest bg-card shadow-[0_14px_30px_rgba(11,122,90,0.14)]'
-                    : 'border-line bg-card/60 hover:border-forest/40'
+                    : 'border-line bg-card/60 hover:border-forest/40 hover:bg-card'
                 }`}
               >
                 <span
-                  className={`grid h-9 w-9 flex-none place-items-center rounded-xl transition ${
+                  className={`grid h-8 w-8 flex-none place-items-center rounded-xl transition sm:h-9 sm:w-9 ${
                     isActive
                       ? 'bg-gradient-to-br from-forest to-emerald text-white shadow-[0_8px_18px_rgba(11,122,90,0.3)]'
                       : 'bg-paper text-ink-soft'
@@ -423,14 +426,14 @@ export default function CartoonExplainer() {
                 </span>
                 <span className="min-w-0">
                   <span
-                    className={`block text-[0.7rem] font-semibold ${
+                    className={`block text-[0.66rem] font-semibold sm:text-[0.7rem] ${
                       isActive ? 'text-forest' : 'text-ink-soft'
                     }`}
                   >
                     Step {i + 1}
                   </span>
                   <span
-                    className={`block truncate text-[0.84rem] font-semibold ${
+                    className={`block truncate text-[0.82rem] font-semibold sm:text-[0.84rem] ${
                       isActive ? 'text-navy' : 'text-ink-soft group-hover:text-navy'
                     }`}
                   >
@@ -469,17 +472,17 @@ export default function CartoonExplainer() {
             />
           </div>
 
-          <div className="relative grid gap-6 p-5 sm:p-8 md:grid-cols-[1fr_auto] md:items-center md:gap-8">
+          <div className="relative grid gap-5 p-4 sm:gap-6 sm:p-6 md:grid-cols-[1fr_auto] md:items-center md:gap-8 md:p-8">
             {/* Left: text */}
             <div className="order-2 min-w-0 md:order-1">
-              <div className="inline-flex items-center gap-2 rounded-full bg-forest/10 px-3 py-1.5 text-[0.78rem] font-semibold text-forest">
+              <div className="inline-flex items-center gap-2 rounded-full bg-forest/10 px-3 py-1.5 text-[0.72rem] font-semibold text-forest sm:text-[0.78rem]">
                 <Icon size={11} strokeWidth={2.4} />
                 Step {active + 1} of {STEPS.length}
               </div>
-              <h3 className="mt-3 text-[1.35rem] font-bold leading-tight text-navy sm:text-[1.55rem]">
+              <h3 className="mt-3 text-[1.2rem] font-bold leading-tight text-navy sm:text-[1.35rem] md:text-[1.55rem]">
                 {step.title}
               </h3>
-              <p className="mt-2 max-w-[46ch] text-[0.92rem] leading-relaxed">
+              <p className="mt-2 max-w-[46ch] text-[0.9rem] leading-relaxed sm:text-[0.92rem]">
                 {step.subtitle}
               </p>
 
@@ -495,7 +498,7 @@ export default function CartoonExplainer() {
             </div>
 
             {/* Right: scene */}
-            <div className="relative order-1 h-[280px] sm:h-[320px] md:order-2 md:h-[360px] md:w-[400px]">
+            <div className="relative order-1 h-[220px] min-[420px]:h-[250px] sm:h-[300px] md:order-2 md:h-[360px] md:w-[400px]">
               <div className="absolute inset-0 grid place-items-center">
                 <Scene key={step.id} />
               </div>
@@ -508,7 +511,7 @@ export default function CartoonExplainer() {
           </div>
         </div>
 
-        <p className="mt-4 text-center text-[0.78rem]">
+        <p className="mt-4 text-center text-[0.74rem] text-ink-soft sm:text-[0.78rem]">
           {paused ? 'Paused while you explore' : 'Auto-playing. Click a step to jump ahead.'}
         </p>
       </div>

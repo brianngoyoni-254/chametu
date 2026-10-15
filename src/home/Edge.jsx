@@ -26,13 +26,13 @@ const EDGE = [
 
 export default function Edge() {
   return (
-    <section id="edge" className="border-y border-line bg-card py-20 sm:py-24">
-      <div className="wrap grid gap-10 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
+    <section id="edge" className="border-y border-line bg-card py-16 sm:py-20 md:py-24">
+      <div className="wrap grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16">
         <Reveal className="lg:sticky lg:top-28 lg:self-start">
-          <h2 className="max-w-[18ch] font-display text-[1.9rem] font-bold leading-tight tracking-tight text-navy sm:text-[2.4rem]">
+          <h2 className="max-w-[18ch] font-display text-[clamp(1.6rem,5vw,2.4rem)] font-bold leading-tight tracking-tight text-navy">
             Built for how chamas actually run
           </h2>
-          <p className="mt-3 max-w-[40ch] text-[1rem] leading-relaxed text-ink-soft">
+          <p className="mt-3 max-w-[40ch] text-[0.95rem] leading-relaxed text-ink-soft sm:text-[1rem]">
             Everything Kenyan chamas do by WhatsApp, notebooks and guesswork, now in one place.
           </p>
         </Reveal>
@@ -40,13 +40,20 @@ export default function Edge() {
         <Reveal>
           <ul className="divide-y divide-line border-y border-line">
             {EDGE.map(([Icon, title, desc]) => (
-              <li key={title} className="flex gap-4 py-6 sm:gap-5">
-                <span className="grid h-11 w-11 flex-none place-items-center rounded-xl bg-forest/10 text-forest">
-                  <Icon size={19} strokeWidth={2.2} aria-hidden="true" />
+              <li
+                key={title}
+                className="group flex gap-3 py-5 transition-colors hover:bg-forest/[0.03] sm:gap-5 sm:py-6"
+              >
+                <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-forest/10 text-forest transition-all duration-300 group-hover:bg-forest group-hover:text-white sm:h-11 sm:w-11">
+                  <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="font-display text-[1.08rem] font-semibold text-navy">{title}</h3>
-                  <p className="mt-1.5 max-w-[52ch] text-[.92rem] leading-relaxed text-ink-soft">{desc}</p>
+                  <h3 className="font-display text-[1.02rem] font-semibold text-navy sm:text-[1.08rem]">
+                    {title}
+                  </h3>
+                  <p className="mt-1.5 max-w-[52ch] text-[0.9rem] leading-relaxed text-ink-soft sm:text-[.92rem]">
+                    {desc}
+                  </p>
                 </div>
               </li>
             ))}

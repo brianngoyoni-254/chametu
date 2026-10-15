@@ -43,17 +43,19 @@ function Stat({ icon: Icon, target, decimals = 0, prefix = '', suffix = '', labe
   })
 
   return (
-    <div className="flex items-center gap-3.5 px-5 py-5 sm:px-6 sm:py-6">
-      <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-forest/10 text-forest">
+    <div className="group relative flex items-center gap-3 px-4 py-4 sm:gap-3.5 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+      <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-forest/10 text-forest transition-transform duration-300 group-hover:scale-110 sm:h-11 sm:w-11">
         <Icon size={18} strokeWidth={2.2} aria-hidden="true" />
       </span>
       <div className="min-w-0">
-        <b className="block font-display text-[1.35rem] font-bold leading-none tracking-tight tabular-nums text-navy sm:text-[1.6rem]">
+        <b className="block font-display text-[1.15rem] font-bold leading-none tracking-tight tabular-nums text-navy sm:text-[1.45rem] lg:text-[1.6rem]">
           {prefix}
           {text}
           {suffix}
         </b>
-        <span className="mt-1.5 block text-[.78rem] leading-tight text-ink-soft">{label}</span>
+        <span className="mt-1.5 block text-[0.72rem] leading-tight text-ink-soft sm:text-[.78rem]">
+          {label}
+        </span>
       </div>
     </div>
   )
@@ -91,7 +93,7 @@ export default function TrustBar() {
       <Reveal direction="fade">
         <div
           ref={ref}
-          className="grid grid-cols-1 divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-[0_30px_60px_-30px_rgba(11,31,51,0.35)] min-[560px]:grid-cols-2 min-[560px]:divide-y-0 lg:grid-cols-4 lg:divide-x"
+          className="grid grid-cols-2 divide-x divide-y divide-line overflow-hidden rounded-2xl border border-line bg-card shadow-[0_30px_60px_-30px_rgba(11,31,51,0.35)] sm:divide-y-0 lg:grid-cols-4"
         >
           {STATS.map((s) => (
             <Stat key={s.label} {...s} active={active} />
