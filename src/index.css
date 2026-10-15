@@ -1,6 +1,9 @@
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
 @import "tailwindcss";
 
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
 @theme {
   --color-forest: #0B7A5A;
   --color-forest-dark: #075C44;
@@ -22,7 +25,7 @@
   --breakpoint-nav: 861px;
   --breakpoint-hero: 961px;
 
-  /* Cartoon + hero animations */
+  /* Animations */
   --animate-float: float 5s ease-in-out infinite;
   --animate-pop-in: pop-in 0.55s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-bubble-in: bubble-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -30,6 +33,9 @@
   --animate-fade-up: fade-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* ============================================================
+   KEYFRAMES
+   ============================================================ */
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-8px); }
@@ -56,7 +62,9 @@
   100% { opacity: 1; transform: translateY(0); }
 }
 
-/* Dark mode overrides */
+/* ============================================================
+   DARK MODE OVERRIDES
+   ============================================================ */
 :root[data-theme="dark"] {
   --color-forest: #34D399;
   --color-forest-dark: #10B981;
@@ -71,100 +79,219 @@
   --color-ink-soft: #9DB0C0;
 }
 
+/* ============================================================
+   BASE
+   ============================================================ */
 @layer base {
   html {
     scroll-behavior: smooth;
     scroll-padding-top: 70px;
     line-height: normal;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   body {
     @apply bg-paper text-ink font-sans antialiased;
     background-image: radial-gradient(900px 420px at 85% -60px, rgba(16, 185, 129, 0.14), transparent);
     background-repeat: no-repeat;
+    overflow-x: hidden;
+    min-height: 100dvh;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3 {
     font-family: var(--font-display);
     font-weight: 700;
     color: var(--color-navy);
+    text-wrap: balance;
   }
+
+  h1 { text-wrap: balance; }
+  h2, h3 { text-wrap: pretty; }
 
   p {
     color: var(--color-ink-soft);
     line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  img, svg, video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  input, select, textarea, button {
+    font: inherit;
+  }
+
+  /* Prevent iOS input zoom */
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea {
+      font-size: max(16px, 1rem);
+    }
+  }
+
+  /* Better tap feedback */
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Selection */
+  ::selection {
+    background: rgba(11, 122, 90, 0.22);
+    color: var(--color-navy);
+  }
+
+  /* Custom scrollbar (desktop) */
+  @media (min-width: 861px) {
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(11, 31, 51, 0.16);
+      border-radius: 999px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(11, 31, 51, 0.28); background-clip: padding-box; }
+    [data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); background-clip: padding-box; }
   }
 }
 
+/* ============================================================
+   COMPONENTS
+   ============================================================ */
 @layer components {
+
+  /* ---------- Layout wrapper ---------- */
   .wrap {
+    width: 100%;
     max-width: 1160px;
     margin-inline: auto;
     padding-inline: 18px;
   }
+  @media (min-width: 400px) {
+    .wrap { padding-inline: 20px; }
+  }
   @media (min-width: 641px) {
     .wrap { padding-inline: 28px; }
   }
+  @media (min-width: 1024px) {
+    .wrap { padding-inline: 32px; }
+  }
 
+  /* ---------- Buttons ---------- */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 7px;
-    padding: 10px 19px;
+    padding: 11px 20px;
     border: 1px solid transparent;
     border-radius: 12px;
     font-size: 0.9rem;
     font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    min-height: 44px; /* accessible tap target */
   }
   .btn:active { transform: translateY(1px); }
+  .btn:focus-visible {
+    outline: 2px solid var(--color-forest);
+    outline-offset: 2px;
+  }
+
+  @media (max-width: 480px) {
+    .btn { padding: 11px 16px; font-size: 0.86rem; }
+  }
 
   .btn-primary {
     background: linear-gradient(135deg, #0B7A5A, #10B981);
     color: #fff;
+    box-shadow: 0 1px 2px rgba(11, 93, 59, 0.1);
   }
-  .btn-primary:hover { box-shadow: 0 6px 18px rgba(11, 93, 59, 0.32); }
+  .btn-primary:hover {
+    box-shadow: 0 10px 24px -8px rgba(11, 93, 59, 0.45);
+    transform: translateY(-1px);
+  }
 
   .btn-ghost {
     color: var(--color-navy);
     border-color: var(--color-line);
+    background: transparent;
   }
-  .btn-ghost:hover { border-color: var(--color-navy); }
+  .btn-ghost:hover {
+    border-color: var(--color-navy);
+    background: rgba(11, 31, 51, 0.03);
+  }
 
   .btn-gold {
     background: var(--color-gold);
     color: #3A2A08;
   }
-  .btn-gold:hover { box-shadow: 0 6px 18px rgba(217, 164, 65, 0.4); }
+  .btn-gold:hover {
+    box-shadow: 0 10px 24px -8px rgba(217, 164, 65, 0.5);
+    transform: translateY(-1px);
+  }
 
   .btn-outline {
     color: #fff;
     border-color: rgba(255, 255, 255, 0.35);
+    background: transparent;
   }
-  .btn-outline:hover { border-color: #fff; }
+  .btn-outline:hover {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+  }
 
   .btn-white {
     background: #fff;
     color: var(--color-forest);
   }
+  .btn-white:hover {
+    background: #F3F6F9;
+    transform: translateY(-1px);
+  }
+
   .btn-white-outline {
     color: #fff;
     border-color: rgba(255, 255, 255, 0.4);
+    background: transparent;
+  }
+  .btn-white-outline:hover {
+    border-color: #fff;
+    background: rgba(255, 255, 255, 0.08);
   }
 
+  /* ---------- Cards ---------- */
   .card-v2 {
     background: var(--color-card);
     border: 1px solid var(--color-line);
     border-radius: 18px;
     padding: 22px;
-    box-shadow: 0 1px 2px rgba(11, 31, 51, 0.05), 0 8px 24px rgba(11, 31, 51, 0.05);
-    transition: transform 0.15s;
+    box-shadow:
+      0 1px 2px rgba(11, 31, 51, 0.05),
+      0 8px 24px rgba(11, 31, 51, 0.05);
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.2s ease,
+                border-color 0.2s ease;
   }
-  .card-v2:hover { transform: translateY(-3px); }
+  .card-v2:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 2px 4px rgba(11, 31, 51, 0.06),
+      0 16px 32px rgba(11, 31, 51, 0.08);
+  }
+  @media (max-width: 480px) {
+    .card-v2 { padding: 18px; border-radius: 16px; }
+  }
 
-  /* Scroll reveal */
+  /* ---------- Scroll reveal ---------- */
   .reveal {
     opacity: 0;
     transform: translate3d(0, 22px, 0);
@@ -172,21 +299,22 @@
       opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
       transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
     backface-visibility: hidden;
+    will-change: opacity, transform;
   }
-  .reveal-left { transform: translate3d(-22px, 0, 0); }
+  .reveal-left  { transform: translate3d(-22px, 0, 0); }
   .reveal-right { transform: translate3d(22px, 0, 0); }
-  .reveal-down { transform: translate3d(0, -22px, 0); }
-  .reveal-fade { transform: none; }
+  .reveal-down  { transform: translate3d(0, -22px, 0); }
+  .reveal-fade  { transform: none; }
   .reveal.is-visible {
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
 
-  /* Scroll to top */
+  /* ---------- Scroll to top ---------- */
   .scroll-top {
     position: fixed;
-    right: 20px;
-    bottom: 20px;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     z-index: 40;
     display: grid;
     place-items: center;
@@ -222,7 +350,7 @@
     }
   }
 
-  /* Fullscreen hero video */
+  /* ---------- Hero video ---------- */
   .hero-video {
     position: absolute;
     inset: 0;
@@ -241,7 +369,7 @@
       linear-gradient(180deg, rgba(7, 20, 16, 0.5) 0%, rgba(7, 20, 16, 0.32) 45%, rgba(7, 20, 16, 0.82) 100%);
   }
 
-  /* Animated hamburger lines */
+  /* ---------- Hamburger ---------- */
   .hamburger-line {
     display: block;
     height: 2px;
@@ -252,7 +380,7 @@
       width 0.5s cubic-bezier(0.76, 0, 0.24, 1);
   }
 
-  /* Cartoon speech bubble tail */
+  /* ---------- Speech bubble tails ---------- */
   .bubble-tail-left::after,
   .bubble-tail-right::after {
     content: "";
@@ -264,6 +392,7 @@
     background: inherit;
     border: inherit;
     border-radius: 2px;
+    pointer-events: none;
   }
   .bubble-tail-left::after {
     left: -7px;
@@ -275,9 +404,68 @@
     border-left: none;
     border-bottom: none;
   }
+  @media (max-width: 480px) {
+    .bubble-tail-left::after,
+    .bubble-tail-right::after {
+      width: 10px;
+      height: 10px;
+      top: 20px;
+    }
+    .bubble-tail-left::after { left: -6px; }
+    .bubble-tail-right::after { right: -6px; }
+  }
+
+  /* ---------- Typography helpers ---------- */
+  .h1-fluid {
+    font-size: clamp(2rem, 5.5vw, 3.6rem);
+    line-height: 1.06;
+    letter-spacing: -0.02em;
+  }
+  .h2-fluid {
+    font-size: clamp(1.5rem, 4vw, 2.4rem);
+    line-height: 1.15;
+    letter-spacing: -0.015em;
+  }
+  .h3-fluid {
+    font-size: clamp(1.15rem, 2.8vw, 1.55rem);
+    line-height: 1.25;
+  }
+  .body-fluid {
+    font-size: clamp(0.92rem, 1.8vw, 1rem);
+  }
+
+  /* ---------- Section vertical rhythm ---------- */
+  .section-y {
+    padding-block: clamp(4rem, 9vw, 6rem);
+  }
 }
 
-/* Dark mode overrides for hardcoded backgrounds */
+/* ============================================================
+   UTILITY OVERRIDES
+   ============================================================ */
+
+/* Ensure animated SVG scenes never overflow their containers */
+.hero-cartoon {
+  overflow: hidden;
+}
+
+/* Make sure full-bleed media respects safe areas on notched phones */
+@supports (padding: env(safe-area-inset-left)) {
+  .wrap {
+    padding-left: max(18px, env(safe-area-inset-left));
+    padding-right: max(18px, env(safe-area-inset-right));
+  }
+  @media (min-width: 641px) {
+    .wrap {
+      padding-left: max(28px, env(safe-area-inset-left));
+      padding-right: max(28px, env(safe-area-inset-right));
+    }
+  }
+}
+
+/* ============================================================
+   DARK MODE — HARDCODED COLOR REMAPS
+   ============================================================ */
 [data-theme="dark"] .bg-white {
   background-color: var(--color-card) !important;
 }
@@ -383,9 +571,16 @@
   color-scheme: dark;
 }
 
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
   .reveal {
@@ -394,5 +589,12 @@
   }
   .scroll-top {
     transition: opacity 0.15s ease !important;
+  }
+  .animate-float,
+  .animate-pop-in,
+  .animate-bubble-in,
+  .animate-bounce-soft,
+  .animate-fade-up {
+    animation: none !important;
   }
 }
