@@ -63,6 +63,8 @@ import SuperAdminLayout from '../superadmin/SuperAdminLayout'
 import SuperAdminOverview from '../superadmin/SuperAdminOverview'
 import SuperAdminBilling from '../superadmin/SuperAdminBilling'
 import SuperAdminChamas from '../superadmin/SuperAdminChamas'
+import SuperAdminLogin from '../superadmin/SuperAdminLogin'
+import RequireSuperAdmin from './RequireSuperAdmin'
 
 const Soon = ({ title }) => (
   <div className="mx-auto max-w-[1180px]">
@@ -137,19 +139,19 @@ export default function AppRoutes() {
       </Route>
 
       {/* Super Admin — developer portal */}
-      {/* TODO: protect this route so only your developer account can access it.
-          Right now anyone who types /superadmin can view platform-wide data. */}
-      <Route path="/superadmin" element={<SuperAdminLayout />}>
-        <Route index element={<SuperAdminOverview />} />
-        <Route path="billing" element={<SuperAdminBilling />} />
-        <Route path="chamas" element={<SuperAdminChamas />} />
-        {/* Add more super-admin pages here:
-            <Route path="chamas" element={<SuperAdminChamas />} />
-            
-            <Route path="payments" element={<SuperAdminPayments />} />
-            <Route path="audit" element={<SuperAdminAudit />} />
-            <Route path="settings" element={<SuperAdminSettings />} />
-        */}
+      <Route path="/superadmin/login" element={<SuperAdminLogin />} />
+      
+      <Route element={<RequireSuperAdmin />}>
+        <Route path="/superadmin" element={<SuperAdminLayout />}>
+          <Route index element={<SuperAdminOverview />} />
+          <Route path="billing" element={<SuperAdminBilling />} />
+          <Route path="chamas" element={<SuperAdminChamas />} />
+          {/* Add more super-admin pages here:
+              <Route path="payments" element={<SuperAdminPayments />} />
+              <Route path="audit" element={<SuperAdminAudit />} />
+              <Route path="settings" element={<SuperAdminSettings />} />
+          */}
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
