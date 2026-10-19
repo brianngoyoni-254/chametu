@@ -1,5 +1,5 @@
-import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Building2, CreditCard, Smartphone, ShieldCheck, Settings } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { LayoutDashboard, Building2, CreditCard, Smartphone, ShieldCheck, Settings, LogOut } from 'lucide-react'
 import logo from '../assets/logos.png' // <-- Import the logo
 
 const LINKS = [
@@ -12,11 +12,17 @@ const LINKS = [
 ]
 
 export default function SuperAdminSidebar() {
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    localStorage.removeItem('superadmin_session')
+    navigate('/superadmin/login')
+  }
+
   return (
     <aside className="w-[260px] shrink-0 h-screen sticky top-0 flex flex-col bg-[#0B1B2B] text-white overflow-y-auto">
       {/* Brand */}
       <div className="flex items-center gap-3 p-6 pb-8">
-        {/* Replaced the custom "C" with your logo */}
         <img 
           src={logo} 
           alt="Chametu" 
@@ -51,7 +57,7 @@ export default function SuperAdminSidebar() {
 
       {/* Footer */}
       <div className="mt-auto p-6 border-t border-white/10">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-4">
           <div className="grid h-9 w-9 place-items-center rounded-full bg-navy border border-white/20 text-[0.8rem] font-bold">
             SA
           </div>
@@ -60,6 +66,15 @@ export default function SuperAdminSidebar() {
             <div className="text-[0.7rem] text-white/50">Full platform access</div>
           </div>
         </div>
+        
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2 text-[0.8rem] font-semibold text-white/60 transition hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
+        >
+          <LogOut size={14} />
+          Sign out
+        </button>
       </div>
     </aside>
   )
