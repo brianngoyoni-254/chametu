@@ -58,6 +58,12 @@ import MemberRotation from '../member/MemberRotation'
 import MemberVoting from '../member/MemberVoting'
 import DemoMemberEntry from '../member/DemoMemberEntry'
 
+// Super Admin (Developer Portal)
+import SuperAdminLayout from '../superadmin/SuperAdminLayout'
+import SuperAdminOverview from '../superadmin/SuperAdminOverview'
+import SuperAdminBilling from '../superadmin/SuperAdminBilling'
+import SuperAdminChamas from '../superadmin/SuperAdminChamas'
+
 const Soon = ({ title }) => (
   <div className="mx-auto max-w-[1180px]">
     <h1 className="font-display text-2xl font-bold text-navy">{title}</h1>
@@ -128,6 +134,22 @@ export default function AppRoutes() {
         <Route path="voting" element={<MemberVoting />} />
         <Route path="welfare" element={<MemberWelfare />} />
         <Route path="profile" element={<MemberProfile />} />
+      </Route>
+
+      {/* Super Admin — developer portal */}
+      {/* TODO: protect this route so only your developer account can access it.
+          Right now anyone who types /superadmin can view platform-wide data. */}
+      <Route path="/superadmin" element={<SuperAdminLayout />}>
+        <Route index element={<SuperAdminOverview />} />
+        <Route path="billing" element={<SuperAdminBilling />} />
+        <Route path="chamas" element={<SuperAdminChamas />} />
+        {/* Add more super-admin pages here:
+            <Route path="chamas" element={<SuperAdminChamas />} />
+            
+            <Route path="payments" element={<SuperAdminPayments />} />
+            <Route path="audit" element={<SuperAdminAudit />} />
+            <Route path="settings" element={<SuperAdminSettings />} />
+        */}
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
