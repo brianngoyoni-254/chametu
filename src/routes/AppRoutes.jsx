@@ -63,6 +63,10 @@ import SuperAdminLayout from '../superadmin/SuperAdminLayout'
 import SuperAdminOverview from '../superadmin/SuperAdminOverview'
 import SuperAdminBilling from '../superadmin/SuperAdminBilling'
 import SuperAdminChamas from '../superadmin/SuperAdminChamas'
+import SuperAdminPayments from '../superadmin/SuperAdminPayments'
+import SuperAdminSupport from '../superadmin/SuperAdminSupport'
+import SuperAdminAudit from '../superadmin/SuperAdminAudit'
+import SuperAdminSettings from '../superadmin/SuperAdminSettings'
 import SuperAdminLogin from '../superadmin/SuperAdminLogin'
 import RequireSuperAdmin from './RequireSuperAdmin'
 
@@ -140,17 +144,16 @@ export default function AppRoutes() {
 
       {/* Super Admin — developer portal */}
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
-      
+
       <Route element={<RequireSuperAdmin />}>
         <Route path="/superadmin" element={<SuperAdminLayout />}>
           <Route index element={<SuperAdminOverview />} />
-          <Route path="billing" element={<SuperAdminBilling />} />
           <Route path="chamas" element={<SuperAdminChamas />} />
-          {/* Add more super-admin pages here:
-              <Route path="payments" element={<SuperAdminPayments />} />
-              <Route path="audit" element={<SuperAdminAudit />} />
-              <Route path="settings" element={<SuperAdminSettings />} />
-          */}
+          <Route path="billing" element={<SuperAdminBilling />} />
+          <Route path="payments" element={<SuperAdminPayments />} />
+          <Route path="support" element={<SuperAdminSupport />} />
+          <Route path="audit" element={<SuperAdminAudit />} />
+          <Route path="settings" element={<SuperAdminSettings />} />
         </Route>
       </Route>
 
