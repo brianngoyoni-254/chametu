@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Percent, PiggyBank, ArrowRightLeft, Receipt,
   Heart, User, X, Sparkles, Package, CalendarDays, RefreshCw, Vote,
+  LifeBuoy,
 } from 'lucide-react'
 import logo from '../assets/logos.png'
 
@@ -28,7 +29,10 @@ const GROUPS = [
   },
   {
     label: 'Me',
-    links: [{ to: '/member/profile', icon: User, label: 'My Profile' }],
+    links: [
+      { to: '/member/profile', icon: User, label: 'My Profile' },
+      { to: '/member/support', icon: LifeBuoy, label: 'Support' },
+    ],
   },
 ]
 
@@ -43,20 +47,11 @@ export default function MemberSidebar({ open, onClose, chamaName }) {
         />
       )}
 
-      {/*
-        Sidebar is a brand element — always dark, in both light and dark
-        themes. That's why the gradient uses a hardcoded #0B1F33 instead of
-        the themeable `from-navy` (which flips to a light colour in dark
-        mode). Everything inside the sidebar (text-white/*, bg-emerald/25,
-        bg-white/[0.06], etc.) is likewise hardcoded and does not respond
-        to the theme.
-      */}
       <aside
         className={`fixed z-50 flex h-screen w-[272px] flex-col overflow-y-auto bg-gradient-to-b from-[#0B1F33] via-[#0A2A3E] to-[#08222A] p-4 text-white shadow-2xl transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand */}
         <div className="flex items-center justify-between px-2.5 pb-5 pt-1.5">
           <div className="flex items-center gap-2.5">
             <div className="relative">
@@ -85,7 +80,6 @@ export default function MemberSidebar({ open, onClose, chamaName }) {
           </button>
         </div>
 
-        {/* Chama pill */}
         <div className="mx-2 mb-4 rounded-2xl border border-white/10 bg-white/[0.06] px-3.5 py-3 backdrop-blur">
           <div className="flex items-center gap-2">
             <span className="grid h-6 w-6 place-items-center rounded-lg bg-emerald/25">
@@ -100,7 +94,6 @@ export default function MemberSidebar({ open, onClose, chamaName }) {
           </div>
         </div>
 
-        {/* Nav groups */}
         <nav className="flex flex-col gap-5">
           {GROUPS.map((group) => (
             <div key={group.label}>
@@ -144,7 +137,6 @@ export default function MemberSidebar({ open, onClose, chamaName }) {
           ))}
         </nav>
 
-        {/* Footer note */}
         <div className="mt-auto pt-5">
           <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-[0.68rem] leading-relaxed text-white/50">
             <div className="font-semibold text-white/70">Read-only access</div>
