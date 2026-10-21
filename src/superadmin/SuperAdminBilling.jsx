@@ -1,84 +1,74 @@
-import { useState } from 'react'
-import { Download, Ban, Bell, Smartphone, CheckCircle2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Download, Ban, Bell, Smartphone, CheckCircle2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-
-const INITIAL_INVOICES = [
-  { id: 1, name: 'Wanjiku Merry-go-round', owner: 'R. Wanjiku', tier: 'Starter', daysOverdue: 14, amount: 1500, status: 'Blocked' },
-  { id: 2, name: 'Mama Mboga Welfare', owner: 'A. Achieng', tier: 'Growth', daysOverdue: 32, amount: 6000, status: 'Blocked' },
-  { id: 3, name: 'Amani Savers', owner: 'L. Njeri', tier: 'Starter', daysOverdue: 5, amount: 1500, status: 'Overdue' },
-  { id: 4, name: 'Mwangaza Youth Group', owner: 'T. Mutua', tier: 'Growth', daysOverdue: 21, amount: 3000, status: 'Blocked' },
-]
+import { readUnpaidInvoices, readChamaSummary } from '../lib/superadminBridge'
 
 export default function SuperAdminBilling() {
-  const [invoices, setInvoices] = useState(INITIAL_INVOICES)
-  const eligibleForBulkBlock = invoices.filter((i) => i.daysOverdue >= 14 && i.status !== 'Blocked').length
+  const [invoices, setInvoices] = useState(() => readUnpaidInvoices())
+  const [summary, setSummary] = useState(() => readChamaSummary())
 
-  const handleAction = (id, action, name) => {
-    if (action === 'Mark paid') {
-      setInvoices((p) => p.filter((i) => i.id !== id))
-      toast.success('Invoice Cleared', { description: `${name} has been marked as paid.` })
-    } else if (action === 'Block') {
-      setInvoices((p) => p.map((i) => (i.id === id ? { ...i, status: 'Blocked' } : i)))
-      toast.error('Chama Blocked', { description: `${name} blocked for non-payment.` })
-    }
-  }
+  const refresh = () => { setInvoices(readUnpaidInvoices()); setSummary(readChamaSummary()) }
+  useEffect(() => {
+    const onStorage = () => refresh()
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  const eligible = invoices.filter((i) => i.daysOverdue >= 14 && i.status !== 'Blocked').length
 
   const handleBulkBlock = () => {
-    if (eligibleForBulkBlock === 0) return toast.info('No eligible invoices', { description: 'All 14+ day overdue chamas are already blocked.' })
-    setInvoices((p) => p.map((i) => (i.daysOverdue >= 14 && i.status !== 'Blocked' ? { ...i, status: 'Blocked' } : i)))
-    toast.error('Bulk Block Executed', { description: `Blocked ${eligibleForBulkBlock} chamas.` })
+    if (eligible === 0) return toast.info('No eligible invoices')
+    setInvoices((prev) => prev.map((i) => (i.daysOverdue >= 14 && i.status !== 'Blocked' ? { ...i, status: 'Blocked' } : i)))
+    toast.error('Bulk Block Executed', { description: `Blocked ${eligible} chama(s).` })
   }
-
-  const handleReminder = (name) => toast.success('Reminder Sent', { description: `SMS + Email sent to chair of ${name}.` })
-  const handleMpesa = (name) => toast.info('STK Push Sent', { description: `Awaiting M-Pesa PIN for ${name}.` })
+  const handleAction = (id, action, name) => {
+    if (action === 'Mark paid') {
+      setInvoices((prev) => prev.filter((i) => i.id !== id))
+      toast.success('Invoice Cleared', { description: `${name} marked as paid.` })
+    } else if (action === 'Block') {
+      setInvoices((prev) => prev.map((i) => (i.id === id ? { ...i, status: 'Blocked' } : i)))
+      toast.error('Chama Blocked', { description: `${name} blocked.` })
+    }
+  }
+  const handleReminder = (name) => toast.success('Reminder Sent', { description: `SMS + Email sent to ${name}.` })
+  const handleMpesa = (name) => toast.info('STK Push Sent', { description: `Awaiting PIN for ${name}.` })
 
   const handleExport = () => {
-    const headers = ['Chama Name', 'Owner', 'Tier', 'Days Overdue', 'Amount Due (KSh)', 'Status']
+    const headers = ['Chama', 'Owner', 'Tier', 'Days Overdue', 'Amount (KSh)', 'Status']
     const rows = invoices.map((i) => [i.name, i.owner, i.tier, i.daysOverdue, i.amount, i.status])
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const csv = [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a')
-    a.href = url
-    a.download = `chametu-unpaid-invoices-${new Date().toISOString().slice(0, 10)}.csv`
+    a.href = url; a.download = `chametu-invoices-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
-    toast.success('Export Complete', { description: `Downloaded ${invoices.length} invoices.` })
+    toast.success('Export Complete')
   }
 
   const tierBadge = (t) => t === 'Starter' ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
     : t === 'Growth' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
     : t === 'Business' ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
     : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
-
   const statusBadge = (s) => s === 'Blocked' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
     : s === 'Overdue' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
     : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400'
-
-  const Actions = ({ inv }) => (
-    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-      <button onClick={() => handleReminder(inv.name)} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy transition hover:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white sm:px-3 sm:text-[0.75rem]"><Bell size={11} /> Remind</button>
-      <button onClick={() => handleMpesa(inv.name)} className="flex items-center gap-1 rounded-lg bg-[#0B1F33] px-2.5 py-1.5 text-[0.7rem] font-semibold text-white transition hover:bg-[#0B1F33]/90 dark:bg-emerald dark:text-[#06331F] sm:px-3 sm:text-[0.75rem]"><Smartphone size={11} /> M-Pesa</button>
-      <button onClick={() => handleAction(inv.id, 'Mark paid', inv.name)} className="rounded-lg bg-forest px-2.5 py-1.5 text-[0.7rem] font-semibold text-white transition hover:bg-forest-dark dark:bg-emerald dark:text-[#06331F] sm:px-3 sm:text-[0.75rem]">Paid</button>
-      {inv.status !== 'Blocked' && (
-        <button onClick={() => handleAction(inv.id, 'Block', inv.name)} className="rounded-lg bg-red-600 px-2.5 py-1.5 text-[0.7rem] font-semibold text-white transition hover:bg-red-700 sm:px-3 sm:text-[0.75rem]">Block</button>
-      )}
-    </div>
-  )
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-bold text-navy dark:text-white sm:text-2xl">Billing & tiers</h1>
-          <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">Tier payments, reminders and enforcement</p>
+          <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">Tier payments and enforcement (live from admin data)</p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button onClick={refresh} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
+            <RefreshCw size={14} /> Refresh
+          </button>
+          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
             <Download size={15} /> Export CSV
           </button>
-          <button onClick={handleBulkBlock} className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition ${eligibleForBulkBlock > 0 ? 'bg-red-500 hover:bg-red-600' : 'cursor-not-allowed bg-red-400/50'}`}>
-            <Ban size={15} /> Block {eligibleForBulkBlock} overdue
+          <button onClick={handleBulkBlock} className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white ${eligible > 0 ? 'bg-red-500 hover:bg-red-600' : 'cursor-not-allowed bg-red-400/50'}`}>
+            <Ban size={15} /> Block {eligible} overdue
           </button>
         </div>
       </div>
@@ -86,13 +76,13 @@ export default function SuperAdminBilling() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Collected this month</div>
-          <div className="mt-1.5 font-display text-xl font-bold text-navy dark:text-white sm:mt-2 sm:text-2xl">KSh 33,000</div>
-          <div className="mt-1 text-[0.72rem] font-semibold text-forest dark:text-emerald-400 sm:text-[0.78rem]">Active, fully paid chamas</div>
+          <div className="mt-1.5 font-display text-xl font-bold text-navy dark:text-white sm:mt-2 sm:text-2xl">KSh {summary.tierPrice?.toLocaleString() ?? '—'}</div>
+          <div className="mt-1 text-[0.72rem] font-semibold text-forest dark:text-emerald-400 sm:text-[0.78rem]">{summary.tier} tier · {summary.memberCounts?.active} active</div>
         </div>
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Outstanding</div>
           <div className="mt-1.5 font-display text-xl font-bold text-navy dark:text-white sm:mt-2 sm:text-2xl">KSh {invoices.reduce((s, i) => s + i.amount, 0).toLocaleString()}</div>
-          <div className="mt-1 text-[0.72rem] font-semibold text-red-600 dark:text-red-400 sm:text-[0.78rem]">{invoices.length} chamas owe tier fees</div>
+          <div className="mt-1 text-[0.72rem] font-semibold text-red-600 dark:text-red-400 sm:text-[0.78rem]">{invoices.length} chama(s) owe tier fees</div>
         </div>
         <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Tier prices</div>
@@ -121,7 +111,12 @@ export default function SuperAdminBilling() {
                 <div><span className="block text-ink-soft">Days</span><span className="font-mono font-semibold text-navy dark:text-white">{inv.daysOverdue}d</span></div>
                 <div><span className="block text-ink-soft">Amount</span><span className="font-mono font-semibold text-navy dark:text-white">KSh {inv.amount.toLocaleString()}</span></div>
               </div>
-              <div className="mt-3"><Actions inv={inv} /></div>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <button onClick={() => handleReminder(inv.name)} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white"><Bell size={11} /> Remind</button>
+                <button onClick={() => handleMpesa(inv.name)} className="flex items-center gap-1 rounded-lg bg-[#0B1F33] px-2.5 py-1.5 text-[0.7rem] font-semibold text-white dark:bg-emerald dark:text-[#06331F]"><Smartphone size={11} /> M-Pesa</button>
+                <button onClick={() => handleAction(inv.id, 'Mark paid', inv.name)} className="rounded-lg bg-forest px-2.5 py-1.5 text-[0.7rem] font-semibold text-white dark:bg-emerald dark:text-[#06331F]">Paid</button>
+                {inv.status !== 'Blocked' && <button onClick={() => handleAction(inv.id, 'Block', inv.name)} className="rounded-lg bg-red-600 px-2.5 py-1.5 text-[0.7rem] font-semibold text-white">Block</button>}
+              </div>
             </li>
           ))}
         </ul>
@@ -148,7 +143,14 @@ export default function SuperAdminBilling() {
                   <td className="px-4 py-3 font-mono text-ink-soft lg:px-5 lg:py-4">{inv.daysOverdue}</td>
                   <td className="px-4 py-3 font-mono text-navy dark:text-white lg:px-5 lg:py-4">KSh {inv.amount.toLocaleString()}</td>
                   <td className="px-4 py-3 lg:px-5 lg:py-4"><span className={`inline-flex rounded-md px-2 py-1 text-[0.68rem] font-bold ${statusBadge(inv.status)}`}>{inv.status}</span></td>
-                  <td className="px-4 py-3 lg:px-5 lg:py-4"><div className="flex justify-end"><Actions inv={inv} /></div></td>
+                  <td className="px-4 py-3 lg:px-5 lg:py-4">
+                    <div className="flex justify-end gap-1.5">
+                      <button onClick={() => handleReminder(inv.name)} className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.72rem] font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white"><Bell size={11} /> Remind</button>
+                      <button onClick={() => handleMpesa(inv.name)} className="flex items-center gap-1 rounded-lg bg-[#0B1F33] px-2.5 py-1.5 text-[0.72rem] font-semibold text-white dark:bg-emerald dark:text-[#06331F]"><Smartphone size={11} /> M-Pesa</button>
+                      <button onClick={() => handleAction(inv.id, 'Mark paid', inv.name)} className="rounded-lg bg-forest px-2.5 py-1.5 text-[0.72rem] font-semibold text-white dark:bg-emerald dark:text-[#06331F]">Paid</button>
+                      {inv.status !== 'Blocked' && <button onClick={() => handleAction(inv.id, 'Block', inv.name)} className="rounded-lg bg-red-600 px-2.5 py-1.5 text-[0.72rem] font-semibold text-white">Block</button>}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
