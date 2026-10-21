@@ -24,6 +24,8 @@ import {
   X,
   LogOut,
   Pencil,
+  LifeBuoy,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTier } from "../context/TierContext";
@@ -40,6 +42,8 @@ const SECTIONS = [
       { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
       { to: "/dashboard/invite", icon: Mail, label: "Invite Members" },
       { to: "/dashboard/chama", icon: Users, label: "My Chama" },
+      { to: "/dashboard/support", icon: LifeBuoy, label: "Support" },
+      { to: "/dashboard/settings", icon: SettingsIcon, label: "Settings" },
     ],
   },
   {
@@ -98,7 +102,6 @@ function initials(name) {
     .toUpperCase();
 }
 
-/** Avatar: shows uploaded photo if present, otherwise initials on a gradient. */
 function Avatar({ member, size = "md" }) {
   const dim =
     size === "lg" ? "w-11 h-11 text-[0.9rem]" : "w-8 h-8 text-[0.7rem]";
@@ -128,7 +131,6 @@ export default function Sidebar({ open, onClose }) {
 
   const [profileOpen, setProfileOpen] = useState(false);
 
-  // Hide links the current member has neither permission nor tier to open
   const visibleSections = SECTIONS.map((section) => ({
     ...section,
     items: section.items.filter((item) => {
@@ -160,13 +162,6 @@ export default function Sidebar({ open, onClose }) {
         />
       )}
 
-      {/*
-        Sidebar is a brand element — always dark, in both light and dark
-        themes. That's why the gradient uses a hardcoded #0B1F33 instead of
-        the themeable `from-navy` (which flips to light in dark mode).
-        Everything inside the sidebar (text-white/*, bg-gold, bg-emerald,
-        etc.) is likewise hardcoded and does not respond to the theme.
-      */}
       <aside
         className={`
           fixed hero:sticky hero:top-0 hero:h-screen z-50
@@ -176,7 +171,6 @@ export default function Sidebar({ open, onClose }) {
           ${open ? "translate-x-0" : "-translate-x-full hero:translate-x-0"}
         `}
       >
-        {/* Brand */}
         <div className="flex items-center justify-between px-2.5 pb-6 pt-1.5">
           <div className="flex items-center gap-2.5">
             <img
@@ -197,7 +191,6 @@ export default function Sidebar({ open, onClose }) {
           </button>
         </div>
 
-        {/* Navigation */}
         {visibleSections.map((section) => (
           <div key={section.label}>
             <div className="text-[0.68rem] tracking-wider text-white/40 font-semibold mt-3.5 mb-1.5 px-2.5">
@@ -234,7 +227,6 @@ export default function Sidebar({ open, onClose }) {
           </div>
         ))}
 
-        {/* Footer: plan + user card + logout */}
         <div className="mt-auto pt-3.5 px-2.5 border-t border-white/10 flex flex-col gap-3">
           <div className="text-[0.72rem] text-white/40">
             <b className="text-gold font-display">{tier}</b> plan
@@ -243,7 +235,6 @@ export default function Sidebar({ open, onClose }) {
             members
           </div>
 
-          {/* Clickable user card → opens ProfileModal */}
           {currentMember && (
             <button
               type="button"
@@ -268,7 +259,6 @@ export default function Sidebar({ open, onClose }) {
             </button>
           )}
 
-          {/* Logout */}
           <button
             onClick={handleLogout}
             className="flex items-center gap-2.5 w-full px-3 py-2.5 rounded-xl text-[0.86rem] font-medium text-white/70 hover:bg-red-500/10 hover:text-red-300 transition"
@@ -279,7 +269,6 @@ export default function Sidebar({ open, onClose }) {
         </div>
       </aside>
 
-      {/* Profile modal */}
       <ProfileModal
         open={profileOpen}
         onClose={() => setProfileOpen(false)}
