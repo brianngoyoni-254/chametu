@@ -1,7 +1,5 @@
 /* ============================================================
    chametuStorage.js - local-only persistence layer
-   Holds: chama, invites, members, member sessions, member ledger.
-   This is the ONLY file that should touch these localStorage keys.
    ============================================================ */
 
 const CHAMA_KEY          = 'chametu_chama_v1'
@@ -9,8 +7,11 @@ const INVITES_KEY        = 'chametu_invites_v1'
 const MEMBERS_KEY        = 'chametu_members_v2'
 const MEMBER_SESSION_KEY = 'chametu_member_session_v1'
 const MEMBER_LEDGER_KEY  = 'chametu_member_ledger_v1'
-
-/* ---------------- low-level helpers ---------------- */
+const TRANSACTIONS_KEY   = 'chametu_transactions_v1'
+const PAYMENTS_KEY       = 'chametu_payments_v1'
+const WELFARE_KEY        = 'chametu_welfare_v1'
+const LOANS_KEY          = 'chametu_loans_v1'
+const SAVINGS_KEY        = 'chametu_savings_v1'
 
 function read(key, fallback) {
   try {
@@ -24,6 +25,9 @@ function read(key, fallback) {
 function write(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value))
+  } catch {}
+  try {
+    window.dispatchEvent(new CustomEvent('chametu:storage-updated', { detail: { key } }))
   } catch {}
 }
 
@@ -64,24 +68,11 @@ export function saveChama(chama) {
   return chama
 }
 
-/**
- * Returns the chama object scoped to the given member session.
- * Prioritises the session's own chamaName and chamaCode so a member
- * always sees the exact chama they were invited to, even if another
- * chama's record happens to be in localStorage.
- *
- * Config (amount, due, grace, maxLoanMultiple) still comes from the
- * locally stored chama record.
- */
 export function getMemberChama(session) {
   const local = getChama() || {}
   const name = session?.chamaName || local.name || 'My Chama'
   const code = session?.chamaCode || local.code || ''
-  return {
-    ...local,
-    name,
-    code,
-  }
+  return { ...local, name, code }
 }
 
 /* ============================================================
@@ -268,7 +259,54 @@ export function loginMember(chamaCode, contact, password) {
 }
 
 /* ============================================================
-   PER-MEMBER FINANCE / LEDGER (view layer)
+   LOANS - LIVE AGGREGATION
+   ============================================================ */
+
+export function getMemberLiveLoan(session) {
+  if (!session) return null
+  const loans = read(LOANS_KEY, [])
+  const mine = loans.filter(
+    (l) =>
+      l.memberId === session.id ||
+      l.member === session.name ||
+      (session.email && l.memberEmail === session.email)
+  )
+
+  const current =
+    mine.find((l) => l.status === 'active') ||
+    mine.find((l) => l.status === 'overdue') ||
+    mine.find((l) => l.status === 'new') ||
+    mine.find((l) => l.status === 'repaid') ||
+    null
+
+  if (!current) return null
+
+  return {
+    id: current.id,
+    amount: Number(current.amount) || 0,
+    balance: Number(current.balance ?? current.amount) || 0,
+    status: current.status,
+    purpose: current.purpose || '',
+    appliedAt: current.appliedAt,
+    approvedAt: current.approvedAt,
+    repaidAt: current.repaidAt,
+  }
+}
+
+export function getMemberLoanUsed(session) {
+  if (!session) return 0
+  const loans = read(LOANS_KEY, [])
+  return loans
+    .filter(
+      (l) =>
+        (l.memberId === session.id || l.member === session.name) &&
+        (l.status === 'active' || l.status === 'overdue')
+    )
+    .reduce((s, l) => s + Number(l.balance ?? l.amount ?? 0), 0)
+}
+
+/* ============================================================
+   PER-MEMBER FINANCE (view layer)
    ============================================================ */
 
 function readLedger() {
@@ -284,9 +322,7 @@ export function getMemberFinance(session) {
   const ledger = readLedger()
   const key = session?.id || session?.email || 'anon'
 
-  if (ledger[key]) return ledger[key]
-
-  const seed = {
+  const base = ledger[key] || {
     savings: 45000,
     contributions: {
       expected: scopedChama.amount || 5000,
@@ -295,9 +331,19 @@ export function getMemberFinance(session) {
     },
     loan: null,
   }
-  ledger[key] = seed
-  writeLedger(ledger)
-  return seed
+  if (!ledger[key]) {
+    ledger[key] = base
+    writeLedger(ledger)
+  }
+
+  const liveLoan = getMemberLiveLoan(session)
+
+  return {
+    ...base,
+    loan: liveLoan,
+    loanUsed: getMemberLoanUsed(session),
+    loanLimitMultiplier: scopedChama.maxLoanMultiple || 3,
+  }
 }
 
 export function setMemberFinance(session, next) {
@@ -315,7 +361,169 @@ export function getMemberTransactions(session) {
 }
 
 /* ============================================================
-   UTIL
+   WRITE-BACK ACTIONS
    ============================================================ */
+
+export function payMemberContribution(session, amount) {
+  const members = getMembers()
+  const idx = members.findIndex(
+    (m) => m.id === session?.id || m.email === session?.email
+  )
+  const chama = getChama() || {}
+  const paid = Number(amount) || chama.amount || 5000
+  const name = session?.name || 'Member'
+
+  if (idx !== -1) {
+    members[idx] = { ...members[idx], status: 'active', contributionPaid: paid }
+    saveMembers(members)
+  }
+
+  const pays = read(PAYMENTS_KEY, [])
+  pays.unshift({
+    id: `p-${Date.now()}`,
+    name,
+    phone: members[idx]?.phone || '—',
+    amount: paid,
+    ref: `Q${makeToken(9)}`,
+    status: 'matched',
+    matchedTo: name,
+    time: new Date().toISOString(),
+  })
+  write(PAYMENTS_KEY, pays)
+
+  const tx = read(TRANSACTIONS_KEY, [])
+  tx.unshift({
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    desc: `Contribution — ${name}`,
+    debit: 0,
+    credit: paid,
+  })
+  write(TRANSACTIONS_KEY, tx)
+
+  const savings = read(SAVINGS_KEY, [])
+  savings.unshift({
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    member: name,
+    deposit: paid,
+    withdrawal: 0,
+    balance: (members[idx]?.savings || 0) + paid,
+  })
+  write(SAVINGS_KEY, savings)
+}
+
+export function applyMemberLoan(session, { amount, purpose }) {
+  const loans = read(LOANS_KEY, [])
+  const member = getMembers().find(
+    (m) => m.id === session?.id || m.email === session?.email
+  )
+  loans.unshift({
+    id: Date.now(),
+    member: session?.name || 'Member',
+    memberId: session?.id || member?.id,
+    memberEmail: session?.email || member?.email,
+    amount: Number(amount) || 0,
+    balance: Number(amount) || 0,
+    status: 'new',
+    purpose: purpose || '',
+    appliedAt: new Date().toISOString(),
+  })
+  write(LOANS_KEY, loans)
+}
+
+export function applyMemberWelfare(session, { reason, amount }) {
+  const member = getMembers().find(
+    (m) => m.id === session?.id || m.email === session?.email
+  )
+  const welfare = read(WELFARE_KEY, [])
+  welfare.unshift({
+    id: Date.now(),
+    member: session?.name || 'Member',
+    memberId: session?.id || member?.id,
+    reason: reason || 'Other',
+    amount: Number(amount) || 0,
+    status: 'pending',
+    submittedAt: new Date().toISOString(),
+  })
+  write(WELFARE_KEY, welfare)
+}
+
+/* ============================================================
+   LOAN REPAYMENT
+   ============================================================ */
+
+export function repayMemberLoan(session, { loanId, amount, method = 'mpesa' }) {
+  const loans = read(LOANS_KEY, [])
+  const idx = loans.findIndex(
+    (l) =>
+      l.id === loanId &&
+      (l.memberId === session?.id ||
+        l.member === session?.name ||
+        l.memberEmail === session?.email)
+  )
+  if (idx === -1) return null
+
+  const loan = loans[idx]
+  const amt = Number(amount)
+  if (!amt || amt <= 0) return null
+  if (amt > Number(loan.balance || 0))
+    return { error: 'amount-exceeds-balance', remaining: Number(loan.balance) }
+
+  const remaining = Number(loan.balance) - amt
+  const updated = {
+    ...loan,
+    balance: remaining,
+    status: remaining <= 0 ? 'repaid' : loan.status,
+    repaidAt: remaining <= 0 ? new Date().toISOString() : loan.repaidAt,
+    lastRepaymentAt: new Date().toISOString(),
+  }
+  loans[idx] = updated
+  write(LOANS_KEY, loans)
+
+  const name = session?.name || loan.member || 'Member'
+
+  const tx = read(TRANSACTIONS_KEY, [])
+  tx.unshift({
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    desc: `Loan repayment — ${name}`,
+    debit: 0,
+    credit: amt,
+  })
+  write(TRANSACTIONS_KEY, tx)
+
+  const savings = read(SAVINGS_KEY, [])
+  savings.unshift({
+    date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    member: name,
+    deposit: amt,
+    withdrawal: 0,
+    balance: 0,
+    kind: 'loan-repayment',
+  })
+  write(SAVINGS_KEY, savings)
+
+  const ledger = readLedger()
+  const key = session?.id || session?.email || 'anon'
+  const entries = (ledger[key]?.transactions) || []
+  ledger[key] = {
+    ...(ledger[key] || {}),
+    transactions: [
+      {
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        desc: `Loan repayment${loan.purpose ? ` — ${loan.purpose}` : ''}`,
+        amount: -amt,
+      },
+      ...entries,
+    ],
+  }
+  writeLedger(ledger)
+
+  void method
+  return updated
+}
+
+export function isLoanOutstanding(loan) {
+  if (!loan) return false
+  return loan.status === 'active' || loan.status === 'overdue'
+}
 
 export function joinChamaWithUserStore() {}

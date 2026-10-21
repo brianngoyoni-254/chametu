@@ -1,14 +1,17 @@
 import { Link } from 'react-router-dom'
-import { FiMapPin, FiHeart, FiTwitter, FiLinkedin, FiMail } from 'react-icons/fi'
+import {
+  FiMapPin, FiHeart, FiTwitter, FiLinkedin, FiMail,
+} from 'react-icons/fi'
 import logo from '../assets/logos.png'
 
 const COLUMNS = [
   {
     title: 'Product',
     links: [
-      { href: '#features', label: 'Features' },
-      { href: '#rewards', label: 'Rewards' },
-      { href: '#security', label: 'Security' },
+      { to: '/#features', label: 'Features' },
+      { to: '/#rewards', label: 'Rewards' },
+      { to: '/#security', label: 'Security' },
+      { to: '/#how', label: 'How it works' },
     ],
   },
   {
@@ -16,23 +19,33 @@ const COLUMNS = [
     links: [
       { to: '/register', label: 'Create your chama' },
       { to: '/login', label: 'Log in' },
+      { to: '/rewards/plans', label: 'Plans & pricing' },
+      { to: '/rewards/how-it-works', label: 'Rewards' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { to: '/contact', label: 'Contact us' },
+      { to: '/privacy', label: 'Privacy policy' },
+      { to: '/terms', label: 'Terms of service' },
     ],
   },
 ]
 
 const SOCIAL = [
-  { icon: FiTwitter, label: 'Twitter', href: '#' },
-  { icon: FiLinkedin, label: 'LinkedIn', href: '#' },
-  { icon: FiMail, label: 'Email', href: 'mailto:hello@chametu.co.ke' },
+  { icon: FiTwitter, label: 'Twitter', href: 'https://twitter.com/chametu' },
+  { icon: FiLinkedin, label: 'LinkedIn', href: 'https://linkedin.com/company/chametu' },
+  { icon: FiMail, label: 'Email', href: 'mailto:support@chametu.co.ke' },
 ]
 
 const linkClass =
-  'text-[0.86rem] text-ink-soft transition-colors hover:text-forest sm:text-[.88rem]'
+  'inline-flex items-center text-[0.86rem] text-ink-soft transition-colors hover:text-forest sm:text-[.88rem]'
 
 export default function Footer() {
   return (
     <footer className="border-t border-line bg-card">
-      <div className="wrap grid gap-8 py-12 sm:gap-10 sm:py-14 md:grid-cols-[1.4fr_1fr_1fr] md:gap-12">
+      <div className="wrap grid gap-8 py-12 sm:gap-10 sm:py-14 md:grid-cols-[1.4fr_1fr_1fr_1fr] md:gap-12">
         <div className="max-w-[40ch]">
           <Link to="/" className="inline-flex items-center gap-2.5">
             <span className="grid h-9 w-9 place-items-center rounded-xl bg-forest/10">
@@ -52,6 +65,8 @@ export default function Footer() {
                 key={label}
                 href={href}
                 aria-label={label}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-paper text-ink-soft transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:bg-forest/5 hover:text-forest"
               >
                 <Icon size={15} strokeWidth={2.2} />
@@ -67,16 +82,10 @@ export default function Footer() {
             </h2>
             <ul className="mt-4 space-y-2.5">
               {col.links.map((l) => (
-                <li key={l.label}>
-                  {l.to ? (
-                    <Link to={l.to} className={linkClass}>
-                      {l.label}
-                    </Link>
-                  ) : (
-                    <a href={l.href} className={linkClass}>
-                      {l.label}
-                    </a>
-                  )}
+                <li key={l.to}>
+                  <Link to={l.to} className={linkClass}>
+                    {l.label}
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -97,9 +106,20 @@ export default function Footer() {
               in Kenya
             </span>
           </div>
-          <div className="flex items-center gap-1.5">
-            <FiMapPin size={13} className="text-forest" aria-hidden="true" />
-            <span>Nairobi, Kenya</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <Link to="/privacy" className="hover:text-forest transition-colors">
+              Privacy
+            </Link>
+            <Link to="/terms" className="hover:text-forest transition-colors">
+              Terms
+            </Link>
+            <Link to="/contact" className="hover:text-forest transition-colors">
+              Contact
+            </Link>
+            <span className="inline-flex items-center gap-1.5">
+              <FiMapPin size={13} className="text-forest" aria-hidden="true" />
+              Nairobi, Kenya
+            </span>
           </div>
         </div>
       </div>

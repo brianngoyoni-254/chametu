@@ -8,6 +8,9 @@ import ResetPassword from '../auth/ResetPassword'
 import Payment from '../auth/Payment'
 import HowRewardsWork from '../home/HowRewardsWork'
 import MemberJoin from '../auth/MemberJoin'
+import Privacy from '../home/Privacy'
+import Terms from '../home/Terms'
+import Contact from '../home/Contact'
 
 import ProtectedRoute from './ProtectedRoute'
 import DashboardLayout from '../dashboard/DashboardLayout'
@@ -16,12 +19,12 @@ import Rewards from '../rewards/Rewards'
 import Points from '../rewards/Points'
 import TierComparison from '../rewards/TierComparison'
 
-// Main
 import Overview from '../dashboard/admin/Overview'
 import InviteMembers from '../dashboard/admin/InviteMembers'
 import MyChama from '../dashboard/admin/MyChama'
+import Support from '../dashboard/admin/Support'
+import Settings from '../dashboard/admin/Settings'
 
-// Finance
 import Payments from '../dashboard/admin/Payments'
 import Transactions from '../dashboard/admin/Transactions'
 import Contributions from '../dashboard/admin/Contributions'
@@ -29,21 +32,17 @@ import Savings from '../dashboard/admin/Savings'
 import Loans from '../dashboard/admin/Loans'
 import Welfare from '../dashboard/admin/Welfare'
 
-// Investments
 import Portfolio from '../dashboard/admin/Portfolio'
 import Assets from '../dashboard/admin/Assets'
 
-// Governance
 import Payouts from '../dashboard/admin/Payouts'
 import Meetings from '../dashboard/admin/Meetings'
 import Voting from '../dashboard/admin/Voting'
 
-// People & Reports
 import Members from '../dashboard/admin/Members'
 import Statements from '../dashboard/admin/Statements'
 import Reports from '../dashboard/admin/Reports'
 
-// Member account
 import MemberLayout from '../member/MemberLayout'
 import MemberOverview from '../member/MemberOverview'
 import MemberLoans from '../member/MemberLoans'
@@ -56,9 +55,9 @@ import MemberAssets from '../member/MemberAssets'
 import MemberMeetings from '../member/MemberMeetings'
 import MemberRotation from '../member/MemberRotation'
 import MemberVoting from '../member/MemberVoting'
+import MemberSupport from '../member/MemberSupport'
 import DemoMemberEntry from '../member/DemoMemberEntry'
 
-// Super Admin (Developer Portal)
 import SuperAdminLayout from '../superadmin/SuperAdminLayout'
 import SuperAdminOverview from '../superadmin/SuperAdminOverview'
 import SuperAdminBilling from '../superadmin/SuperAdminBilling'
@@ -80,7 +79,6 @@ const Soon = ({ title }) => (
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* Public */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -88,19 +86,19 @@ export default function AppRoutes() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/rewards/how-it-works" element={<HowRewardsWork />} />
-
-      {/* Member invite link */}
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+      <Route path="/contact" element={<Contact />} />
       <Route path="/join/:chamaCode/:token" element={<MemberJoin />} />
-
-      {/* Local preview */}
       <Route path="/demo/member" element={<DemoMemberEntry />} />
 
-      {/* Admin — protected */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Overview />} />
           <Route path="/dashboard/invite" element={<InviteMembers />} />
           <Route path="/dashboard/chama" element={<MyChama />} />
+          <Route path="/dashboard/support" element={<Support />} />
+          <Route path="/dashboard/settings" element={<Settings />} />
 
           <Route path="/dashboard/payments" element={<Payments />} />
           <Route path="/dashboard/transactions" element={<Transactions />} />
@@ -127,7 +125,6 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Member portal */}
       <Route path="/member" element={<MemberLayout />}>
         <Route index element={<MemberOverview />} />
         <Route path="contributions" element={<MemberContributions />} />
@@ -139,12 +136,11 @@ export default function AppRoutes() {
         <Route path="rotation" element={<MemberRotation />} />
         <Route path="voting" element={<MemberVoting />} />
         <Route path="welfare" element={<MemberWelfare />} />
+        <Route path="support" element={<MemberSupport />} />
         <Route path="profile" element={<MemberProfile />} />
       </Route>
 
-      {/* Super Admin — developer portal */}
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
-
       <Route element={<RequireSuperAdmin />}>
         <Route path="/superadmin" element={<SuperAdminLayout />}>
           <Route index element={<SuperAdminOverview />} />
