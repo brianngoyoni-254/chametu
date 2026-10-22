@@ -174,7 +174,7 @@ export default function MemberSupport() {
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Support</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Reach the Chametu team directly. Every ticket goes to your chama's superadmin.
+            Reach the Chametu team directly. Every ticket goes to chametu support team.
           </p>
         </div>
         <button
