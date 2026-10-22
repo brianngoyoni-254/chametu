@@ -1,23 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   UserPlus, Search, MoreVertical, Download, X, Mail, Send,
   CheckCircle2, AlertCircle, Eye, ShieldCheck, Bell, Wallet,
   UserMinus, Trash2, Link2, XCircle, UserCheck, Pencil, Save,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
 import { useTier } from '../../context/TierContext'
-
-const SEED_MEMBERS = [
-  { id: 'm1', name: 'Daniel Muthui',  email: 'daniel@chametu.co.ke',  phone: '0712 345 678', role: 'Chairman',    savings: 85000,  loan: 20000, status: 'active'  },
-  { id: 'm2', name: 'Brian Ngoyoni',   email: 'brian@chametu.co.ke',   phone: '0722 111 222', role: 'Treasurer',   savings: 60000,  loan: 0,     status: 'active'  },
-  { id: 'm3', name: 'Kevin Mwangi',   email: 'kevin@chametu.co.ke',  phone: '0733 555 001', role: 'Secretary',   savings: 45000,  loan: 50000, status: 'active'  },
-  { id: 'm4', name: 'Mary Achieng',   email: 'mary@chametu.co.ke',   phone: '0722 900 123', role: 'Member',      savings: 120000, loan: 40000, status: 'active'  },
-  { id: 'm5', name: 'David Otieno',   email: 'david@chametu.co.ke',  phone: '0711 888 234', role: 'Member',      savings: 30000,  loan: 18000, status: 'arrears' },
-  { id: 'm6', name: 'Grace Wanjiru',  email: 'grace@chametu.co.ke',  phone: '0722 333 444', role: 'Member',      savings: 380000, loan: 0,     status: 'active'  },
-  { id: 'm7', name: 'Peter Otieno',   email: 'peter@chametu.co.ke',  phone: '0711 222 333', role: 'Member',      savings: 310000, loan: 0,     status: 'active'  },
-  { id: 'm8', name: 'Faith Mwende',   email: 'faith@chametu.co.ke',  phone: '0700 444 555', role: 'Member',      savings: 120000, loan: 0,     status: 'invited' },
-]
 
 const FILTERS = [
   { key: 'all',      label: 'All' },
@@ -39,18 +30,13 @@ const STATUS_STYLE = {
 /* ---------- helpers ---------- */
 
 function initials(name) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .filter(Boolean)
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  if (!name) return '??'
+  return name.split(' ').map((w) => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
 }
 
 function buildCSV(members) {
-  const headers = ['Name', 'Email', 'Phone', 'Role', 'Savings (KSh)', 'Loan (KSh)', 'Status']
-  const rows = members.map((m) => [m.name, m.email, m.phone, m.role, m.savings, m.loan, m.status])
+  const headers = ['Name', 'Email', 'Phone', 'Role', 'Savings (KSh)', 'Status']
+  const rows = members.map((m) => [m.name, m.email, m.phone || '—', m.role, m.savings, m.status])
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
   return [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n')
 }
@@ -104,93 +90,99 @@ function getMenuItems(member) {
   ]
 }
 
-/** Avatar cell — shows uploaded photo if present, otherwise initials on a gradient. */
+/* ---------- sub-components ---------- */
+
 function MemberAvatar({ member, size = 'md' }) {
   const dim = size === 'lg' ? 'w-11 h-11 text-[0.9rem]' : 'w-8 h-8 text-[0.72rem]'
   if (member?.avatar) {
-    return (
-      <img
-        src={member.avatar}
-        alt={member.name}
-        className={`${dim} rounded-lg object-cover shrink-0`}
-      />
-    )
+    return <img src={member.avatar} alt={member.name} className={`${dim} rounded-lg object-cover shrink-0`} />
   }
   return (
-    <span
-      className={`${dim} rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold shrink-0`}
-    >
-      {initials(member?.name || '')}
+    <span className={`${dim} rounded-lg bg-gradient-to-br from-forest to-emerald text-white grid place-items-center font-display font-bold shrink-0`}>
+      {initials(member?.name)}
     </span>
   )
 }
 
 function RowMenu({ member, onAction }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef(null)
+  const [coords, setCoords] = useState({ top: 0, left: 0 })
+  const buttonRef = useRef(null)
+  const menuRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
     const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+      if (menuRef.current && !menuRef.current.contains(e.target) && buttonRef.current && !buttonRef.current.contains(e.target)) {
+        setOpen(false)
+      }
     }
     const onEsc = (e) => e.key === 'Escape' && setOpen(false)
+    const onScroll = () => setOpen(false)
+
     document.addEventListener('mousedown', onClick)
     document.addEventListener('keydown', onEsc)
+    window.addEventListener('scroll', onScroll, true)
+
     return () => {
       document.removeEventListener('mousedown', onClick)
       document.removeEventListener('keydown', onEsc)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [open])
+
+  const handleOpen = (e) => {
+    e.stopPropagation()
+    if (!open && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect()
+      const menuHeight = 220
+      const spaceBelow = window.innerHeight - rect.bottom
+      const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom
+      setCoords({ top: top, left: rect.right - 224 })
+    }
+    setOpen(!open)
+  }
 
   const items = getMenuItems(member)
 
   return (
-    <div className="relative inline-block text-left" ref={ref}>
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
-        className={`p-1.5 rounded-lg transition ${
-          open
-            ? 'bg-forest/10 text-navy'
-            : 'text-ink-soft hover:text-navy hover:bg-forest/10'
-        }`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-label={`Actions for ${member.name}`}
+        ref={buttonRef}
+        onClick={handleOpen}
+        className={`p-1.5 rounded-lg transition ${open ? 'bg-forest/10 text-navy' : 'text-ink-soft hover:text-navy hover:bg-forest/10'}`}
       >
         <MoreVertical size={15} strokeWidth={2} />
       </button>
 
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full mt-1 z-30 w-56 bg-white border border-line rounded-xl shadow-lg overflow-hidden py-1"
-        >
+      {open && createPortal(
+        <div ref={menuRef} style={{ top: coords.top, left: coords.left }} className="fixed z-[100] w-56 bg-white border border-line rounded-xl shadow-lg overflow-hidden py-1">
           {items.map((item, i) =>
             item.divider ? (
               <div key={`d${i}`} className="h-px bg-line my-1" />
             ) : (
               <button
                 key={item.key}
-                role="menuitem"
                 onClick={() => { setOpen(false); onAction(item.key, member) }}
-                className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[0.86rem] transition ${
-                  item.danger
-                    ? 'text-red-600 hover:bg-red-50'
-                    : 'text-navy hover:bg-forest/[0.06]'
-                }`}
+                className={`w-full flex items-center gap-2.5 px-3.5 py-2 text-left text-[0.86rem] transition ${item.danger ? 'text-red-600 hover:bg-red-50' : 'text-navy hover:bg-forest/[0.06]'}`}
               >
-                <item.icon
-                  size={14}
-                  strokeWidth={2}
-                  className={item.danger ? 'text-red-500 shrink-0' : 'text-ink-soft shrink-0'}
-                />
+                <item.icon size={14} strokeWidth={2} className={item.danger ? 'text-red-500 shrink-0' : 'text-ink-soft shrink-0'} />
                 {item.label}
               </button>
             )
           )}
-        </div>
+        </div>,
+        document.body
       )}
+    </>
+  )
+}
+
+function Field({ label, value, mono }) {
+  return (
+    <div>
+      <div className="text-[0.72rem] uppercase tracking-wider font-semibold text-ink-soft">{label}</div>
+      <div className={`mt-0.5 text-[0.92rem] text-navy ${mono ? 'font-mono' : ''}`}>{value}</div>
     </div>
   )
 }
@@ -205,7 +197,7 @@ function ProfileModal({ member, open, onClose, onSave }) {
       setDraft({
         name: member.name,
         email: member.email,
-        phone: member.phone,
+        phone: member.phone || '',
         role: member.role,
       })
     }
@@ -221,78 +213,35 @@ function ProfileModal({ member, open, onClose, onSave }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white border border-line rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-md overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between px-5 py-4 border-b border-line">
           <div className="flex items-center gap-3">
             <MemberAvatar member={member} size="lg" />
             <div className="min-w-0">
-              <h3 className="font-display font-semibold text-navy text-[1.05rem] truncate">
-                {editing ? 'Edit member' : member.name}
-              </h3>
-              <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[0.66rem] font-bold uppercase tracking-wide ${STATUS_STYLE[member.status]}`}>
-                {member.status}
-              </span>
+              <h3 className="font-display font-semibold text-navy text-[1.05rem] truncate">{editing ? 'Edit member' : member.name}</h3>
+              <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-full text-[0.66rem] font-bold uppercase tracking-wide ${STATUS_STYLE[member.status] || STATUS_STYLE.active}`}>{member.status}</span>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-paper text-ink-soft hover:text-navy transition"
-            aria-label="Close"
-          >
-            <X size={16} strokeWidth={2} />
-          </button>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-paper text-ink-soft hover:text-navy transition"><X size={16} strokeWidth={2} /></button>
         </div>
 
         <div className="px-5 py-4 flex flex-col gap-3">
           {editing ? (
             <>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Full name
-                <input
-                  value={draft.name}
-                  onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Email
-                <input
-                  value={draft.email}
-                  onChange={(e) => setDraft({ ...draft, email: e.target.value })}
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Phone
-                <input
-                  value={draft.phone}
-                  onChange={(e) => setDraft({ ...draft, phone: e.target.value })}
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                />
-              </label>
-              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                Role
-                <select
-                  value={draft.role}
-                  onChange={(e) => setDraft({ ...draft, role: e.target.value })}
-                  className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                >
-                  {ROLES.map((r) => <option key={r}>{r}</option>)}
-                </select>
-              </label>
+              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Full name<input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition" /></label>
+              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Email<input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition" /></label>
+              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Phone<input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition" /></label>
+              <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Role<select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition">{ROLES.map((r) => <option key={r}>{r}</option>)}</select></label>
             </>
           ) : (
             <>
               <Field label="Email" value={member.email} mono />
-              <Field label="Phone" value={member.phone} mono />
+              <Field label="Phone" value={member.phone || '—'} mono />
               <Field label="Role"  value={member.role} />
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Savings" value={`KSh ${member.savings.toLocaleString()}`} mono />
-                <Field label="Loan"    value={member.loan > 0 ? `KSh ${member.loan.toLocaleString()}` : '—'} mono />
+                <Field label="Savings" value={`KSh ${Number(member.savings || 0).toLocaleString()}`} mono />
+                <Field label="Status" value={member.status} />
               </div>
             </>
           )}
@@ -301,35 +250,13 @@ function ProfileModal({ member, open, onClose, onSave }) {
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
           {editing ? (
             <>
-              <button
-                onClick={() => setEditing(false)}
-                className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={save}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
-              >
-                <Save size={14} strokeWidth={2} />
-                Save changes
-              </button>
+              <button onClick={() => setEditing(false)} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition">Cancel</button>
+              <button onClick={save} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"><Save size={14} strokeWidth={2} />Save changes</button>
             </>
           ) : (
             <>
-              <button
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
-              >
-                Close
-              </button>
-              <button
-                onClick={() => setEditing(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
-              >
-                <Pencil size={14} strokeWidth={2} />
-                Edit
-              </button>
+              <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition">Close</button>
+              <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"><Pencil size={14} strokeWidth={2} />Edit</button>
             </>
           )}
         </div>
@@ -338,59 +265,26 @@ function ProfileModal({ member, open, onClose, onSave }) {
   )
 }
 
-function Field({ label, value, mono }) {
-  return (
-    <div>
-      <div className="text-[0.72rem] uppercase tracking-wider font-semibold text-ink-soft">{label}</div>
-      <div className={`mt-0.5 text-[0.92rem] text-navy ${mono ? 'font-mono' : ''}`}>{value}</div>
-    </div>
-  )
-}
-
 function RoleModal({ member, open, onClose, onSave }) {
   const [role, setRole] = useState('Member')
-
-  useEffect(() => {
-    if (open && member) setRole(member.role)
-  }, [open, member])
-
+  useEffect(() => { if (open && member) setRole(member.role) }, [open, member])
   if (!open || !member) return null
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4 border-b border-line">
           <h3 className="font-display font-semibold text-navy text-[1.05rem]">Change role</h3>
-          <p className="mt-0.5 text-[0.82rem] text-ink-soft">
-            What should {member.name.split(' ')[0]} be in this chama?
-          </p>
+          <p className="mt-0.5 text-[0.82rem] text-ink-soft">What should {member.name.split(' ')[0]} be in this chama?</p>
         </div>
         <div className="px-5 py-4">
-          <select
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] text-navy outline-none focus:border-forest transition"
-          >
+          <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] text-navy outline-none focus:border-forest transition">
             {ROLES.map((r) => <option key={r}>{r}</option>)}
           </select>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onSave(role)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
-          >
-            <ShieldCheck size={14} strokeWidth={2} />
-            Save
-          </button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition">Cancel</button>
+          <button onClick={() => onSave(role)} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"><ShieldCheck size={14} strokeWidth={2} />Save</button>
         </div>
       </div>
     </div>
@@ -400,30 +294,15 @@ function RoleModal({ member, open, onClose, onSave }) {
 function ConfirmDialog({ open, title, body, confirmLabel, danger, onClose, onConfirm }) {
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 py-4">
           <h3 className="font-display font-semibold text-navy text-[1.05rem]">{title}</h3>
           <p className="mt-1.5 text-[0.86rem] text-ink-soft">{body}</p>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={`px-4 py-2.5 rounded-xl text-white text-[0.86rem] font-semibold transition ${
-              danger ? 'bg-red-600 hover:bg-red-700' : 'bg-forest hover:bg-forest-dark'
-            }`}
-          >
-            {confirmLabel}
-          </button>
+          <button onClick={onClose} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition">Cancel</button>
+          <button onClick={onConfirm} className={`px-4 py-2.5 rounded-xl text-white text-[0.86rem] font-semibold transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-forest hover:bg-forest-dark'}`}>{confirmLabel}</button>
         </div>
       </div>
     </div>
@@ -435,153 +314,69 @@ function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo }
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('Member')
   const [error, setError] = useState('')
-  const [sent, setSent] = useState(false)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    if (open) { setName(''); setEmail(''); setRole('Member'); setError(''); setSent(false) }
+    if (open) { setName(''); setEmail(''); setRole('Member'); setError(''); setBusy(false) }
   }, [open])
-
-  useEffect(() => {
-    if (!open) return
-    const onEsc = (e) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onEsc)
-    return () => window.removeEventListener('keydown', onEsc)
-  }, [open, onClose])
 
   if (!open) return null
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     setError('')
     const trimmedName = name.trim()
     const trimmedEmail = email.trim().toLowerCase()
-    if (!trimmedName) return setError('Enter the member\u2019s name.')
+    
+    if (!trimmedName) return setError('Enter the member’s name.')
     if (!isValidEmail(trimmedEmail)) return setError('Enter a valid email address.')
     if (existingEmails.includes(trimmedEmail)) return setError('That email is already on this chama.')
-    const ok = onInvite({ name: trimmedName, email: trimmedEmail, role })
-    if (ok === false) return
-    setSent(true)
-    setTimeout(() => onClose(), 1400)
+
+    setBusy(true)
+    const success = await onInvite({ name: trimmedName, email: trimmedEmail, role })
+    setBusy(false)
+    if (success) onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 grid place-items-center p-4" onClick={onClose}>
-      <div
-        className="bg-white border border-line rounded-2xl w-full max-w-md overflow-hidden shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {sent ? (
-          <div className="p-7 text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-emerald/15 text-forest grid place-items-center mb-3">
-              <CheckCircle2 size={22} strokeWidth={2} />
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-md overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={submit}>
+          <div className="flex items-start justify-between px-5 py-4 border-b border-line">
+            <div>
+              <h3 className="font-display font-semibold text-navy text-[1.05rem]">Invite a member</h3>
+              <p className="mt-0.5 text-[0.82rem] text-ink-soft">{atCap ? `You've reached the ${capInfo.maxMembers}-member cap on ${capInfo.tier}.` : "They'll receive an email with a join link."}</p>
             </div>
-            <h3 className="font-display font-semibold text-navy text-lg">Invite sent</h3>
-            <p className="mt-1 text-[0.86rem] text-ink-soft">
-              We emailed <b className="text-navy">{email}</b> an invite link to join the chama.
-            </p>
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-paper text-ink-soft hover:text-navy transition"><X size={16} strokeWidth={2} /></button>
           </div>
-        ) : (
-          <form onSubmit={submit}>
-            <div className="flex items-start justify-between px-5 py-4 border-b border-line">
-              <div>
-                <h3 className="font-display font-semibold text-navy text-[1.05rem]">Invite a member</h3>
-                <p className="mt-0.5 text-[0.82rem] text-ink-soft">
-                  {atCap
-                    ? `You've reached the ${capInfo.maxMembers}-member cap on ${capInfo.tier}.`
-                    : "They'll receive an email with a join link."}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-paper text-ink-soft hover:text-navy transition"
-                aria-label="Close"
-              >
-                <X size={16} strokeWidth={2} />
-              </button>
-            </div>
-            <div className="px-5 py-4 flex flex-col gap-3">
-              {atCap ? (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gold/15 text-[#8A6112] text-[0.84rem]">
-                  <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
-                  <span>
-                    Your <b>{capInfo.tier}</b> plan allows up to <b>{capInfo.maxMembers}</b> members.
-                    Upgrade your plan to invite more.
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                    Full name
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Anne Wanjiku"
-                      autoFocus
-                      className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                    Email address
-                    <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white focus-within:border-forest transition">
-                      <Mail size={15} strokeWidth={2} className="text-ink-soft shrink-0" />
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@example.com"
-                        className="w-full outline-none text-[0.92rem] font-normal text-navy bg-transparent"
-                      />
-                    </div>
-                  </label>
-                  <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">
-                    Role
-                    <select
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition"
-                    >
-                      {ROLES.map((r) => <option key={r}>{r}</option>)}
-                    </select>
-                  </label>
-                  {error && (
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[0.82rem]">
-                      <AlertCircle size={14} strokeWidth={2} className="shrink-0" />
-                      {error}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition"
-              >
-                {atCap ? 'Close' : 'Cancel'}
-              </button>
-              {!atCap && (
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition"
-                >
-                  <Send size={14} strokeWidth={2} />
-                  Send invite
-                </button>
-              )}
-            </div>
-          </form>
-        )}
+          <div className="px-5 py-4 flex flex-col gap-3">
+            {atCap ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gold/15 text-[#8A6112] text-[0.84rem]"><AlertCircle size={14} strokeWidth={2} className="shrink-0" /><span>Your <b>{capInfo.tier}</b> plan allows up to <b>{capInfo.maxMembers}</b> members.</span></div>
+            ) : (
+              <>
+                <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Full name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Anne Wanjiku" autoFocus disabled={busy} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition disabled:opacity-50" /></label>
+                <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Email address<div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white focus-within:border-forest transition"><Mail size={15} strokeWidth={2} className="text-ink-soft shrink-0" /><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@example.com" disabled={busy} className="w-full outline-none text-[0.92rem] font-normal text-navy bg-transparent disabled:opacity-50" /></div></label>
+                <label className="flex flex-col gap-1.5 text-[0.8rem] font-semibold text-navy">Role<select value={role} onChange={(e) => setRole(e.target.value)} disabled={busy} className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] font-normal text-navy outline-none focus:border-forest transition disabled:opacity-50">{ROLES.map((r) => <option key={r}>{r}</option>)}</select></label>
+                {error && <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 text-red-700 text-[0.82rem]"><AlertCircle size={14} strokeWidth={2} className="shrink-0" />{error}</div>}
+              </>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
+            <button type="button" onClick={onClose} disabled={busy} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold hover:border-navy transition disabled:opacity-50">{atCap ? 'Close' : 'Cancel'}</button>
+            {!atCap && (
+              <button type="submit" disabled={busy} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold hover:bg-forest-dark transition disabled:opacity-50"><Send size={14} strokeWidth={2} />{busy ? 'Sending…' : 'Send invite'}</button>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   )
 }
 
+/* ---------- main page ---------- */
+
 export default function Members() {
-  // Members come from ChamaContext so the sidebar and this page stay in sync.
-  const { members, setMembers } = useChama()
-  // Tier info drives the member cap shown in the header and enforced on invite.
+  const { members, setMembers, refetchMembers, recordContribution } = useChama()
   const { tier, config } = useTier()
 
   const [filter, setFilter] = useState('all')
@@ -590,166 +385,111 @@ export default function Members() {
   const [profileTarget, setProfileTarget] = useState(null)
   const [roleTarget, setRoleTarget] = useState(null)
   const [confirm, setConfirm] = useState(null)
-
-  // Seed the chama once if the context has no members yet (fresh install)
-  useEffect(() => {
-    if (members.length === 0) setMembers(SEED_MEMBERS)
-  }, [members.length, setMembers])
+  
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 8
 
   const rows = useMemo(() => {
     return members.filter((m) => {
       if (filter !== 'all' && m.status !== filter) return false
       if (query) {
         const q = query.toLowerCase()
-        if (
-          !m.name.toLowerCase().includes(q) &&
-          !m.email.toLowerCase().includes(q) &&
-          !m.phone.includes(q)
-        ) {
-          return false
-        }
+        if (!m.name.toLowerCase().includes(q) && !m.email.toLowerCase().includes(q) && !(m.phone || '').includes(q)) return false
       }
       return true
     })
   }, [members, filter, query])
 
-  const counts = useMemo(
-    () => ({
-      all: members.length,
-      active: members.filter((m) => m.status === 'active').length,
-      invited: members.filter((m) => m.status === 'invited').length,
-      arrears: members.filter((m) => m.status === 'arrears').length,
-      inactive: members.filter((m) => m.status === 'inactive').length,
-    }),
-    [members]
-  )
+  useEffect(() => { setCurrentPage(1) }, [filter, query])
 
-  // Members that count toward the tier cap (everyone except the inactive)
-  const capUsed = useMemo(
-    () => members.filter((m) => m.status !== 'inactive').length,
-    [members]
-  )
-  const atCap = capUsed >= config.maxMembers
+  const totalPages = Math.ceil(rows.length / itemsPerPage) || 1
+  const indexOfLastItem = currentPage * itemsPerPage
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage
+  const currentRows = rows.slice(indexOfFirstItem, indexOfLastItem)
 
+  const counts = useMemo(() => ({
+    all: members.length,
+    active: members.filter((m) => m.status === 'active').length,
+    invited: members.filter((m) => m.status === 'invited').length,
+    arrears: members.filter((m) => m.status === 'arrears').length,
+    inactive: members.filter((m) => m.status === 'inactive').length,
+  }), [members])
+
+  const capUsed = useMemo(() => members.filter((m) => m.status !== 'inactive').length, [members])
+  const atCap = capUsed >= (config?.maxMembers || 10)
   const existingEmails = useMemo(() => members.map((m) => m.email.toLowerCase()), [members])
 
-  const updateMember = (id, patch) =>
-    setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
-
+  const updateMember = (id, patch) => setMembers((prev) => prev.map((m) => (m.id === id ? { ...m, ...patch } : m)))
   const removeMember = (id) => setMembers((prev) => prev.filter((m) => m.id !== id))
 
   const handleExport = () => {
     if (rows.length === 0) return toast.error('Nothing to export for this filter.')
     downloadCSV(rows)
-    toast.success(`Exported ${rows.length} ${rows.length === 1 ? 'member' : 'members'} to CSV.`)
+    toast.success(`Exported ${rows.length} members to CSV.`)
   }
 
-  const handleInvite = ({ name, email, role }) => {
-    // Enforce the tier member cap before appending
+  const handleInvite = async ({ name, email, role }) => {
     if (atCap) {
-      toast.error(
-        `Your ${tier} plan allows up to ${config.maxMembers} members. Upgrade to add more.`
-      )
+      toast.error(`Your ${tier} plan allows up to ${config.maxMembers} members.`)
       return false
     }
-    const next = {
-      id: `m${Date.now()}`,
-      name,
-      email,
-      phone: '—',
-      role,
-      savings: 0,
-      loan: 0,
-      status: 'invited',
-      avatar: null,
+
+    const token = localStorage.getItem('auth_token')
+    try {
+      const res = await fetch('http://localhost:5000/api/chama/members/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ name, email, role })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Failed to invite')
+      toast.success(`Invite sent to ${email}.`)
+      refetchMembers()
+      return true
+    } catch (err) {
+      toast.error(err.message)
+      return false
     }
-    setMembers((prev) => [next, ...prev])
-    toast.success(`Invite sent to ${email}.`)
-    return true
   }
 
-  const handleMenuAction = (key, member) => {
+  const handleMenuAction = async (key, member) => {
     switch (key) {
-      case 'view':
-        setProfileTarget(member)
-        break
-
-      case 'role':
-        setRoleTarget(member)
-        break
-
-      case 'remind':
-        toast.info(`Reminder queued for ${member.email} (backend not connected)`)
-        break
-
+      case 'view': setProfileTarget(member); break
+      case 'role': setRoleTarget(member); break
+      case 'remind': toast.info(`Reminder queued for ${member.email}`); break
       case 'record': {
         const amount = 5000
-        updateMember(member.id, { savings: member.savings + amount, status: 'active' })
-        toast.success(`Recorded KSh ${amount.toLocaleString()} for ${member.name.split(' ')[0]}`)
+        const res = await recordContribution(member.id, amount, 'CASH')
+        if (res.ok) toast.success(`Recorded KSh ${amount.toLocaleString()} for ${member.name.split(' ')[0]}`)
+        else toast.error(res.message)
         break
       }
-
-      case 'resend':
-        toast.success(`Invite resent to ${member.email}`)
-        break
-
+      case 'resend': toast.success(`Invite resent to ${member.email}`); break
       case 'copy': {
         const link = `${window.location.origin}/join?email=${encodeURIComponent(member.email)}`
-        navigator.clipboard?.writeText(link).then(
-          () => toast.success('Invite link copied to clipboard'),
-          () => toast.error('Could not copy — check browser permissions')
-        )
+        navigator.clipboard?.writeText(link).then(() => toast.success('Invite link copied'))
         break
       }
-
-      case 'reactivate':
-        updateMember(member.id, { status: 'active' })
-        toast.success(`${member.name.split(' ')[0]} reactivated`)
-        break
-
+      case 'reactivate': updateMember(member.id, { status: 'active' }); toast.success(`${member.name.split(' ')[0]} reactivated`); break
       case 'deactivate':
         setConfirm({
-          title: `Deactivate ${member.name}?`,
-          body: 'They will lose access to the chama app. Their data and history are preserved.',
-          confirmLabel: 'Deactivate',
-          onConfirm: () => {
-            updateMember(member.id, { status: 'inactive' })
-            toast.success(`${member.name.split(' ')[0]} deactivated`)
-            setConfirm(null)
-          },
+          title: `Deactivate ${member.name}?`, body: 'They will lose access.', confirmLabel: 'Deactivate',
+          onConfirm: () => { updateMember(member.id, { status: 'inactive' }); toast.success(`${member.name.split(' ')[0]} deactivated`); setConfirm(null) },
         })
         break
-
       case 'cancel':
         setConfirm({
-          title: `Cancel invite for ${member.name}?`,
-          body: 'Their invite link will stop working. You can invite them again later.',
-          confirmLabel: 'Cancel invite',
-          danger: true,
-          onConfirm: () => {
-            removeMember(member.id)
-            toast.success(`Invite cancelled for ${member.name.split(' ')[0]}`)
-            setConfirm(null)
-          },
+          title: `Cancel invite for ${member.name}?`, body: 'Their link will stop working.', confirmLabel: 'Cancel invite', danger: true,
+          onConfirm: () => { removeMember(member.id); toast.success(`Invite cancelled`); setConfirm(null) },
         })
         break
-
       case 'remove':
         setConfirm({
-          title: `Remove ${member.name} from the chama?`,
-          body: 'This cannot be undone. Their contribution and loan history will be removed from your records.',
-          confirmLabel: 'Remove',
-          danger: true,
-          onConfirm: () => {
-            removeMember(member.id)
-            toast.success(`${member.name.split(' ')[0]} removed from chama`)
-            setConfirm(null)
-          },
+          title: `Remove ${member.name}?`, body: 'This cannot be undone.', confirmLabel: 'Remove', danger: true,
+          onConfirm: () => { removeMember(member.id); toast.success(`${member.name.split(' ')[0]} removed`); setConfirm(null) },
         })
         break
-
-      default:
-        break
+      default: break
     }
   }
 
@@ -761,64 +501,30 @@ export default function Members() {
           <p className="mt-1.5 text-ink-soft">
             {counts.active} active · {counts.invited} invited · {counts.arrears} in arrears
             {' · '}
-            <span className={atCap ? 'text-[#8A6112] font-semibold' : ''}>
-              {capUsed}/{config.maxMembers} on {tier}
-            </span>
+            <span className={atCap ? 'text-[#8A6112] font-semibold' : ''}>{capUsed}/{config?.maxMembers || 10} on {tier}</span>
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-sm font-semibold hover:border-forest transition"
-          >
-            <Download size={15} strokeWidth={2} />
-            Export CSV
-          </button>
-          <button
-            onClick={() => setInviteOpen(true)}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
-              atCap
-                ? 'bg-paper text-ink-soft border border-line hover:border-gold cursor-pointer'
-                : 'bg-forest text-white hover:bg-forest-dark'
-            }`}
-            title={atCap ? `You've reached your ${tier} member cap` : 'Invite a new member'}
-          >
-            <UserPlus size={15} strokeWidth={2} />
-            Add member
-          </button>
+          <button onClick={handleExport} className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-sm font-semibold hover:border-forest transition"><Download size={15} strokeWidth={2} />Export CSV</button>
+          <button onClick={() => setInviteOpen(true)} className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${atCap ? 'bg-paper text-ink-soft border border-line hover:border-gold cursor-pointer' : 'bg-forest text-white hover:bg-forest-dark'}`}><UserPlus size={15} strokeWidth={2} />Add member</button>
         </div>
       </header>
 
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
         <div className="flex gap-1.5 flex-wrap">
           {FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`px-3.5 py-2 rounded-xl text-[0.82rem] font-semibold transition ${
-                filter === f.key
-                  ? 'bg-navy text-white'
-                  : 'bg-white border border-line text-ink-soft hover:border-navy'
-              }`}
-            >
-              {f.label}
-              <span className="ml-1.5 opacity-60">{counts[f.key]}</span>
+            <button key={f.key} onClick={() => setFilter(f.key)} className={`px-3.5 py-2 rounded-xl text-[0.82rem] font-semibold transition ${filter === f.key ? 'bg-navy text-white' : 'bg-white border border-line text-ink-soft hover:border-navy'}`}>
+              {f.label}<span className="ml-1.5 opacity-60">{counts[f.key]}</span>
             </button>
           ))}
         </div>
-
         <div className="flex items-center gap-2 border border-line rounded-xl px-3 py-2 bg-white max-w-[260px]">
           <Search size={15} strokeWidth={2} className="text-ink-soft shrink-0" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, email, phone…"
-            className="outline-none text-sm bg-transparent w-full"
-          />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, email, phone…" className="outline-none text-sm bg-transparent w-full" />
         </div>
       </div>
 
-      <div className="bg-white border border-line rounded-2xl">
+      <div className="bg-white border border-line rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[0.88rem]">
             <thead>
@@ -827,13 +533,12 @@ export default function Members() {
                 <th className="text-left px-5 py-3 border-b border-line font-semibold">Role</th>
                 <th className="text-left px-5 py-3 border-b border-line font-semibold">Phone</th>
                 <th className="text-right px-5 py-3 border-b border-line font-semibold">Savings</th>
-                <th className="text-right px-5 py-3 border-b border-line font-semibold">Loan</th>
                 <th className="text-left px-5 py-3 border-b border-line font-semibold">Status</th>
                 <th className="text-right px-5 py-3 border-b border-line font-semibold"></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((m) => (
+              {currentRows.map((m) => (
                 <tr key={m.id} className="hover:bg-forest/[0.03] transition">
                   <td className="px-5 py-3.5 border-b border-line">
                     <div className="flex items-center gap-3">
@@ -845,79 +550,43 @@ export default function Members() {
                     </div>
                   </td>
                   <td className="px-5 py-3.5 border-b border-line text-ink-soft">{m.role}</td>
-                  <td className="px-5 py-3.5 border-b border-line font-mono text-[0.82rem] text-ink-soft">
-                    {m.phone}
-                  </td>
-                  <td className="px-5 py-3.5 border-b border-line text-right font-mono text-navy">
-                    {m.savings.toLocaleString()}
-                  </td>
-                  <td className="px-5 py-3.5 border-b border-line text-right font-mono text-navy">
-                    {m.loan > 0 ? m.loan.toLocaleString() : '—'}
-                  </td>
+                  <td className="px-5 py-3.5 border-b border-line font-mono text-[0.82rem] text-ink-soft">{m.phone || '—'}</td>
+                  <td className="px-5 py-3.5 border-b border-line text-right font-mono text-navy">{Number(m.savings || 0).toLocaleString()}</td>
                   <td className="px-5 py-3.5 border-b border-line">
-                    <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-[0.7rem] font-bold uppercase tracking-wide ${STATUS_STYLE[m.status]}`}
-                    >
-                      {m.status}
-                    </span>
+                    <span className={`inline-block px-2.5 py-1 rounded-full text-[0.7rem] font-bold uppercase tracking-wide ${STATUS_STYLE[m.status] || STATUS_STYLE.active}`}>{m.status}</span>
                   </td>
                   <td className="px-5 py-3.5 border-b border-line text-right">
                     <RowMenu member={m} onAction={handleMenuAction} />
                   </td>
                 </tr>
               ))}
-              {rows.length === 0 && (
+              {currentRows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-ink-soft">
-                    No members match your filters.
+                  <td colSpan={6} className="px-5 py-12 text-center text-ink-soft">
+                    {members.length === 0 ? 'Loading members from database…' : 'No members match your filters.'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {rows.length > itemsPerPage && (
+          <div className="flex items-center justify-between border-t border-line bg-paper/50 px-5 py-3">
+            <span className="text-[0.82rem] text-ink-soft">Showing <b>{indexOfFirstItem + 1}</b> to <b>{Math.min(indexOfLastItem, rows.length)}</b> of <b>{rows.length}</b> members</span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 rounded-lg border border-line bg-white text-navy hover:bg-paper disabled:opacity-50 transition"><ChevronLeft size={16} /></button>
+              <span className="text-[0.82rem] font-semibold text-navy px-2">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 rounded-lg border border-line bg-white text-navy hover:bg-paper disabled:opacity-50 transition"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <InviteModal
-        open={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        onInvite={handleInvite}
-        existingEmails={existingEmails}
-        atCap={atCap}
-        capInfo={{ tier, maxMembers: config.maxMembers }}
-      />
-
-      <ProfileModal
-        open={!!profileTarget}
-        member={profileTarget}
-        onClose={() => setProfileTarget(null)}
-        onSave={(next) => {
-          updateMember(next.id, next)
-          setProfileTarget(null)
-          toast.success(`${next.name.split(' ')[0]} updated`)
-        }}
-      />
-
-      <RoleModal
-        open={!!roleTarget}
-        member={roleTarget}
-        onClose={() => setRoleTarget(null)}
-        onSave={(role) => {
-          updateMember(roleTarget.id, { role })
-          toast.success(`${roleTarget.name.split(' ')[0]} is now ${role}`)
-          setRoleTarget(null)
-        }}
-      />
-
-      <ConfirmDialog
-        open={!!confirm}
-        title={confirm?.title}
-        body={confirm?.body}
-        confirmLabel={confirm?.confirmLabel}
-        danger={confirm?.danger}
-        onClose={() => setConfirm(null)}
-        onConfirm={confirm?.onConfirm}
-      />
+      <InviteModal open={inviteOpen} onClose={() => setInviteOpen(false)} onInvite={handleInvite} existingEmails={existingEmails} atCap={atCap} capInfo={{ tier, maxMembers: config?.maxMembers || 10 }} />
+      <ProfileModal open={!!profileTarget} member={profileTarget} onClose={() => setProfileTarget(null)} onSave={(next) => { updateMember(next.id, next); setProfileTarget(null); toast.success(`${next.name.split(' ')[0]} updated`) }} />
+      <RoleModal open={!!roleTarget} member={roleTarget} onClose={() => setRoleTarget(null)} onSave={(role) => { updateMember(roleTarget.id, { role }); toast.success(`${roleTarget.name.split(' ')[0]} is now ${role}`); setRoleTarget(null) }} />
+      <ConfirmDialog open={!!confirm} title={confirm?.title} body={confirm?.body} confirmLabel={confirm?.confirmLabel} danger={confirm?.danger} onClose={() => setConfirm(null)} onConfirm={confirm?.onConfirm} />
     </div>
   )
 }

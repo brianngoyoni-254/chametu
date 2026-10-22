@@ -79,6 +79,7 @@ const Soon = ({ title }) => (
 export default function AppRoutes() {
   return (
     <Routes>
+      {/* Public */}
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
@@ -89,9 +90,14 @@ export default function AppRoutes() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/contact" element={<Contact />} />
+      
+      {/* Member invite link */}
       <Route path="/join/:chamaCode/:token" element={<MemberJoin />} />
+      
+      {/* Local preview */}
       <Route path="/demo/member" element={<DemoMemberEntry />} />
 
+      {/* Admin — protected */}
       <Route element={<ProtectedRoute />}>
         <Route element={<DashboardLayout />}>
           <Route path="/dashboard" element={<Overview />} />
@@ -125,21 +131,25 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      <Route path="/member" element={<MemberLayout />}>
-        <Route index element={<MemberOverview />} />
-        <Route path="contributions" element={<MemberContributions />} />
-        <Route path="savings" element={<MemberSavings />} />
-        <Route path="loans" element={<MemberLoans />} />
-        <Route path="transactions" element={<MemberTransactions />} />
-        <Route path="assets" element={<MemberAssets />} />
-        <Route path="meetings" element={<MemberMeetings />} />
-        <Route path="rotation" element={<MemberRotation />} />
-        <Route path="voting" element={<MemberVoting />} />
-        <Route path="welfare" element={<MemberWelfare />} />
-        <Route path="support" element={<MemberSupport />} />
-        <Route path="profile" element={<MemberProfile />} />
+      {/* Member portal — protected */}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/member" element={<MemberLayout />}>
+          <Route index element={<MemberOverview />} />
+          <Route path="contributions" element={<MemberContributions />} />
+          <Route path="savings" element={<MemberSavings />} />
+          <Route path="loans" element={<MemberLoans />} />
+          <Route path="transactions" element={<MemberTransactions />} />
+          <Route path="assets" element={<MemberAssets />} />
+          <Route path="meetings" element={<MemberMeetings />} />
+          <Route path="rotation" element={<MemberRotation />} />
+          <Route path="voting" element={<MemberVoting />} />
+          <Route path="welfare" element={<MemberWelfare />} />
+          <Route path="support" element={<MemberSupport />} />
+          <Route path="profile" element={<MemberProfile />} />
+        </Route>
       </Route>
 
+      {/* Super Admin — developer portal */}
       <Route path="/superadmin/login" element={<SuperAdminLogin />} />
       <Route element={<RequireSuperAdmin />}>
         <Route path="/superadmin" element={<SuperAdminLayout />}>

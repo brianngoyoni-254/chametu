@@ -1,13 +1,11 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import {
   LogOut, Bell, Menu, CheckCheck, Trash2, X,
   AlertTriangle, Info, CheckCircle2, ArrowRight,
 } from 'lucide-react'
 import MemberSidebar from './MemberSidebar'
-import {
-  getMemberSession, clearMemberSession, getMemberChama,
-} from '../lib/chametuStorage'
+import { useAuth } from '../context/AuthContext'
 import { useMemberNotifications } from '../lib/memberNotifications'
 
 const TITLES = {
@@ -49,14 +47,17 @@ function ago(iso) {
 }
 
 export default function MemberLayout() {
-  const session = getMemberSession()
+  const { user, logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
 
-  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useMemberNotifications(session?.id)
+  // Get chama data saved by AuthContext during login
+  const chamaData = JSON.parse(localStorage.getItem('chama_data') || '{}')
+  
+  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useMemberNotifications(user?.id)
 
   useEffect(() => {
     const onClick = (e) => {
@@ -71,16 +72,21 @@ export default function MemberLayout() {
     }
   }, [])
 
-  if (!session) return <Navigate to="/" replace />
+  // 1. If not logged in, go to login
+  if (!user) return <Navigate to="/login" replace />
 
-  const chama = getMemberChama(session)
+  // 2. If the logged-in user is an Admin (Chairman/Treasurer/Secretary), kick them to the Admin Dashboard
+  if (user.portal === 'admin') {
+    return <Navigate to="/dashboard" replace />
+  }
+
   const segment = location.pathname.split('/member/')[1] || ''
   const title = TITLES[segment] || 'Overview'
-  const subtitle = SUBTITLES[segment] || `${chama.name} / member account`
+  const subtitle = SUBTITLES[segment] || `${chamaData.name || 'My Chama'} / member account`
 
-  function logout() {
-    clearMemberSession()
-    window.location.href = '/'
+  function handleLogout() {
+    logout()
+    navigate('/login')
   }
 
   function initials(name) {
@@ -98,7 +104,7 @@ export default function MemberLayout() {
       <MemberSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        chamaName={chama.name}
+        chamaName={chamaData.name || 'My Chama'}
       />
 
       <main className="min-w-0 flex-1">
@@ -226,18 +232,18 @@ export default function MemberLayout() {
 
             <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-card py-1.5 pl-1.5 pr-3">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald font-display text-[0.7rem] font-bold text-white shadow-sm">
-                {initials(session.name)}
+                {initials(user.name)}
               </span>
               <div className="hidden min-w-0 sm:block">
                 <div className="truncate text-[0.78rem] font-semibold leading-tight text-navy">
-                  {session.name}
+                  {user.name}
                 </div>
                 <div className="text-[0.65rem] capitalize text-ink-soft">
-                  {session.role}
+                  {user.role}
                 </div>
               </div>
               <button
-                onClick={logout}
+                onClick={handleLogout}
                 className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[0.68rem] font-semibold text-ink-soft transition hover:bg-red-500/10 hover:text-red-600"
               >
                 <LogOut size={12} />

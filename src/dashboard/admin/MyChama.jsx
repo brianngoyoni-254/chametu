@@ -1,15 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pencil, Check, Building2, Users, Calendar, Coins } from 'lucide-react'
-import { getChama, saveChama, getMembers } from '../../lib/chametuStorage'
+import { useChama } from '../../context/ChamaContext'
+import { toast } from 'sonner'
 
 function initials(name) {
-  return (name || '')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || 'CH'
+  return (
+    (name || '')
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'CH'
+  )
 }
 
 function buildProfile(chama) {
@@ -37,37 +40,38 @@ const INITIAL_LOAN = {
 }
 
 export default function MyChama() {
-  const stored = useMemo(() => getChama(), [])
-  const [profile, setProfile] = useState(() => buildProfile(stored))
+  const { chama, members, updateChama } = useChama()
+  
+  const [profile, setProfile] = useState(() => buildProfile(chama))
   const [contrib, setContrib] = useState(() => ({
     ...INITIAL_CONTRIB,
-    amount: stored?.amount ?? INITIAL_CONTRIB.amount,
-    dueDay: stored?.due ?? INITIAL_CONTRIB.dueDay,
-    grace: stored?.grace ?? INITIAL_CONTRIB.grace,
+    amount: chama?.amount ?? INITIAL_CONTRIB.amount,
+    dueDay: chama?.due ?? INITIAL_CONTRIB.dueDay,
+    grace: chama?.grace ?? INITIAL_CONTRIB.grace,
   }))
   const [loan, setLoan] = useState(() => ({
     ...INITIAL_LOAN,
-    maxMultiple: stored?.maxLoanMultiple ?? INITIAL_LOAN.maxMultiple,
+    maxMultiple: chama?.maxLoanMultiple ?? INITIAL_LOAN.maxMultiple,
   }))
   const [editing, setEditing] = useState(null)
 
-  // Member count always reflects what is really stored
-  const [memberCount, setMemberCount] = useState(() => (getMembers() || []).length)
-
+  // Keep local state in sync if the chama data loads after the component mounts
   useEffect(() => {
-    setMemberCount((getMembers() || []).length)
-  }, [editing])
+    if (chama) {
+      setProfile(buildProfile(chama))
+    }
+  }, [chama])
 
-  // Persist name changes so other pages pick them up
+  // Persist name changes directly to the context and localStorage
   function finishEditing() {
     setEditing(null)
-    const current = getChama() || {}
-    saveChama({ ...current, ...profile })
+    updateChama(profile)
+    toast.success('Chama details updated')
   }
 
   function cancelEditing() {
     setEditing(null)
-    setProfile(buildProfile(getChama()))
+    setProfile(buildProfile(chama))
   }
 
   return (
@@ -158,7 +162,7 @@ export default function MyChama() {
               <Users size={11} /> Members
             </div>
             <div className="mt-1 font-display text-sm font-semibold text-navy">
-              {memberCount} active
+              {members.length} active
             </div>
           </div>
         </div>

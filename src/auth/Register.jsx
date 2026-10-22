@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Sun, Moon, Eye, EyeOff, Check, Mail, Lock, User,
   Building2, Phone, Gift, Smartphone, Vote, Star, Sparkles,
   ArrowLeft, Crown, ShieldCheck,
 } from 'lucide-react'
-import { useChama } from '../context/ChamaContext'
+import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
 import { TIERS, ORDER } from '../lib/tiers'
+import { toast } from 'sonner'
 import logo from '../assets/logos.png'
 
 const PLAN_META = {
@@ -27,7 +28,8 @@ const isValidEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
 const isValidPhone = (v) => /^0[17]\d{8}$/.test(v.replace(/\s/g, ''))
 
 export default function Register() {
-  const { joinChamaWithUser } = useChama()
+  const { register } = useAuth()
+  const { setBaseTier, startTrial } = useTier()
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
@@ -58,28 +60,43 @@ export default function Register() {
   const submit = async (e) => {
     e.preventDefault()
     setError('')
+
     if (name.trim().length < 2) return setError('Enter your full name.')
     if (!isValidEmail(email)) return setError('Enter a valid email address.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
     if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number.')
 
+    setBusy(true)
     try {
-      sessionStorage.setItem(
-        'chametu_pending_signup',
-        JSON.stringify({
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password,
-          chamaName: chamaName.trim(),
-          phone: phone.replace(/\s/g, ''),
-          tier: selectedTier,
-        })
-      )
-    } catch {
-      return setError('Your browser blocked storage. Enable it to continue.')
+      // 1. Create the account + chama in the backend database
+      const session = await register({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+        phone: phone.replace(/\s/g, ''),
+        chamaName: chamaName.trim(),
+        tier: selectedTier,
+      })
+
+      // 2. Set the local tier context so the UI reflects their choice
+      setBaseTier(selectedTier)
+      startTrial()
+
+      // 3. Show success
+      toast.success(`Welcome, ${name.split(' ')[0]}! Your chama is ready.`)
+      
+      // 4. Route based on their portal role 👇
+      if (session.portal === 'member') {
+        navigate('/member', { replace: true })
+      } else {
+        navigate('/dashboard', { replace: true })
+      }
+    } catch (err) {
+      setError(err?.message || 'Could not create your account. Please try again.')
+    } finally {
+      setBusy(false)
     }
-    navigate('/payment')
   }
 
   const selectedPlan = TIERS[selectedTier]
@@ -275,7 +292,7 @@ export default function Register() {
               disabled={busy}
               className="mt-2 w-full cursor-pointer rounded-2xl border-0 bg-gradient-to-br from-forest to-emerald py-4 font-display text-base font-bold text-white shadow-[0_10px_24px_rgba(11,122,90,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:transform-none disabled:opacity-55"
             >
-              {busy ? 'Creating…' : `Continue to payment · ${selectedTier}`}
+              {busy ? 'Creating your chama…' : 'Create your chama'}
             </button>
 
             {error && (
