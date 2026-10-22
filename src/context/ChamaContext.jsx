@@ -2,157 +2,178 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { useAuth } from './AuthContext'
 import { DEFAULT_ROLES, permissionsFor } from '../lib/permissions'
 
-const MEMBERS_KEY = 'chametu_members_v2'
-const ROLES_KEY = 'chametu_roles_v2'
-const CURRENT_KEY = 'chametu_current_member_v1'
-const CHAMA_KEY = 'chametu_chama_v1'
-
 const ChamaContext = createContext(null)
-
-function load(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : fallback
-  } catch {
-    return fallback
-  }
-}
-
-function save(key, value) {
-  try {
-    if (value === null || value === undefined) localStorage.removeItem(key)
-    else localStorage.setItem(key, JSON.stringify(value))
-  } catch {}
-}
 
 export function ChamaProvider({ children }) {
   const { user } = useAuth()
-  const [members, setMembers] = useState(() => load(MEMBERS_KEY, []))
-  const [roles, setRoles] = useState(() => load(ROLES_KEY, DEFAULT_ROLES))
-  const [devMemberId, setDevMemberId] = useState(() => load(CURRENT_KEY, null))
-  const [chama, setChama] = useState(() => load(CHAMA_KEY, null))
-  const [hydrated, setHydrated] = useState(false)
+  
+  const [members, setMembers] = useState([])
+  const [loans, setLoans] = useState([])
+  const [roles] = useState(DEFAULT_ROLES)
+  const [chama, setChama] = useState(null)
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true)
+  const [devMemberId, setDevMemberId] = useState(null)
 
-  useEffect(() => { save(MEMBERS_KEY, members) }, [members])
-  useEffect(() => { save(ROLES_KEY, roles) }, [roles])
-  useEffect(() => { save(CURRENT_KEY, devMemberId) }, [devMemberId])
-  useEffect(() => { save(CHAMA_KEY, chama) }, [chama])
-  useEffect(() => { setHydrated(true) }, [])
+  // 1. Load chama data from localStorage
+  useEffect(() => {
+    if (!user) {
+      setChama(null)
+      return
+    }
+    try {
+      const raw = localStorage.getItem('chama_data')
+      if (raw) setChama(JSON.parse(raw))
+    } catch {
+      setChama(null)
+    }
+  }, [user])
 
-  /**
-   * Resolve which member this session belongs to.
-   *   1. Auth user's email matches a member's email
-   *   2. Dev override (View-as switcher)
-   *   3. First active non-Member (fallback so the app isn't empty)
-   */
-  const currentMember = useMemo(() => {
-    if (!hydrated) return null
-
-    if (user?.email) {
-      const email = String(user.email).toLowerCase()
-      const byEmail = members.find((m) => m.email?.toLowerCase() === email)
-      if (byEmail) return byEmail
+  // 2. Fetch Members
+  const fetchMembers = useCallback(async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token || !user) {
+      setMembers([])
+      setIsLoadingMembers(false)
+      return
     }
 
+    setIsLoadingMembers(true)
+    try {
+      const response = await fetch('http://localhost:5000/api/chama/members', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMembers(data)
+      } else if (response.status === 401) {
+        localStorage.removeItem('auth_token')
+        window.location.href = '/login'
+      }
+    } catch (err) {
+      console.error("Failed to fetch members:", err)
+    } finally {
+      setIsLoadingMembers(false)
+    }
+  }, [user])
+
+  // 3. Fetch Loans
+  const fetchLoans = useCallback(async () => {
+    const token = localStorage.getItem('auth_token')
+    if (!token || !user) return
+
+    try {
+      const response = await fetch('http://localhost:5000/api/finance/loans', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setLoans(data)
+      }
+    } catch (err) {
+      console.error("Failed to fetch loans:", err)
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchMembers()
+    fetchLoans()
+  }, [fetchMembers, fetchLoans])
+
+  // 4. Finance Actions
+  const recordContribution = useCallback(async (memberId, amount, reference = 'CASH') => {
+    const token = localStorage.getItem('auth_token')
+    try {
+      const res = await fetch('http://localhost:5000/api/finance/contribution', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ member_id: memberId, amount, reference })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message)
+      
+      await fetchMembers() // Refresh balances
+      return { ok: true, message: data.message }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchMembers])
+
+  const applyForLoan = useCallback(async (amount, purpose = '') => {
+    const token = localStorage.getItem('auth_token')
+    try {
+      const res = await fetch('http://localhost:5000/api/finance/loans/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ amount, purpose })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message)
+      
+      await fetchLoans()
+      return { ok: true, loan_id: data.loan_id }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchLoans])
+
+  const updateLoanStatus = useCallback(async (loanId, status) => {
+    const token = localStorage.getItem('auth_token')
+    try {
+      const res = await fetch(`http://localhost:5000/api/finance/loans/${loanId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ status })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message)
+      
+      await fetchLoans()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchLoans])
+
+  const currentMember = useMemo(() => {
+    if (!user) return null
+    if (members.length === 0) {
+      return { id: 'temp', name: user.name, email: user.email, role: user.role || 'Chairman', status: 'active' }
+    }
+    const email = String(user.email).toLowerCase()
+    const byEmail = members.find((m) => m.email?.toLowerCase() === email)
+    if (byEmail) return byEmail
     if (devMemberId) {
       const byId = members.find((m) => m.id === devMemberId)
       if (byId) return byId
     }
+    return members[0] || null
+  }, [user, members, devMemberId])
 
-    return (
-      members.find((m) => m.status === 'active' && m.role !== 'Member') ||
-      members.find((m) => m.status === 'active') ||
-      members[0] ||
-      null
-    )
-  }, [user, members, devMemberId, hydrated])
-
-  const permissions = useMemo(
-    () => permissionsFor(currentMember, roles),
-    [currentMember, roles]
-  )
-
+  const permissions = useMemo(() => permissionsFor(currentMember, roles), [currentMember, roles])
   const can = useCallback((permKey) => Boolean(permissions[permKey]), [permissions])
-
   const setCurrentMember = useCallback((id) => setDevMemberId(id), [])
 
-  /** Patch the currently signed-in member (name / phone / avatar). */
-  const updateCurrentMember = useCallback(
-    (patch) => {
-      if (!currentMember) return
-      setMembers((prev) =>
-        prev.map((m) => (m.id === currentMember.id ? { ...m, ...patch } : m))
-      )
-    },
-    [currentMember, setMembers]
-  )
-
-  /** Called on signup (create mode). Creates a chama with the new user as Chairman. */
-  const createChamaForUser = useCallback(
-    ({ name, email, chamaName, baseTier = 'Starter' }) => {
-      const member = {
-        id: `m${Date.now()}`,
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        phone: '—',
-        role: 'Chairman',
-        savings: 0,
-        loan: 0,
-        status: 'active',
-        isOwner: true,
-        avatar: null,
-      }
-      setMembers([member])
-      setRoles(DEFAULT_ROLES)
-      setDevMemberId(member.id)
-      setChama({
-        name: chamaName?.trim() || `${name.split(' ')[0]}'s Chama`,
-        code: `CHM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-        baseTier,
-        createdAt: new Date().toISOString(),
-      })
-      return { memberId: member.id, baseTier }
-    },
-    []
-  )
-
-  /** Called on signup (join mode). Adds the new user as a Member. */
-  const joinChamaWithUser = useCallback(({ name, email, code }) => {
-    const member = {
-      id: `m${Date.now()}`,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: '—',
-      role: 'Member',
-      savings: 0,
-      loan: 0,
-      status: 'active',
-      avatar: null,
-    }
-    setMembers((prev) => [...prev, member])
-    setDevMemberId(member.id)
-    return member.id
+  const updateChama = useCallback((patch) => {
+    setChama((prev) => {
+      const next = { ...prev, ...patch }
+      try { localStorage.setItem('chama_data', JSON.stringify(next)) } catch {}
+      return next
+    })
   }, [])
 
   const value = useMemo(
     () => ({
-      chama,
-      members,
-      roles,
-      currentMember,
+      chama, members, loans, roles, currentMember,
       currentRole: currentMember?.role || null,
-      permissions,
-      can,
-      setCurrentMember,
-      setMembers,
-      setRoles,
-      updateCurrentMember,
-      createChamaForUser,
-      joinChamaWithUser,
+      isLoadingMembers, permissions, can, setCurrentMember, setMembers,
+      updateChama, refetchMembers: fetchMembers, refetchLoans: fetchLoans,
+      recordContribution, applyForLoan, updateLoanStatus,
     }),
     [
-      chama, members, roles, currentMember, permissions, can,
-      setCurrentMember, updateCurrentMember, createChamaForUser, joinChamaWithUser,
+      chama, members, loans, roles, currentMember, isLoadingMembers,
+      permissions, can, setCurrentMember, updateChama, fetchMembers, fetchLoans,
+      recordContribution, applyForLoan, updateLoanStatus,
     ]
   )
 

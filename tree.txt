@@ -18,7 +18,8 @@ src/
 |   |-- DataTable.jsx
 |   |-- Logo.jsx
 |   |-- Modal.jsx
-|   `-- StatCard.jsx
+|   |-- StatCard.jsx
+|   `-- ThemeToggle.jsx
 |-- context
 |   |-- AuthContext.jsx
 |   |-- ChamaContext.jsx
@@ -38,6 +39,7 @@ src/
 |       |-- Members.jsx
 |       |-- MyChama.jsx
 |       |-- NoAccess.jsx
+|       |-- NotificationSettings.jsx
 |       |-- Overview.jsx
 |       |-- Payments.jsx
 |       |-- Payouts.jsx
@@ -45,7 +47,9 @@ src/
 |       |-- Reports.jsx
 |       |-- RolesPermissions.jsx
 |       |-- Savings.jsx
+|       |-- Settings.jsx
 |       |-- Statements.jsx
+|       |-- Support.jsx
 |       |-- Transactions.jsx
 |       |-- Upgrade.jsx
 |       |-- Voting.jsx
@@ -53,30 +57,42 @@ src/
 |       `-- data
 |           `-- adminData.js
 |-- home
+|   |-- CartoonExplainer.jsx
+|   |-- Contact.jsx
 |   |-- CtaBand.jsx
 |   |-- Edge.jsx
 |   |-- Features.jsx
 |   |-- Footer.jsx
 |   |-- Hero.jsx
+|   |-- HeroCartoon.jsx
+|   |-- HeroVideo.jsx
 |   |-- Home.jsx
 |   |-- HowItWorks.jsx
 |   |-- HowRewardsWork.jsx
 |   |-- Join.jsx
+|   |-- LiveChat.jsx
 |   |-- Navbar.jsx
+|   |-- Privacy.jsx
 |   |-- Reveal.jsx
 |   |-- Rewards.jsx
 |   |-- ScrollToTop.jsx
 |   |-- Security.jsx
+|   |-- Terms.jsx
 |   `-- TrustBar.jsx
 |-- index.css
 |-- lib
+|   |-- adminNotifications.js
 |   |-- catalog.js
 |   |-- chametuShared.js
 |   |-- chametuStorage.js
+|   |-- memberNotifications.js
 |   |-- permissions.js
 |   |-- pointsStore.js
 |   |-- setupDemo.js
-|   `-- tiers.js
+|   |-- superadminBridge.js
+|   |-- superadminBridgeImports.js
+|   |-- tiers.js
+|   `-- welfareShared.js
 |-- main.jsx
 |-- member
 |   |-- DemoMemberEntry.jsx
@@ -90,6 +106,7 @@ src/
 |   |-- MemberRotation.jsx
 |   |-- MemberSavings.jsx
 |   |-- MemberSidebar.jsx
+|   |-- MemberSupport.jsx
 |   |-- MemberTransactions.jsx
 |   |-- MemberVoting.jsx
 |   `-- MemberWelfare.jsx
@@ -105,8 +122,23 @@ src/
 |   |-- AppRoutes.jsx
 |   |-- ProtectedRoute.jsx
 |   |-- RequirePermission.jsx
+|   |-- RequireSuperAdmin.jsx
 |   `-- RequireTier.jsx
+|-- superadmin
+|   |-- SuperAdminAudit.jsx
+|   |-- SuperAdminBilling.jsx
+|   |-- SuperAdminChamas.jsx
+|   |-- SuperAdminLayout.jsx
+|   |-- SuperAdminLogin.jsx
+|   |-- SuperAdminNavbar.jsx
+|   |-- SuperAdminOverview.jsx
+|   |-- SuperAdminPayments.jsx
+|   |-- SuperAdminSettings.jsx
+|   |-- SuperAdminSidebar.jsx
+|   |-- SuperAdminSupport.jsx
+|   |-- useNotifications.js
+|   `-- useTickets.js
 `-- utils
     `-- formatCurrency.js
 
-15 directories, 95 files
+16 directories, 126 files

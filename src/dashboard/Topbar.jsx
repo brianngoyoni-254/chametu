@@ -4,7 +4,8 @@ import {
   Menu, Search, Bell, Sun, Moon, CheckCheck, Trash2, X,
   AlertTriangle, Info, CheckCircle2, Settings, ArrowRight,
 } from 'lucide-react'
-import { getChama } from '../lib/chametuStorage'
+import { useAuth } from '../context/AuthContext'
+import { useChama } from '../context/ChamaContext'
 import { useAdminNotifications } from '../lib/adminNotifications'
 
 const TITLES = {
@@ -48,24 +49,13 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
-function readUser() {
-  try {
-    const raw = localStorage.getItem('chametu_auth_session')
-    if (raw) return JSON.parse(raw)
-    const raw2 = localStorage.getItem('superadmin_session')
-    if (raw2) return JSON.parse(raw2)
-    const raw3 = localStorage.getItem('chametu_member_session_v1')
-    if (raw3) return JSON.parse(raw3)
-  } catch {}
-  return null
-}
-
 export default function Topbar({ onBurger }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-
-  const [user, setUser] = useState(() => readUser())
-  const [chama, setChama] = useState(() => getChama())
+  
+  // Use real contexts instead of localStorage
+  const { user } = useAuth()
+  const { chama, currentMember } = useChama()
 
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
@@ -75,29 +65,19 @@ export default function Topbar({ onBurger }) {
   const title = useMemo(() => TITLES[pathname] || 'Dashboard', [pathname])
   const chamaName = chama?.name || 'My Chama'
 
+  // Use currentMember first (which has real DB role), fallback to user
+  const activeUser = currentMember || user
+
   const initials = useMemo(() => {
-    if (!user?.name) return '··'
-    return user.name
+    if (!activeUser?.name) return '··'
+    return activeUser.name
       .split(' ')
       .map((w) => w[0])
       .filter(Boolean)
       .join('')
       .slice(0, 2)
       .toUpperCase()
-  }, [user])
-
-  useEffect(() => {
-    const onStorage = () => {
-      setUser(readUser())
-      setChama(getChama())
-    }
-    window.addEventListener('storage', onStorage)
-    window.addEventListener('chametu:storage-updated', onStorage)
-    return () => {
-      window.removeEventListener('storage', onStorage)
-      window.removeEventListener('chametu:storage-updated', onStorage)
-    }
-  }, [])
+  }, [activeUser])
 
   useEffect(() => {
     const onClick = (e) => {
@@ -144,7 +124,7 @@ export default function Topbar({ onBurger }) {
         <p className="truncate text-[0.72rem] text-ink-soft">{chamaName}</p>
       </div>
 
-      <div className="hidden md:flex items-center gap-2 w-full max-w-[300px] border border-line rounded-xl px-3 py-2 bg-white text-ink-soft">
+      <div className="hidden md:flex items-center gap-2 w-full max-w-[300px] border border-line rounded-xl px-3 py-2 bg-card text-ink-soft">
         <Search size={14} strokeWidth={2} className="shrink-0 opacity-60" />
         <span className="text-[0.82rem] truncate">Search or ask Chametu…</span>
         <span className="ml-auto text-[0.68rem] border border-line rounded-md px-1.5 py-0.5 text-ink-soft">
@@ -154,7 +134,7 @@ export default function Topbar({ onBurger }) {
 
       <button
         onClick={toggleTheme}
-        className="w-9 h-9 rounded-xl border border-line bg-white text-navy grid place-items-center hover:border-forest transition"
+        className="w-9 h-9 rounded-xl border border-line bg-card text-navy grid place-items-center hover:border-forest transition"
         aria-label="Toggle theme"
       >
         <Sun size={15} strokeWidth={2} className="hidden [html[data-theme='dark']_&]:block" />
@@ -164,7 +144,7 @@ export default function Topbar({ onBurger }) {
       <div className="relative" ref={bellRef}>
         <button
           onClick={() => setBellOpen((v) => !v)}
-          className="relative w-9 h-9 rounded-xl border border-line bg-white text-navy grid place-items-center hover:border-forest transition"
+          className="relative w-9 h-9 rounded-xl border border-line bg-card text-navy grid place-items-center hover:border-forest transition"
           aria-label="Notifications"
           aria-expanded={bellOpen}
         >
@@ -177,7 +157,8 @@ export default function Topbar({ onBurger }) {
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-white shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+            {/* ... (keep your existing bell content) ... */}
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2">
                 <h3 className="font-display text-[0.9rem] font-bold text-navy">Notifications</h3>
@@ -252,18 +233,6 @@ export default function Topbar({ onBurger }) {
                 })
               )}
             </div>
-
-            <div className="border-t border-line bg-paper/50 px-4 py-2.5">
-              <button
-                onClick={() => {
-                  setBellOpen(false)
-                  navigate('/dashboard/settings?tab=notifications')
-                }}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[0.75rem] font-semibold text-navy transition hover:bg-white"
-              >
-                <Settings size={12} /> Notification settings <ArrowRight size={11} />
-              </button>
-            </div>
           </div>
         )}
       </div>
@@ -274,10 +243,10 @@ export default function Topbar({ onBurger }) {
         </span>
         <div className="hidden sm:block leading-tight">
           <div className="text-[0.82rem] font-semibold text-navy truncate max-w-[140px]">
-            {user?.name || 'Not signed in'}
+            {activeUser?.name || 'Not signed in'}
           </div>
           <div className="text-[0.7rem] text-ink-soft">
-            {user?.role || '—'} · {chamaName}
+            {activeUser?.role || '—'} · {chamaName}
           </div>
         </div>
       </div>

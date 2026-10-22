@@ -103,8 +103,7 @@ function initials(name) {
 }
 
 function Avatar({ member, size = "md" }) {
-  const dim =
-    size === "lg" ? "w-11 h-11 text-[0.9rem]" : "w-8 h-8 text-[0.7rem]";
+  const dim = size === "lg" ? "w-11 h-11 text-[0.9rem]" : "w-8 h-8 text-[0.7rem]";
   if (member?.avatar) {
     return (
       <img
@@ -142,9 +141,9 @@ export default function Sidebar({ open, onClose }) {
     }),
   })).filter((section) => section.items.length > 0);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
-      await logout();
+      logout();
       toast.success("Logged out");
       navigate("/login", { replace: true });
     } catch {
@@ -231,7 +230,7 @@ export default function Sidebar({ open, onClose }) {
           <div className="text-[0.72rem] text-white/40">
             <b className="text-gold font-display">{tier}</b> plan
             {isTrial ? " · trial" : ""} · up to{" "}
-            <b className="text-gold font-display">{config.maxMembers}</b>{" "}
+            <b className="text-gold font-display">{config?.maxMembers || 10}</b>{" "}
             members
           </div>
 

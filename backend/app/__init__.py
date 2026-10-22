@@ -20,8 +20,10 @@ def create_app(config_class=Config):
 
     from app.routes.auth import auth_bp
     from app.routes.chama import chama_bp
+    from app.routes.finance import finance_bp
 
     app.register_blueprint(auth_bp,url_prefix='/api/auth')
-    app.register_blueprint(chama_bp,url_prefix='/api/chamas')
+    app.register_blueprint(chama_bp,url_prefix='/api/chama')
+    app.register_blueprint(finance_bp, url_prefix='/api/finance')
 
     return app

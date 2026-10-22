@@ -1,172 +1,113 @@
 import { createContext, useContext, useState } from 'react'
 
-const ACCOUNTS_KEY = 'chametu_accounts_v1'
-const SESSION_KEY = 'chametu_auth_session_v1'
+const TOKEN_KEY = 'auth_token'
+const USER_KEY = 'auth_user'
 
 const AuthContext = createContext(null)
 
 const ADMIN_ROLES = ['Chairman', 'Treasurer', 'Secretary']
-const norm = (v) => (v || '').trim().toLowerCase()
 
 export function portalForRole(role) {
   return ADMIN_ROLES.includes(role) ? 'admin' : 'member'
 }
 
-/* ---------- storage ---------- */
-
-function readAccounts() {
-  try {
-    const raw = localStorage.getItem(ACCOUNTS_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-function writeAccounts(list) {
-  try {
-    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list))
-  } catch {}
-}
-function readSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-function writeSession(s) {
-  try {
-    if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s))
-    else localStorage.removeItem(SESSION_KEY)
-  } catch {}
-}
-
-/* ---------- provider ---------- */
-
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => readSession())
+  const [user, setUser] = useState(() => {
+    try {
+      const raw = localStorage.getItem(USER_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  })
   const [loading, setLoading] = useState(false)
 
   /**
-   * Login requires chamaName + email + password.
-   * The chama name is checked against the stored account.
+   * Login calls the Flask backend to verify credentials and get a JWT.
    */
   const login = async ({ chamaName, email, password }) => {
     setLoading(true)
     try {
-      await new Promise((r) => setTimeout(r, 400))
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
 
-      const targetChama = (chamaName || '').trim()
-      const targetEmail = norm(email)
+      const data = await response.json()
 
-      if (!targetChama) throw new Error('Enter your chama name.')
-      if (!targetEmail) throw new Error('Enter your email address.')
-      if (!password) throw new Error('Enter your password.')
-
-      const accounts = readAccounts()
-      const found = accounts.find((a) => norm(a.email) === targetEmail)
-
-      if (!found) {
-        throw new Error(
-          "We couldn't find an account with those details. Check your email, or ask your chairman to invite you."
-        )
+      if (!response.ok) {
+        throw new Error(data.message || 'Invalid email or password.')
       }
 
-      // Chama name check (skipped for legacy accounts missing chamaName)
-      const accountChama = norm(found.chamaName)
-      if (accountChama && accountChama !== norm(targetChama)) {
-        throw new Error(
-          "Those details don't match any account on this device. Double-check the chama name."
-        )
+      // The backend returns { token, user: { name, email, role }, chama: { ... } }
+      const sessionUser = {
+        ...data.user,
+        portal: portalForRole(data.user.role),
       }
 
-      if (found.password && found.password !== password) {
-        throw new Error('Incorrect password. Try again or reset it.')
+      localStorage.setItem(TOKEN_KEY, data.token)
+      localStorage.setItem(USER_KEY, JSON.stringify(sessionUser))
+      // Store chama details to use in ChamaContext later
+      if (data.chama) {
+        localStorage.setItem('chama_data', JSON.stringify(data.chama))
       }
 
-      const session = {
-        id: found.id,
-        name: found.name,
-        email: found.email,
-        role: found.role,
-        portal: found.portal || portalForRole(found.role),
-        chamaCode: found.chamaCode || null,
-        chamaName: found.chamaName || targetChama,
-      }
-      writeSession(session)
-      setUser(session)
-      return session
+      setUser(sessionUser)
+      return sessionUser
     } finally {
       setLoading(false)
     }
   }
 
   /**
-   * Only used by the Chairman creation flow (and by invite-based
-   * signups in MemberJoin which pass chamaName from getChama()).
+   * Register calls the Flask backend to create the User + Chama.
    */
-  const register = async ({
-    name,
-    email,
-    password,
-    role = 'Chairman',
-    chamaCode = null,
-    chamaName = '',
-  }) => {
-    const target = norm(email)
-    const accounts = readAccounts()
-    const existing = accounts.find((a) => norm(a.email) === target)
-    if (existing) {
-      throw new Error('An account with that email already exists. Try logging in.')
-    }
+  const register = async ({ name, email, password, phone, chamaName, tier }) => {
+    setLoading(true)
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          password,
+          phone, // Passed to the backend now
+          chama_name: chamaName,
+          tier: tier || 'Starter',
+          amount: 1000, // Default contribution amount
+        }),
+      })
 
-    const account = {
-      id: 'u_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-      name: (name || '').trim(),
-      email: target,
-      password,
-      role,
-      portal: portalForRole(role),
-      chamaCode,
-      chamaName: (chamaName || '').trim(),
-      createdAt: Date.now(),
-    }
-    writeAccounts([...accounts, account])
+      const data = await response.json()
 
-    const session = {
-      id: account.id,
-      name: account.name,
-      email: account.email,
-      role: account.role,
-      portal: account.portal,
-      chamaCode: account.chamaCode,
-      chamaName: account.chamaName,
+      if (!response.ok) {
+        throw new Error(data.message || 'Registration failed.')
+      }
+
+      const sessionUser = {
+        ...data.user,
+        portal: portalForRole(data.user.role),
+      }
+
+      localStorage.setItem(TOKEN_KEY, data.token)
+      localStorage.setItem(USER_KEY, JSON.stringify(sessionUser))
+      if (data.chama) {
+        localStorage.setItem('chama_data', JSON.stringify(data.chama))
+      }
+
+      setUser(sessionUser)
+      return sessionUser
+    } finally {
+      setLoading(false)
     }
-    writeSession(session)
-    setUser(session)
-    return session
   }
 
   const logout = () => {
-    writeSession(null)
-    setUser(null)
-  }
-
-  const listAccounts = () => readAccounts()
-
-  const findAccount = (email) => {
-    const target = norm(email)
-    return readAccounts().find((a) => norm(a.email) === target) || null
-  }
-
-  const deleteAccount = (id) => {
-    writeAccounts(readAccounts().filter((a) => a.id !== id))
-  }
-
-  const clearAllAccounts = () => {
-    writeAccounts([])
-    writeSession(null)
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    localStorage.removeItem('chama_data')
     setUser(null)
   }
 
@@ -177,10 +118,6 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-    listAccounts,
-    findAccount,
-    deleteAccount,
-    clearAllAccounts,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
