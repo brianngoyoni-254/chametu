@@ -5,6 +5,7 @@ import { ChamaProvider } from './context/ChamaContext'
 import { TierProvider } from './context/TierContext'
 import { PointsProvider } from './context/PointsContext'
 import AppRoutes from './routes/AppRoutes'
+import LiveChat from './home/LiveChat'
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
           <TierProvider>
             <PointsProvider>
               <AppRoutes />
+              <LiveChat />
               <Toaster
                 position="bottom-center"
                 richColors
