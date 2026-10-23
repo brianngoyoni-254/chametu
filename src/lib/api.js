@@ -5,8 +5,12 @@ export async function api(
   path,
   { method = 'GET', body, token, headers: extraHeaders, ...rest } = {},
 ) {
+  // Automatically grab the token from storage if not explicitly passed.
+  // This removes the need to manually pass localStorage tokens in every component.
+  const authToken = token || localStorage.getItem('auth_token')
+  
   const headers = { 'Content-Type': 'application/json', ...(extraHeaders || {}) }
-  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`
 
   let res
   try {

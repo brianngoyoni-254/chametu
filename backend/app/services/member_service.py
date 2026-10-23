@@ -3,11 +3,14 @@ import logging
 import secrets
 from datetime import datetime, timedelta
 
+from flask import current_app # <-- NEW IMPORT
+
 from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member
 from app.models.invite import Invite
 from app.models.contribution import MemberInvite
+from app.services.email_service import send_email # <-- NEW IMPORT
 
 logger = logging.getLogger(__name__)
 
@@ -166,18 +169,27 @@ def list_invites(chama_id):
         .order_by(MemberInvite.created_at.desc())
         .all()
     )
-    return [
-        {
+    
+    now = datetime.utcnow()
+    results = []
+    
+    for i in rows:
+        # Dynamically flag expired invites so the frontend shows the correct button
+        status = i.status
+        if status == 'pending' and i.expires_at and now > i.expires_at:
+            status = 'expired'
+            
+        results.append({
             'id': i.id,
             'contact': i.contact,
             'role': i.role,
-            'status': i.status,
+            'status': status, # Now returns 'expired' if the 7 days have passed
             'token': i.token,
             'createdAt': i.created_at.isoformat(),
             'expiresAt': i.expires_at.isoformat() if i.expires_at else None,
-        }
-        for i in rows
-    ]
+        })
+        
+    return results
 
 
 def create_invite(chama_id, contact, role='Member', invited_name=None,
@@ -199,6 +211,14 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     existing = MemberInvite.query.filter_by(
         chama_id=chama_id, contact=contact, status='pending',
     ).first()
+    
+    # Ensure existing invites that are expired aren't reused blindly
+    now = datetime.utcnow()
+    if existing and existing.expires_at and now > existing.expires_at:
+        db.session.delete(existing)
+        db.session.commit()
+        existing = None
+
     if existing:
         logger.debug('reusing pending invite for %s', contact)
         return {
@@ -234,6 +254,46 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     ))
     db.session.commit()
 
+    # ------------------------------------------------------------------
+    # Send Email via Brevo if contact is an email address
+    # ------------------------------------------------------------------
+    if '@' in contact:
+        frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+        invite_link = f"{frontend_url}/join/{chama.code}/{token}"
+        display_name = invited_name or contact.split('@')[0]
+        
+        subject = f"Invitation to join {chama.name} on Chametu"
+        html_content = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #0B1F33; padding: 20px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #0B7A5A; margin: 0; font-size: 24px;">Chametu</h2>
+            </div>
+            
+            <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 30px; text-align: center;">
+                <h3 style="margin-top: 0; color: #0B1F33; font-size: 20px;">You're Invited!</h3>
+                <p style="color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
+                    <b>{display_name}</b>, you have been invited to join <b>{chama.name}</b> as a <b>{role}</b>.
+                </p>
+                
+                <a href="{invite_link}" style="display: inline-block; background-color: #0B7A5A; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">
+                    Join {chama.name}
+                </a>
+                
+                <p style="color: #64748B; font-size: 13px; margin-top: 24px;">
+                    Or copy and paste this link into your browser:<br>
+                    <a href="{invite_link}" style="color: #0B7A5A; word-break: break-all;">{invite_link}</a>
+                </p>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94A3B8;">
+                Sent by Chametu on behalf of {chama.name}.<br>
+                This invitation expires in 7 days.
+            </div>
+        </div>
+        """
+        send_email(contact, subject, html_content)
+    # ------------------------------------------------------------------
+
     logger.info(
         'invite created: chama=%s contact=%s role=%s actor=%s',
         chama_id, contact, role, actor_user_id,
@@ -253,12 +313,17 @@ def cancel_invite(chama_id, invite_id):
     inv = MemberInvite.query.filter_by(id=invite_id, chama_id=chama_id).first()
     if not inv:
         raise ValueError('Invite not found')
-    inv.status = 'cancelled'
+        
+    # Hard delete the legacy invite if it exists
     legacy = Invite.query.filter_by(token=inv.token).first()
     if legacy:
         db.session.delete(legacy)
+        
+    # Hard delete the main invite from the database
+    db.session.delete(inv)
     db.session.commit()
-    logger.info('invite cancelled: chama=%s invite=%s', chama_id, invite_id)
+    
+    logger.info('invite deleted: chama=%s invite=%s', chama_id, invite_id)
 
 
 # ============================ FINANCE HELPERS ============================

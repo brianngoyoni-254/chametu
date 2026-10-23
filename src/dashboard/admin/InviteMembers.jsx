@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, Check, Send, Mail, Phone, MessageCircle, ExternalLink, Loader2 } from 'lucide-react'
+import { Copy, Check, Send, Mail, Phone, MessageCircle, ExternalLink, Loader2, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
@@ -9,22 +9,53 @@ const badge = {
   pending: 'bg-[#FBF1E0] text-[#8A6417]',
   joined: 'bg-[#E9F5EF] text-forest',
   expired: 'bg-line text-ink-soft',
+  cancelled: 'bg-red-50 text-red-600',
 }
-const badgeLabel = { pending: 'PENDING', joined: 'JOINED', expired: 'EXPIRED' }
+const badgeLabel = { pending: 'PENDING', joined: 'JOINED', expired: 'EXPIRED', cancelled: 'CANCELLED' }
+
+// Custom Confirm Modal that handles both Cancel and Delete actions
+function ConfirmModal({ open, title, body, confirmLabel, onClose, onConfirm, loading }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="px-5 py-4">
+          <h3 className="font-display font-semibold text-navy text-[1.05rem]">{title}</h3>
+          <p className="mt-1.5 text-[0.86rem] text-ink-soft">{body}</p>
+        </div>
+        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
+          <button onClick={onClose} disabled={loading} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold disabled:opacity-50">
+            Keep it
+          </button>
+          <button onClick={onConfirm} disabled={loading} className="px-4 py-2.5 rounded-xl text-white text-[0.86rem] font-semibold bg-red-600 hover:bg-red-700 transition disabled:opacity-50">
+            {loading ? 'Processing...' : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default function InviteMembers() {
   const navigate = useNavigate()
-  const { chama } = useChama() 
+  const { chama, roles } = useChama() 
   
   const [invites, setInvites] = useState([])
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
-  const [form, setForm] = useState({ contact: '', role: 'Member' })
+  
+  // Tracks which invite is being cancelled/deleted
+  const [actionTarget, setActionTarget] = useState(null) 
+  const [isProcessing, setIsProcessing] = useState(false) 
+  
+  const roleNames = roles?.length > 0 ? roles.map(r => r.name) : ['Member', 'Secretary', 'Treasurer', 'Chairman']
+  
+  const [form, setForm] = useState({ contact: '', role: roleNames[0] })
   const [copiedId, setCopiedId] = useState(null)
 
   const fetchInvites = async () => {
     try {
-      const data = await api('/api/chama/invites', { token: localStorage.getItem('auth_token') })
+      const data = await api('/api/chama/invites')
       setInvites(data)
     } catch (err) {
       toast.error('Failed to load invites')
@@ -46,12 +77,16 @@ export default function InviteMembers() {
     try {
       const newInvite = await api('/api/chama/invites', {
         method: 'POST',
-        token: localStorage.getItem('auth_token'),
         body: { contact, role: form.role }
       })
       setInvites((prev) => [newInvite, ...prev])
-      setForm({ contact: '', role: 'Member' })
-      toast.success('Invite generated successfully')
+      setForm({ contact: '', role: roleNames[0] })
+      
+      if (contact.includes('@')) {
+        toast.success('Invite generated and email sent!')
+      } else {
+        toast.success('Invite generated! Copy the link to share via WhatsApp/SMS.')
+      }
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -76,14 +111,19 @@ export default function InviteMembers() {
     navigate(`/join/${chama?.code}/${invite.token}`)
   }
 
-  async function cancelInvite(id) {
-    if (!confirm('Cancel this invite?')) return
+  // Handles deleting/cancelling the invite
+  async function executeAction() {
+    if (!actionTarget) return
+    setIsProcessing(true)
     try {
-      await api(`/api/chama/invites/${id}`, { method: 'DELETE', token: localStorage.getItem('auth_token') })
-      setInvites((prev) => prev.filter((i) => i.id !== id))
-      toast.success('Invite cancelled')
+      await api(`/api/chama/invites/${actionTarget.id}`, { method: 'DELETE' })
+      setInvites((prev) => prev.filter((i) => i.id !== actionTarget.id))
+      toast.success('Invite deleted successfully')
+      setActionTarget(null)
     } catch (err) {
       toast.error(err.message)
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -99,7 +139,7 @@ export default function InviteMembers() {
           Invite by email or phone
         </h3>
         <p className="mt-1 text-sm text-ink-soft">
-          Each invite gets its own link, tied to <b className="text-navy">{chama?.name || 'this chama'}</b> only — it won't work for any other chama.
+          Enter an email to automatically send an invite via Brevo. For phone numbers, copy the link and share it manually.
         </p>
         <form onSubmit={sendInvite} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-55 flex-1 text-xs font-semibold text-ink">
@@ -118,10 +158,7 @@ export default function InviteMembers() {
               onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
               className="mt-1.5 block rounded-xl border border-line px-3 py-2.5 text-sm outline-none focus:border-forest"
             >
-              <option>Member</option>
-              <option>Secretary</option>
-              <option>Treasurer</option>
-              <option>Chairman</option>
+              {roleNames.map(r => <option key={r}>{r}</option>)}
             </select>
           </label>
           <button
@@ -165,6 +202,7 @@ export default function InviteMembers() {
                   </span>
                 </div>
 
+                {/* Pending Invites: Show Links & Actions */}
                 {inv.status === 'pending' && (
                   <>
                     <div className="mt-2 truncate rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs text-ink">
@@ -194,19 +232,46 @@ export default function InviteMembers() {
                       </button>
 
                       <button
-                        onClick={() => cancelInvite(inv.id)}
-                        className="ml-auto text-xs font-semibold text-red-600"
+                        onClick={() => setActionTarget(inv)}
+                        className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
                       >
                         Cancel
                       </button>
                     </div>
                   </>
                 )}
+
+                {/* Expired / Cancelled Invites: Show Delete Option */}
+                {(inv.status === 'expired' || inv.status === 'cancelled' || (inv.status !== 'pending' && inv.status !== 'joined')) && (
+                  <div className="mt-2 flex justify-end">
+                    <button
+                      onClick={() => setActionTarget(inv)}
+                      className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                    >
+                      <Trash2 size={13} /> Delete invite
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Dynamic Confirm Modal for both Cancel and Delete */}
+      <ConfirmModal
+        open={!!actionTarget}
+        title={actionTarget?.status === 'pending' ? 'Cancel this invite?' : 'Delete this invite?'}
+        body={
+          actionTarget?.status === 'pending'
+            ? `Are you sure you want to cancel the invite for ${actionTarget?.contact}? They will no longer be able to use this link to join.`
+            : `Are you sure you want to permanently delete the expired invite for ${actionTarget?.contact}?`
+        }
+        confirmLabel={actionTarget?.status === 'pending' ? 'Cancel Invite' : 'Delete permanently'}
+        loading={isProcessing}
+        onClose={() => setActionTarget(null)}
+        onConfirm={executeAction}
+      />
     </div>
   )
 }

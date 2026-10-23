@@ -6,13 +6,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logo from '../assets/logos.png'
-import { useMemberAuth } from '../lib/memberAuth'
 import { api } from '../lib/api'
 
 export default function MemberJoin() {
   const { chamaCode, token } = useParams()
   const navigate = useNavigate()
-  const { acceptInvite } = useMemberAuth()
   
   const [invite, setInvite] = useState(null)
   const [chama, setChama] = useState(null)
@@ -29,7 +27,8 @@ export default function MemberJoin() {
   useEffect(() => {
     async function verify() {
       try {
-        const res = await api(`/api/member/invites/${chamaCode}/${token}`)
+        // Updated to match the new auth.py route
+        const res = await api(`/api/auth/invites/${chamaCode}/${token}`)
         setInvite(res.invite)
         setChama(res.chama)
         setContact(res.invite.contact || '')
@@ -83,13 +82,28 @@ export default function MemberJoin() {
 
     setBusy(true)
     try {
-      const data = await acceptInvite({
-        email: contact.trim().toLowerCase(),
-        name: name.trim(),
-        password,
-        chamaCode,
-        role: invite.role || 'Member',
+      // Direct API call replaces useMemberAuth
+      const data = await api('/api/auth/accept-invite', {
+        method: 'POST',
+        body: {
+          email: contact.trim().toLowerCase(),
+          name: name.trim(),
+          password,
+          chamaCode,
+          role: invite.role || 'Member',
+        }
       })
+      
+      // Save token and user to storage
+      localStorage.setItem('auth_token', data.token)
+      localStorage.setItem('auth_user', JSON.stringify(data.user))
+      if (data.chama) {
+        localStorage.setItem('chama_data', JSON.stringify(data.chama))
+      }
+      
+      // Notify the app that auth changed so contexts refresh
+      window.dispatchEvent(new Event('auth-changed'))
+
       toast.success(`Welcome to ${chama.name}, ${name.split(' ')[0]}!`)
       navigate(data.user.portal === 'member' ? '/member' : '/dashboard', { replace: true })
     } catch (err) {

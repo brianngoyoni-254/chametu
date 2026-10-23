@@ -1,30 +1,37 @@
 import { RefreshCw, Users, Trophy, Calendar, History } from 'lucide-react'
-import { useSharedState, SHARED_KEYS, DEFAULT_PAYOUT } from '../../lib/chametuShared'
+import { useChama } from '../../context/ChamaContext'
+import { toast } from 'sonner'
 
 function fmt(n) {
   return 'KSh ' + Number(n).toLocaleString('en-KE')
 }
 
 export default function Payouts() {
-  const [state, setState] = useSharedState(SHARED_KEYS.payout, DEFAULT_PAYOUT)
-  const { order, cursor, contributionPerMember, history } = state
+  const { sharedData, members, recordPayout } = useChama()
+  
+  const { order = [], cursor = 0, contributionPerMember = 0, history = [] } = sharedData?.payout || {}
 
   const payout = contributionPerMember * order.length
-  const current = order[cursor % order.length]
-  const next = order[(cursor + 1) % order.length]
-  const cycleComplete = history.length >= order.length
+  const current = order[cursor % order.length] || '—'
+  const next = order[(cursor + 1) % order.length] || '—'
+  const cycleComplete = history.length >= order.length && order.length > 0
 
-  function completePayout() {
+  async function completePayout() {
+    const member = members.find(m => m.name === current)
+    if (!member) {
+      toast.error('Member not found in database')
+      return
+    }
     const today = new Date()
     const label = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    setState((s) => ({
-      ...s,
-      cursor: s.cursor + 1,
-      history: [
-        { member: current, date: label, amount: payout, ts: Date.now() },
-        ...s.history,
-      ],
-    }))
+    
+    // Pass member.user_id (backend expects the user's ID based on the route we reviewed)
+    const res = await recordPayout(member.user_id || member.id, payout, label)
+    if (res.ok) {
+      toast.success(`${current} marked as paid`)
+    } else {
+      toast.error(res.message)
+    }
   }
 
   return (

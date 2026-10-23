@@ -12,6 +12,7 @@ from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member, ChamaSettings
 from app.logging_utils import log_writes
+from app.services import member_service # <-- NEW IMPORT
 
 auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -26,6 +27,71 @@ def generate_chama_code():
 
 def _portal_for(role: str) -> str:
     return "admin" if role in ADMIN_ROLES else "member"
+
+
+# ---------------------------------------------------------------------
+# INVITE VERIFICATION & ACCEPTANCE (NEW)
+# ---------------------------------------------------------------------
+@auth_bp.route("/invites/<chama_code>/<token>", methods=["GET"])
+def verify_invite(chama_code, token):
+    """Checks if the invite link is valid and returns chama details."""
+    try:
+        data = member_service.verify_chama_invite(chama_code, token)
+        return jsonify(data), 200
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+
+
+@auth_bp.route("/accept-invite", methods=["POST"])
+@log_writes(logger, 'auth.invite_accept')
+def accept_invite():
+    """Creates a new user account from an invite and logs them in."""
+    data = request.get_json() or {}
+    
+    email = (data.get("email") or "").lower().strip()
+    name = (data.get("name") or "").strip()
+    password = data.get("password") or ""
+    chama_code = data.get("chamaCode")
+    role = data.get("role", "Member")
+    phone = data.get("phone")
+
+    if not email or not name or len(password) < 6 or not chama_code:
+        return jsonify({"message": "Name, email, password and chama code are required"}), 400
+
+    try:
+        result = member_service.accept_member_invite(
+            email=email,
+            name=name,
+            password=password,
+            chama_code=chama_code,
+            role=role,
+            phone=phone
+        )
+    except ValueError as e:
+        return jsonify({"message": str(e)}), 400
+    except Exception as e:
+        logger.exception("Failed to accept invite")
+        return jsonify({"message": "An error occurred while creating the account"}), 500
+
+    # Generate a JWT token for immediate login
+    portal = _portal_for(result['user']['role'])
+    token = create_access_token(
+        identity=result['user']['id'],
+        additional_claims={
+            "chama_id": result['chama']['id'],
+            "role": result['user']['role'],
+            "portal": portal,
+        }
+    )
+
+    return jsonify({
+        "token": token,
+        "user": {
+            **result['user'],
+            "portal": portal
+        },
+        "chama": result['chama']
+    }), 201
 
 
 # ---------------------------------------------------------------------

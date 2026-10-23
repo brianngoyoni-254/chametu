@@ -16,6 +16,15 @@ class Config:
 
     # Comma-separated extra origins for CORS (e.g. "https://app.chametu.co.ke")
     FRONTEND_ORIGINS = os.environ.get("FRONTEND_ORIGINS", "")
+    
+    # Base URL for the frontend (used in emails for invite links)
+    FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
+
+    # ------------------------------------------------------------------
+    # Brevo Email Integration
+    # ------------------------------------------------------------------
+    BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
+    BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "no-reply@chametu.co.ke")
 
     # ------------------------------------------------------------------
     # Logging (read by app.logging_config)

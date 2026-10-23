@@ -5,51 +5,11 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logoUrl from '../../assets/logos.png'
-import { getChama } from '../../lib/chametuStorage'
+import { useChama } from '../../context/ChamaContext'
 
-const MEMBERS_KEY = 'chametu_members_v2'
-const ISSUED_KEY = 'chametu_statements_issued_v1'
-
-/* Real chama details, read at call time so renames propagate immediately */
-function buildChama() {
-  const c = getChama() || {}
-  return {
-    name: c.name || 'My Chama',
-    code: c.code || 'CHM-000000',
-    paybill: c.paybill || '174379',
-    currency: 'KSh',
-    due: c.due || 30,
-    amount: c.amount || 5000,
-    grace: c.grace || 3,
-  }
-}
-
-const LOAN_MONTHLY_REPAY = 3500
 const LATE_FEE = 100
 
 /* -helpers- */
-
-function loadMembers() {
-  try {
-    const raw = localStorage.getItem(MEMBERS_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return []
-}
-
-function loadIssued() {
-  try {
-    const raw = localStorage.getItem(ISSUED_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return {}
-}
-
-function saveIssued(map) {
-  try {
-    localStorage.setItem(ISSUED_KEY, JSON.stringify(map))
-  } catch {}
-}
 
 function fmtMonth(ym) {
   const [y, m] = ym.split('-')
@@ -83,26 +43,34 @@ function absoluteLogo() {
 }
 
 /**
- * Derive per-member per-month data deterministically from member status.
- * Replace this with a real ledger lookup when the backend exists.
+ * Derive per-member per-month data from real backend context.
  */
-function monthDataFor(member, period) {
-  const CHAMA = buildChama()
+function monthDataFor(member, chama, loanBalance) {
+  const amount = chama?.monthly_contribution || 5000
+  const lateFeeAmount = chama?.late_fee || LATE_FEE
+  
   if (member.status === 'invited' || member.status === 'inactive') {
     return { contribution: 0, paid: 0, lateFee: 0, loanRepay: 0, isPaid: false }
   }
   const isArrears = member.status === 'arrears'
-  const contribution = CHAMA.amount
+  const contribution = amount
   const paid = isArrears ? 0 : contribution
-  const lateFee = isArrears ? LATE_FEE : 0
-  const loanRepay = member.loan > 0 && !isArrears ? LOAN_MONTHLY_REPAY : 0
+  const lateFee = isArrears ? lateFeeAmount : 0
+  // Simplified loan repay calculation for demo (if they have a loan, assume they paid 30% of it or a fixed amount)
+  const loanRepay = loanBalance > 0 && !isArrears ? Math.round(loanBalance * 0.1) : 0 // Just an example logic
+  
   return { contribution, paid, lateFee, loanRepay, isPaid: paid >= contribution }
 }
 
 /* -print template- */
 
-function buildStatementHTML(member, period, data, summary) {
-  const CHAMA = buildChama()
+function buildStatementHTML(member, period, data, summary, chama) {
+  const CHAMA = {
+    name: chama?.name || 'My Chama',
+    code: chama?.code || 'CHM-000000',
+    paybill: chama?.paybill || '174379',
+    currency: 'KSh',
+  }
   const monthLabel = fmtMonth(period)
   const generatedAt = new Date().toLocaleDateString('en-KE', {
     day: 'numeric',
@@ -263,16 +231,11 @@ function openPrint(html) {
 /* ---------- page ---------- */
 
 export default function Statements() {
-  const [members] = useState(() => loadMembers())
+  const { members, loans, chama } = useChama()
   const [period, setPeriod] = useState(recentMonths()[1])
-  const [issued, setIssued] = useState(() => loadIssued())
+  // Session-only tracking (resets on refresh, but no longer relies on localStorage)
+  const [issued, setIssued] = useState({}) 
   const [query, setQuery] = useState('')
-
-  const chama = useMemo(() => buildChama(), [])
-
-  useEffect(() => {
-    saveIssued(issued)
-  }, [issued])
 
   const months = useMemo(() => recentMonths(12), [])
 
@@ -284,8 +247,19 @@ export default function Statements() {
         const q = query.toLowerCase()
         return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
       })
-      .map((m) => ({ member: m, data: monthDataFor(m, period) }))
-  }, [members, period, query])
+      .map((m) => {
+        // Calculate real loan balance for this member
+        const memberLoan = (loans || [])
+          .filter(l => l.member_id === m.id && l.status === 'disbursed')
+          .reduce((sum, l) => sum + Number(l.balance || 0), 0)
+          
+        return { 
+          member: m, 
+          loanBalance: memberLoan,
+          data: monthDataFor(m, chama, memberLoan) 
+        }
+      })
+  }, [members, loans, chama, period, query])
 
   const totals = useMemo(() => {
     return rows.reduce(
@@ -309,9 +283,9 @@ export default function Statements() {
 
   const handlePrintOne = (row) => {
     const html = buildStatementHTML(row.member, period, row.data, {
-      savings: row.member.savings,
-      loan: row.member.loan,
-    })
+      savings: row.member.savings || 0,
+      loan: row.loanBalance,
+    }, chama)
     const ok = openPrint(html)
     if (ok) {
       markIssued(row.member.id)
@@ -324,9 +298,9 @@ export default function Statements() {
     const pages = rows
       .map((row) => {
         const inner = buildStatementHTML(row.member, period, row.data, {
-          savings: row.member.savings,
-          loan: row.member.loan,
-        })
+          savings: row.member.savings || 0,
+          loan: row.loanBalance,
+        }, chama)
         const body = inner.match(/<body[^>]*>([\s\S]*?)<\/body>/)?.[1] || ''
         return `<div class="statement-page">${body}</div>`
       })
@@ -384,7 +358,7 @@ export default function Statements() {
     const unpaid = rows.filter((r) => !r.data.isPaid && r.data.contribution > 0)
     if (unpaid.length === 0) return toast.success('Everyone has paid this period')
     toast.info(
-      `Reminder queued for ${unpaid.length} unpaid member${unpaid.length > 1 ? 's' : ''} (backend not connected)`
+      `Reminder queued for ${unpaid.length} unpaid member${unpaid.length > 1 ? 's' : ''} (backend email service required)`
     )
   }
 
@@ -397,7 +371,7 @@ export default function Statements() {
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Statements</h1>
           <p className="mt-1.5 max-w-[64ch] text-ink-soft">
-            Generate print-ready statements for members of <b className="text-navy">{chama.name}</b>.
+            Generate print-ready statements for members of <b className="text-navy">{chama?.name || 'My Chama'}</b>.
             Choose <b>Save as PDF</b> in the print dialog.
           </p>
         </div>

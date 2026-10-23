@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, CheckCircle2, XCircle, Clock, Search, RefreshCw, FileText } from 'lucide-react'
+import { Plus, CheckCircle2, XCircle, Clock, Search, RefreshCw, FileText, X, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
 
@@ -12,19 +12,20 @@ const badge = {
 }
 
 export default function Loans() {
-  const { loans, members, applyForLoan, updateLoanStatus, refetchLoans } = useChama()
+  const { loans, applyForLoan, updateLoanStatus, repayLoan, refetchLoans } = useChama()
   
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', purpose: '' })
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState('all')
   const [busy, setBusy] = useState(false)
+  const [repayTarget, setRepayTarget] = useState(null) // For the repay modal
 
   const filtered = useMemo(() => {
     return loans.filter((l) => tab === 'all' || l.status === tab).filter((l) => {
       if (!query) return true
       const q = query.toLowerCase()
-      return (l.member + (l.status || '')).toLowerCase().includes(q)
+      return (l.member + (l.purpose || '') + (l.status || '')).toLowerCase().includes(q)
     })
   }, [loans, tab, query])
 
@@ -103,6 +104,7 @@ export default function Loans() {
             { key: 'all', label: `All (${counts.all})` },
             { key: 'pending', label: `Pending (${counts.pending})` },
             { key: 'disbursed', label: `Active (${counts.disbursed})` },
+            { key: 'repaid', label: `Repaid` },
           ].map((f) => (
             <button key={f.key} onClick={() => setTab(f.key)} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${tab === f.key ? 'bg-navy text-white' : 'border border-line bg-white text-ink-soft hover:border-navy'}`}>
               {f.label}
@@ -111,7 +113,7 @@ export default function Loans() {
         </div>
         <div className="ml-auto flex max-w-[240px] flex-1 items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
           <Search size={14} className="text-ink-soft" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search member or purpose…" className="w-full bg-transparent text-sm outline-none" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search member, purpose or status…" className="w-full bg-transparent text-sm outline-none" />
         </div>
       </div>
 
@@ -122,10 +124,11 @@ export default function Loans() {
             <p className="mt-2 text-sm text-ink-soft">No loan applications match.</p>
           </div>
         ) : (
-          <table className="w-full min-w-[700px] text-sm">
+          <table className="w-full min-w-[800px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-soft">
                 <th className="py-2">Member</th>
+                <th className="py-2">Purpose</th>
                 <th className="py-2">Amount</th>
                 <th className="py-2">Balance</th>
                 <th className="py-2">Status</th>
@@ -136,6 +139,7 @@ export default function Loans() {
               {filtered.map((l) => (
                 <tr key={l.id} className="border-b border-line last:border-none">
                   <td className="py-2.5 font-medium text-navy">{l.member}</td>
+                  <td className="py-2.5 text-ink-soft">{l.purpose || '—'}</td>
                   <td className="py-2.5 font-mono">{Number(l.amount).toLocaleString()}</td>
                   <td className="py-2.5 font-mono">{Number(l.balance).toLocaleString()}</td>
                   <td className="py-2.5">
@@ -152,7 +156,10 @@ export default function Loans() {
                       <button onClick={() => handleStatus(l.id, 'disbursed')} className="text-xs font-semibold text-forest">Mark Disbursed</button>
                     )}
                     {l.status === 'disbursed' && (
-                      <span className="inline-flex items-center gap-1 text-[0.68rem] text-ink-soft"><Clock size={10} /> Active</span>
+                      <div className="flex items-center justify-end gap-3">
+                        <span className="inline-flex items-center gap-1 text-[0.68rem] text-ink-soft"><Clock size={10} /> Active</span>
+                        <button onClick={() => setRepayTarget(l)} className="text-xs font-semibold text-forest hover:underline">Repay</button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -160,6 +167,76 @@ export default function Loans() {
             </tbody>
           </table>
         )}
+      </div>
+
+      {repayTarget && (
+        <RepayModal
+          loan={repayTarget}
+          onClose={() => setRepayTarget(null)}
+          onSave={async (amount) => {
+            const res = await repayLoan(repayTarget.id, amount)
+            if (res.ok) {
+              toast.success(`Repayment recorded. Remaining: KSh ${res.remaining.toLocaleString()}`)
+              setRepayTarget(null)
+            } else {
+              toast.error(res.message)
+            }
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function RepayModal({ loan, onClose, onSave }) {
+  const [amount, setAmount] = useState(String(loan.balance))
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const val = Number(amount)
+    if (!val || val <= 0) return
+    setBusy(true)
+    await onSave(val)
+    setBusy(false)
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
+      <div className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <form onSubmit={submit}>
+          <div className="flex items-center justify-between border-b border-line px-5 py-4">
+            <div>
+              <h3 className="font-display font-semibold text-navy">Record Repayment</h3>
+              <p className="mt-0.5 text-[0.82rem] text-ink-soft">For {loan.member}</p>
+            </div>
+            <button type="button" onClick={onClose} className="rounded-lg p-1.5 hover:bg-paper text-ink-soft">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="px-5 py-4">
+            <label className="block">
+              <span className="mb-1.5 block text-[0.8rem] font-semibold text-navy">Amount (KSh)</span>
+              <input
+                type="number" min="1" max={loan.balance} step="1" required
+                value={amount} onChange={(e) => setAmount(e.target.value)}
+                className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-forest"
+              />
+            </label>
+            <p className="mt-2 text-[0.74rem] text-ink-soft">
+              Current balance: <b className="text-navy">KSh {Number(loan.balance).toLocaleString()}</b>
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-line bg-paper/40 px-5 py-3.5">
+            <button type="button" onClick={onClose} className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-navy hover:border-navy">
+              Cancel
+            </button>
+            <button type="submit" disabled={busy} className="flex items-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+              {busy && <Loader2 size={14} className="animate-spin" />}
+              {busy ? 'Saving…' : 'Record Repayment'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )

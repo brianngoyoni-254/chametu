@@ -8,7 +8,6 @@ import {
 
 const PointsContext = createContext(null)
 
-const TOKEN_KEY = 'auth_token'
 export const AUTH_CHANGED_EVENT = 'auth-changed'
 
 const DEFAULT_STATE = {
@@ -24,21 +23,16 @@ export function PointsProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    // These endpoints require a JWT. Without one they would just return 401,
-    // so skip the calls and reset to defaults (e.g. after logout).
-    if (!localStorage.getItem(TOKEN_KEY)) {
-      setState(DEFAULT_STATE)
-      setCatalog([])
-      setLoading(false)
-      return
-    }
-
+    // Removed localStorage token check.
+    // The API layer will throw if unauthorized, which we catch below.
     try {
       const [s, c] = await Promise.all([fetchState(), fetchCatalog()])
       setState(s)
       setCatalog(c)
     } catch {
-      // leave defaults
+      // If not logged in or API fails, reset to defaults silently
+      setState(DEFAULT_STATE)
+      setCatalog([])
     } finally {
       setLoading(false)
     }

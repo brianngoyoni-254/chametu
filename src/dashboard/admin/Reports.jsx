@@ -5,97 +5,50 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import logoUrl from '../../assets/logos.png'
-import { getChama } from '../../lib/chametuStorage'
-
-const MEMBERS_KEY = 'chametu_members_v2'
-
-/* Real chama details, read at call time so renames propagate immediately */
-function buildChama() {
-  const c = getChama() || {}
-  return {
-    name: c.name || 'My Chama',
-    code: c.code || 'CHM-000000',
-    paybill: c.paybill || '174379',
-    currency: 'KSh',
-  }
-}
-
-const MONTHLY_CONTRIBUTION = 5000
-
-/* -report catalog- */
+import { useChama } from '../../context/ChamaContext'
 
 const REPORTS = [
   {
-    id: 'income',
-    icon: BarChart3,
-    title: 'Income statement',
+    id: 'income', icon: BarChart3, title: 'Income statement',
     desc: 'Contributions, expenses and net position for any period.',
-    tag: 'Finance',
-    periodType: 'month',
+    tag: 'Finance', periodType: 'month',
   },
   {
-    id: 'member-statement',
-    icon: FileText,
-    title: 'Member statement',
+    id: 'member-statement', icon: FileText, title: 'Member statement',
     desc: 'Per-member contribution, savings and loan history.',
-    tag: 'Finance',
-    periodType: 'month',
-    target: 'member',
+    tag: 'Finance', periodType: 'month', target: 'member',
   },
   {
-    id: 'loan-portfolio',
-    icon: Wallet,
-    title: 'Loan portfolio',
+    id: 'loan-portfolio', icon: Wallet, title: 'Loan portfolio',
     desc: 'Outstanding, overdue and repayment-rate breakdown.',
-    tag: 'Finance',
-    periodType: 'month',
+    tag: 'Finance', periodType: 'month',
   },
   {
-    id: 'investment',
-    icon: TrendingUp,
-    title: 'Investment performance',
+    id: 'investment', icon: TrendingUp, title: 'Investment performance',
     desc: 'Gains, income and valuation across the portfolio.',
-    tag: 'Investments',
-    periodType: 'quarter',
+    tag: 'Investments', periodType: 'quarter',
   },
   {
-    id: 'attendance',
-    icon: CalendarCheck,
-    title: 'Attendance and voting',
+    id: 'attendance', icon: CalendarCheck, title: 'Attendance and voting',
     desc: 'Meeting attendance and resolution history.',
-    tag: 'Governance',
-    periodType: 'quarter',
+    tag: 'Governance', periodType: 'quarter',
   },
   {
-    id: 'activity',
-    icon: Users,
-    title: 'Member activity',
+    id: 'activity', icon: Users, title: 'Member activity',
     desc: 'Login, payment and engagement per member.',
-    tag: 'People',
-    periodType: 'month',
+    tag: 'People', periodType: 'month',
   },
 ]
-
-/* ---------- helpers ---------- */
-
-function loadMembers() {
-  try {
-    const raw = localStorage.getItem(MEMBERS_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return []
-}
 
 function fmtMonth(ym) {
   const [y, m] = ym.split('-')
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-KE', {
-    month: 'long',
-    year: 'numeric',
+    month: 'long', year: 'numeric',
   })
 }
 
 function fmtKsh(n, currency = 'KSh') {
-  return `${currency} ${Number(n).toLocaleString('en-KE')}`
+  return `${currency} ${Number(n || 0).toLocaleString('en-KE')}`
 }
 
 function recentMonths(n = 12) {
@@ -127,24 +80,12 @@ function fmtQuarter(qy) {
 }
 
 function initials(name) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .filter(Boolean)
-    .join('')
-    .slice(0, 2)
-    .toUpperCase()
+  return name.split(' ').map((w) => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()
 }
 
 function absoluteLogo() {
-  try {
-    return new URL(logoUrl, window.location.origin).href
-  } catch {
-    return logoUrl
-  }
+  try { return new URL(logoUrl, window.location.origin).href } catch { return logoUrl }
 }
-
-/* - CSV - */
 
 function toCSV(headers, rows) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
@@ -163,29 +104,17 @@ function downloadCSV(filename, csv) {
   URL.revokeObjectURL(url)
 }
 
-/* -print- */
-
 function table(headers, rows, totalsRow = null) {
   const thead = `<tr>${headers.map((h) => `<th>${h}</th>`).join('')}</tr>`
   const bodyRows = totalsRow ? [...rows, totalsRow] : rows
-  const tbody = bodyRows
-    .map(
-      (r) =>
-        `<tr>${r
-          .map((c) => `<td>${typeof c === 'number' ? c.toLocaleString() : c}</td>`)
-          .join('')}</tr>`
-    )
-    .join('')
+  const tbody = bodyRows.map((r) =>
+    `<tr>${r.map((c) => `<td>${typeof c === 'number' ? c.toLocaleString() : c}</td>`).join('')}</tr>`
+  ).join('')
   return `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`
 }
 
-function reportHTML(title, period, bodyTable, summary) {
-  const CHAMA = buildChama()
-  const generatedAt = new Date().toLocaleDateString('en-KE', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  })
+function reportHTML(title, period, bodyTable, summary, chama) {
+  const generatedAt = new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })
   const logoSrc = absoluteLogo()
 
   return `<!DOCTYPE html>
@@ -215,8 +144,8 @@ function reportHTML(title, period, bodyTable, summary) {
       <div class="brand-row">
         <img src="${logoSrc}" alt="Chametu" class="brand-logo" />
         <div>
-          <div class="brand-name">${CHAMA.name}</div>
-          <div class="brand-sub">Chama code ${CHAMA.code}</div>
+          <div class="brand-name">${chama.name}</div>
+          <div class="brand-sub">Chama code ${chama.code}</div>
         </div>
       </div>
     </div>
@@ -231,16 +160,13 @@ function reportHTML(title, period, bodyTable, summary) {
   <div class="summary">
     ${summary.map(([k, v]) => `<div class="summary-row"><span>${k}</span><b>${v}</b></div>`).join('')}
   </div>
-  <div class="footer">Generated by Chametu. All amounts in ${CHAMA.currency}.</div>
+  <div class="footer">Generated by Chametu. All amounts in KSh.</div>
 </body></html>`
 }
 
 function openPrint(html) {
   const w = window.open('', '_blank')
-  if (!w) {
-    toast.error('Pop-up blocked. Allow pop-ups to view this report.')
-    return false
-  }
+  if (!w) { toast.error('Pop-up blocked. Allow pop-ups to view this report.'); return false }
   w.document.write(html)
   w.document.close()
   w.focus()
@@ -248,18 +174,14 @@ function openPrint(html) {
   return true
 }
 
-/* -report builders- */
-
-function buildIncomeReport(period, members) {
-  const CHAMA = buildChama()
-  const rows = members
-    .filter((m) => m.status !== 'invited')
-    .map((m) => {
-      const isArrears = m.status === 'arrears'
-      const paid = isArrears ? 0 : MONTHLY_CONTRIBUTION
-      const lateFee = isArrears ? 100 : 0
-      return [m.name, m.role, MONTHLY_CONTRIBUTION, paid, lateFee, paid - MONTHLY_CONTRIBUTION]
-    })
+function buildIncomeReport(period, members, contributions, chama) {
+  const expected = contributions.expectedPerMember || 0
+  const rows = members.filter((m) => m.status !== 'invited').map((m) => {
+    const isArrears = m.status === 'arrears'
+    const paid = isArrears ? 0 : expected
+    const lateFee = isArrears ? 100 : 0
+    return [m.name, m.role, expected, paid, lateFee, paid - expected]
+  })
 
   const headers = ['Member', 'Role', 'Expected', 'Paid', 'Late fee', 'Balance']
   const sum = (i) => rows.reduce((a, r) => a + r[i], 0)
@@ -267,208 +189,112 @@ function buildIncomeReport(period, members) {
 
   return {
     title: `Income statement - ${fmtMonth(period)}`,
-    html: reportHTML(
-      'Income statement',
-      fmtMonth(period),
-      table(headers, rows, totals),
-      [
-        ['Expected contributions', fmtKsh(sum(2), CHAMA.currency)],
-        ['Collected', fmtKsh(sum(3), CHAMA.currency)],
-        ['Late fees', fmtKsh(sum(4), CHAMA.currency)],
-        ['Net position', fmtKsh(sum(3) + sum(4), CHAMA.currency)],
-      ]
-    ),
+    html: reportHTML('Income statement', fmtMonth(period), table(headers, rows, totals), [
+      ['Expected contributions', fmtKsh(sum(2))],
+      ['Collected', fmtKsh(sum(3))],
+      ['Late fees', fmtKsh(sum(4))],
+      ['Net position', fmtKsh(sum(3) + sum(4))],
+    ], chama),
     csv: toCSV(headers, rows),
     csvName: `income-${period}.csv`,
   }
 }
 
-function buildLoanReport(period, members) {
-  const CHAMA = buildChama()
-  const borrowers = members.filter((m) => m.loan > 0)
-  const rows = borrowers.map((m) => {
-    const isOverdue = m.status === 'arrears'
-    return [
-      m.name,
-      m.role,
-      m.loan,
-      isOverdue ? m.loan : Math.round(m.loan * 0.3),
-      isOverdue ? 'Overdue' : 'On track',
-    ]
-  })
+function buildLoanReport(period, loans, chama) {
+  const borrowers = loans.filter((l) => l.status === 'active' || l.status === 'overdue')
+  const rows = borrowers.map((l) => [
+    l.member_name, l.amount, l.balance || l.amount,
+    l.status === 'overdue' ? 'Overdue' : 'On track',
+  ])
 
-  const headers = ['Borrower', 'Role', 'Loan balance', 'Repaid to date', 'Status']
-  const totalLoan = borrowers.reduce((a, m) => a + m.loan, 0)
+  const headers = ['Borrower', 'Amount', 'Balance', 'Status']
+  const totalLoan = borrowers.reduce((a, l) => a + (l.balance || l.amount), 0)
 
   return {
     title: `Loan portfolio - ${fmtMonth(period)}`,
-    html: reportHTML(
-      'Loan portfolio',
-      fmtMonth(period),
-      rows.length
-        ? table(headers, rows)
-        : `<p style="text-align:center;color:#5B6B7B;font-style:italic;padding:20px">No active loans this period.</p>`,
-      [
-        ['Active borrowers', String(borrowers.length)],
-        ['Total outstanding', fmtKsh(totalLoan, CHAMA.currency)],
-        ['Overdue accounts', String(borrowers.filter((m) => m.status === 'arrears').length)],
-        [
-          'Repayment rate',
-          borrowers.length
-            ? `${Math.round(
-                (1 - borrowers.filter((m) => m.status === 'arrears').length / borrowers.length) * 100
-              )}%`
-            : 'None',
-        ],
-      ]
-    ),
+    html: reportHTML('Loan portfolio', fmtMonth(period), 
+      rows.length ? table(headers, rows) : `<p style="text-align:center;color:#5B6B7B;font-style:italic;padding:20px">No active loans this period.</p>`, [
+      ['Active borrowers', String(borrowers.length)],
+      ['Total outstanding', fmtKsh(totalLoan)],
+      ['Overdue accounts', String(borrowers.filter((l) => l.status === 'overdue').length)],
+    ], chama),
     csv: toCSV(headers, rows),
     csvName: `loans-${period}.csv`,
   }
 }
 
-function buildActivityReport(period, members) {
-  const CHAMA = buildChama()
+function buildActivityReport(period, members, chama) {
   const headers = ['Member', 'Role', 'Status', 'Savings', 'Loan', 'Last activity']
-  const rows = members
-    .filter((m) => m.status !== 'invited')
-    .map((m) => [m.name, m.role, m.status, m.savings, m.loan, fmtMonth(period)])
+  const rows = members.filter((m) => m.status !== 'invited').map((m) => [
+    m.name, m.role, m.status, m.savings || 0, m.loan || 0, fmtMonth(period),
+  ])
 
   return {
     title: `Member activity - ${fmtMonth(period)}`,
-    html: reportHTML(
-      'Member activity',
-      fmtMonth(period),
-      table(headers, rows),
-      [
-        ['Active members', String(members.filter((m) => m.status === 'active').length)],
-        ['In arrears', String(members.filter((m) => m.status === 'arrears').length)],
-        ['Inactive', String(members.filter((m) => m.status === 'inactive').length)],
-        ['Total savings', fmtKsh(members.reduce((a, m) => a + m.savings, 0), CHAMA.currency)],
-      ]
-    ),
+    html: reportHTML('Member activity', fmtMonth(period), table(headers, rows), [
+      ['Active members', String(members.filter((m) => m.status === 'active').length)],
+      ['In arrears', String(members.filter((m) => m.status === 'arrears').length)],
+      ['Inactive', String(members.filter((m) => m.status === 'inactive').length)],
+      ['Total savings', fmtKsh(members.reduce((a, m) => a + (m.savings || 0), 0))],
+    ], chama),
     csv: toCSV(headers, rows),
     csvName: `activity-${period}.csv`,
   }
 }
 
-function buildInvestmentReport(quarter) {
-  const CHAMA = buildChama()
-  const rows = [
-    ['Kiambu Land Project', 'Land', 1200000, 1500000, 300000, '+25.0%'],
-    ['Money Market Fund', 'MMF', 900000, 980000, 80000, '+8.9%'],
-    ['Treasury Bills 91 day', 'T-Bill', 600000, 620000, 20000, '+3.3%'],
-  ]
-  const headers = ['Investment', 'Type', 'Invested', 'Current value', 'Gain', 'Return']
-  const totalInvested = rows.reduce((a, r) => a + r[2], 0)
-  const totalValue = rows.reduce((a, r) => a + r[3], 0)
-
-  return {
-    title: `Investment performance - ${fmtQuarter(quarter)}`,
-    html: reportHTML(
-      'Investment performance',
-      fmtQuarter(quarter),
-      table(headers, rows),
-      [
-        ['Total invested', fmtKsh(totalInvested, CHAMA.currency)],
-        ['Current value', fmtKsh(totalValue, CHAMA.currency)],
-        ['Unrealised gain', fmtKsh(totalValue - totalInvested, CHAMA.currency)],
-        ['Overall return', `${Math.round(((totalValue - totalInvested) / totalInvested) * 100)}%`],
-      ]
-    ),
-    csv: toCSV(headers, rows),
-    csvName: `investments-${quarter}.csv`,
-  }
-}
-
-function buildAttendanceReport(quarter) {
-  const CHAMA = buildChama()
-  const headers = ['Meeting', 'Date', 'Attendance', 'Quorum', 'Resolutions']
-  const rows = [
-    ['Monthly General Meeting', 'Sep 28, 2026', '72 / 84', 'Yes', 3],
-    ['Monthly General Meeting', 'Aug 24, 2026', '68 / 84', 'Yes', 2],
-    ['Special: Land Purchase', 'Jul 15, 2026', '61 / 84', 'Yes', 1],
-    ['Monthly General Meeting', 'Jun 27, 2026', '58 / 84', 'No', 2],
-  ]
-
-  return {
-    title: `Attendance and voting - ${fmtQuarter(quarter)}`,
-    html: reportHTML(
-      'Attendance and voting',
-      fmtQuarter(quarter),
-      table(headers, rows),
-      [
-        ['Meetings held', String(rows.length)],
-        [
-          'Average attendance',
-          `${Math.round(
-            rows.reduce((a, r) => a + Number(r[2].split(' / ')[0]), 0) / rows.length
-          )} / 84`,
-        ],
-        ['Total resolutions passed', String(rows.reduce((a, r) => a + r[4], 0))],
-        ['Quorum met', `${rows.filter((r) => r[3] === 'Yes').length} of ${rows.length}`],
-      ]
-    ),
-    csv: toCSV(headers, rows),
-    csvName: `attendance-${quarter}.csv`,
-  }
-}
-
-function buildMemberStatementReport(period, member) {
-  const CHAMA = buildChama()
-  const isArrears = member.status === 'arrears'
-  const paid = isArrears ? 0 : MONTHLY_CONTRIBUTION
+function buildMemberStatementReport(period, member, contributions, chama) {
+  const expected = contributions.expectedPerMember || 0
+  const paid = member.status === 'arrears' ? 0 : expected
+  
   const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance']
   const rows = [
-    [fmtMonth(period), 'Contribution', MONTHLY_CONTRIBUTION, paid, MONTHLY_CONTRIBUTION - paid],
-    [fmtMonth(period), 'Savings', '', '', member.savings],
+    [fmtMonth(period), 'Contribution', expected, paid, expected - paid],
+    [fmtMonth(period), 'Savings', '', '', member.savings || 0],
     [fmtMonth(period), 'Loan balance', member.loan || 'None', '', member.loan || 'None'],
   ]
 
   return {
     title: `Member statement - ${member.name}`,
-    html: reportHTML(
-      `Member statement - ${member.name}`,
-      fmtMonth(period),
-      table(headers, rows),
-      [
-        ['Member', member.name],
-        ['Role', member.role],
-        ['Status', member.status],
-        ['Savings balance', fmtKsh(member.savings, CHAMA.currency)],
-        ['Loan balance', member.loan > 0 ? fmtKsh(member.loan, CHAMA.currency) : 'None'],
-      ]
-    ),
+    html: reportHTML(`Member statement - ${member.name}`, fmtMonth(period), table(headers, rows), [
+      ['Member', member.name],
+      ['Role', member.role],
+      ['Status', member.status],
+      ['Savings balance', fmtKsh(member.savings || 0)],
+      ['Loan balance', member.loan > 0 ? fmtKsh(member.loan) : 'None'],
+    ], chama),
     csv: toCSV(headers, rows),
     csvName: `statement-${member.id}-${period}.csv`,
   }
 }
 
-/* -report dispatch- */
-
-function runReport(report, period, members, memberId) {
+function runReport(report, period, members, loans, contributions, chama, memberId) {
   switch (report.id) {
-    case 'income':
-      return buildIncomeReport(period, members)
-    case 'loan-portfolio':
-      return buildLoanReport(period, members)
-    case 'activity':
-      return buildActivityReport(period, members)
-    case 'investment':
-      return buildInvestmentReport(period)
-    case 'attendance':
-      return buildAttendanceReport(period)
+    case 'income': return buildIncomeReport(period, members, contributions, chama)
+    case 'loan-portfolio': return buildLoanReport(period, loans, chama)
+    case 'activity': return buildActivityReport(period, members, chama)
     case 'member-statement': {
       const m = members.find((x) => x.id === memberId)
       if (!m) return null
-      return buildMemberStatementReport(period, m)
+      return buildMemberStatementReport(period, m, contributions, chama)
     }
-    default:
-      return null
+    // Note: Investment and Attendance are still static mocks until backend endpoints are ready
+    case 'investment':
+      return {
+        title: `Investment performance - ${fmtQuarter(period)}`,
+        html: reportHTML('Investment performance', fmtQuarter(period), table(['Asset', 'Type', 'Value'], [['Mock Asset', 'Land', 100000]]), [['Total', 'KSh 100,000']], chama),
+        csv: toCSV(['Asset', 'Value'], [['Mock Asset', 100000]]),
+        csvName: `investments-${period}.csv`,
+      }
+    case 'attendance':
+      return {
+        title: `Attendance and voting - ${fmtQuarter(period)}`,
+        html: reportHTML('Attendance and voting', fmtQuarter(period), table(['Meeting', 'Attendance'], [['Mock Meeting', '10/12']]), [['Total meetings', '1']], chama),
+        csv: toCSV(['Meeting', 'Attendance'], [['Mock Meeting', '10/12']]),
+        csvName: `attendance-${period}.csv`,
+      }
+    default: return null
   }
 }
-
-/* - modal for member-statement- */
 
 function PickMemberModal({ open, onClose, members, onPick }) {
   const [query, setQuery] = useState('')
@@ -479,44 +305,28 @@ function PickMemberModal({ open, onClose, members, onPick }) {
     .filter((m) => {
       if (!query) return true
       const q = query.toLowerCase()
-      return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+      return m.name.toLowerCase().includes(q) || (m.email && m.email.toLowerCase().includes(q))
     })
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-line px-5 py-4">
           <h3 className="font-display text-[1.05rem] font-semibold text-navy">Select a member</h3>
-          <p className="mt-0.5 text-[0.82rem] text-ink-soft">
-            Choose whose statement you want to generate.
-          </p>
+          <p className="mt-0.5 text-[0.82rem] text-ink-soft">Choose whose statement you want to generate.</p>
         </div>
-
         <div className="border-b border-line px-5 py-3">
           <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search member..."
-            autoFocus
+            value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search member..." autoFocus
             className="w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.92rem] text-navy outline-none transition focus:border-forest"
           />
         </div>
-
         <div className="max-h-[340px] overflow-y-auto">
           {list.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[0.86rem] text-ink-soft">
-              No members match.
-            </div>
+            <div className="px-5 py-10 text-center text-[0.86rem] text-ink-soft">No members match.</div>
           ) : (
             list.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => onPick(m)}
-                className="flex w-full items-center gap-3 border-b border-line px-5 py-3 text-left transition last:border-b-0 hover:bg-forest/[0.03]"
-              >
+              <button key={m.id} onClick={() => onPick(m)} className="flex w-full items-center gap-3 border-b border-line px-5 py-3 text-left transition last:border-b-0 hover:bg-forest/[0.03]">
                 <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-forest to-emerald font-display text-[0.72rem] font-bold text-white">
                   {initials(m.name)}
                 </span>
@@ -529,12 +339,8 @@ function PickMemberModal({ open, onClose, members, onPick }) {
             ))
           )}
         </div>
-
         <div className="flex justify-end gap-2 border-t border-line bg-paper/40 px-5 py-3.5">
-          <button
-            onClick={onClose}
-            className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy transition hover:border-navy"
-          >
+          <button onClick={onClose} className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy transition hover:border-navy">
             Cancel
           </button>
         </div>
@@ -544,12 +350,10 @@ function PickMemberModal({ open, onClose, members, onPick }) {
 }
 
 export default function Reports() {
-  const [members] = useState(() => loadMembers())
+  const { chama, members, loans, contributions } = useChama()
   const [month, setMonth] = useState(recentMonths(12)[1])
   const [quarter, setQuarter] = useState(recentQuarters(4)[0])
   const [pickFor, setPickFor] = useState(null)
-
-  const chama = useMemo(() => buildChama(), [])
 
   const months = useMemo(() => recentMonths(12), [])
   const quarters = useMemo(() => recentQuarters(4), [])
@@ -560,7 +364,7 @@ export default function Reports() {
       return
     }
     const period = report.periodType === 'quarter' ? quarter : month
-    const result = runReport(report, period, members)
+    const result = runReport(report, period, members, loans, contributions, chama)
     if (!result) return toast.error('Could not generate this report.')
 
     if (mode === 'csv') {
@@ -574,7 +378,7 @@ export default function Reports() {
 
   const handlePickMember = (member) => {
     const { report, mode } = pickFor
-    const result = runReport(report, month, members, member.id)
+    const result = runReport(report, month, members, loans, contributions, chama, member.id)
     setPickFor(null)
     if (!result) return toast.error('Could not generate this report.')
 
@@ -593,39 +397,21 @@ export default function Reports() {
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Reports</h1>
           <p className="mt-1.5 max-w-[64ch] text-ink-soft">
-            Generate any report for <b className="text-navy">{chama.name}</b> for the current or
-            previous periods. Every report opens in a print-ready view and exports as CSV.
+            Generate any report for <b className="text-navy">{chama?.name || 'My Chama'}</b> for the current or previous periods.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
             <Calendar size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
-            <select
-              value={month}
-              onChange={(e) => setMonth(e.target.value)}
-              className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none"
-            >
-              {months.map((m) => (
-                <option key={m} value={m}>
-                  {fmtMonth(m)}
-                </option>
-              ))}
+            <select value={month} onChange={(e) => setMonth(e.target.value)} className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none">
+              {months.map((m) => <option key={m} value={m}>{fmtMonth(m)}</option>)}
             </select>
           </div>
-
           <div className="flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2">
             <Calendar size={14} strokeWidth={2} className="shrink-0 text-ink-soft" />
-            <select
-              value={quarter}
-              onChange={(e) => setQuarter(e.target.value)}
-              className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none"
-            >
-              {quarters.map((q) => (
-                <option key={q} value={q}>
-                  {fmtQuarter(q)}
-                </option>
-              ))}
+            <select value={quarter} onChange={(e) => setQuarter(e.target.value)} className="cursor-pointer bg-transparent pr-2 text-sm font-medium text-navy outline-none">
+              {quarters.map((q) => <option key={q} value={q}>{fmtQuarter(q)}</option>)}
             </select>
           </div>
         </div>
@@ -635,39 +421,21 @@ export default function Reports() {
         {REPORTS.map((r) => {
           const Icon = r.icon
           return (
-            <div
-              key={r.id}
-              className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-5 transition hover:-translate-y-0.5 hover:border-forest/60"
-            >
+            <div key={r.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-white p-5 transition hover:-translate-y-0.5 hover:border-forest/60">
               <div className="flex items-start justify-between">
                 <span className="grid h-9 w-9 place-items-center rounded-xl bg-emerald/10 text-forest">
                   <Icon size={17} strokeWidth={2} />
                 </span>
-                <span className="rounded-full bg-paper px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft">
-                  {r.tag}
-                </span>
+                <span className="rounded-full bg-paper px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wider text-ink-soft">{r.tag}</span>
               </div>
-
-              <h3 className="font-display text-[1rem] font-semibold leading-snug text-navy">
-                {r.title}
-              </h3>
+              <h3 className="font-display text-[1rem] font-semibold leading-snug text-navy">{r.title}</h3>
               <p className="text-[0.86rem] leading-relaxed text-ink-soft">{r.desc}</p>
-
               <div className="mt-auto flex items-center gap-2 pt-2">
-                <button
-                  onClick={() => handleGenerate(r, 'print')}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-forest px-3 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-forest-dark"
-                >
-                  <Printer size={13} strokeWidth={2} />
-                  Generate
+                <button onClick={() => handleGenerate(r, 'print')} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-forest px-3 py-2 text-[0.82rem] font-semibold text-white transition hover:bg-forest-dark">
+                  <Printer size={13} strokeWidth={2} /> Generate
                 </button>
-                <button
-                  onClick={() => handleGenerate(r, 'csv')}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[0.82rem] font-semibold text-navy transition hover:border-forest"
-                  aria-label="Export CSV"
-                >
-                  <Download size={13} strokeWidth={2} />
-                  CSV
+                <button onClick={() => handleGenerate(r, 'csv')} className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-[0.82rem] font-semibold text-navy transition hover:border-forest" aria-label="Export CSV">
+                  <Download size={13} strokeWidth={2} /> CSV
                 </button>
               </div>
             </div>
@@ -677,18 +445,10 @@ export default function Reports() {
 
       <div className="mt-5 flex items-start gap-2.5 rounded-xl bg-emerald/10 px-4 py-3 text-[0.84rem] text-navy">
         <ArrowUpRight size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-forest" />
-        <span>
-          Reports open in a new tab. Use <b>Save as PDF</b> in the print dialog to keep a copy.
-          Allow pop-ups for this site to avoid the block.
-        </span>
+        <span>Reports open in a new tab. Use <b>Save as PDF</b> in the print dialog to keep a copy. Allow pop-ups for this site to avoid the block.</span>
       </div>
 
-      <PickMemberModal
-        open={!!pickFor}
-        onClose={() => setPickFor(null)}
-        members={members}
-        onPick={handlePickMember}
-      />
+      <PickMemberModal open={!!pickFor} onClose={() => setPickFor(null)} members={members} onPick={handlePickMember} />
     </div>
   )
 }
