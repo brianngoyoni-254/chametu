@@ -11,8 +11,8 @@ export function ChamaProvider({ children }) {
   const [members, setMembers] = useState([])
   const [loans, setLoans] = useState([])
   const [contributions, setContributions] = useState({
-    period: '', expectedPerMember: 0, totalCollected: 0,
-    totalExpected: 0, pct: 0, members: [],
+    period: '', frequency: 'monthly', expectedPerMember: 0,
+    totalCollected: 0, totalExpected: 0, pct: 0, members: [],
   })
   const [invites, setInvites] = useState([])
   const [sharedData, setSharedData] = useState({
@@ -25,8 +25,8 @@ export function ChamaProvider({ children }) {
   useEffect(() => {
     if (!user) {
       setChama(null); setMembers([]); setLoans([]); setInvites([])
-      setContributions({ period: '', expectedPerMember: 0, totalCollected: 0,
-        totalExpected: 0, pct: 0, members: [] })
+      setContributions({ period: '', frequency: 'monthly', expectedPerMember: 0,
+        totalCollected: 0, totalExpected: 0, pct: 0, members: [] })
       setSharedData({ welfare: [], meetings: [], proposals: [], assets: [], payout: null })
       return
     }
@@ -65,13 +65,38 @@ export function ChamaProvider({ children }) {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // ============ ACTIONS ============
   const recordContribution = useCallback(async (memberId, amount, method = 'cash') => {
     const token = localStorage.getItem('auth_token')
     try {
       await api('/api/chama/contributions', {
         method: 'POST', token,
         body: { member_id: memberId, amount, method },
+      })
+      await fetchData()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchData])
+
+  const setContributionSchedule = useCallback(async (patch) => {
+    const token = localStorage.getItem('auth_token')
+    try {
+      const updated = await api('/api/chama/contributions/schedule', {
+        method: 'PUT', token, body: patch,
+      })
+      await fetchData()
+      return { ok: true, schedule: updated }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchData])
+
+  const setContributionOverride = useCallback(async (memberId, amount) => {
+    const token = localStorage.getItem('auth_token')
+    try {
+      await api(`/api/chama/members/${memberId}/contribution-override`, {
+        method: 'PATCH', token, body: { amount },
       })
       await fetchData()
       return { ok: true }
@@ -197,14 +222,16 @@ export function ChamaProvider({ children }) {
       contributions, invites,
       isLoadingMembers, permissions, can, updateChama,
       refetchMembers: fetchData, refetchLoans: fetchData,
-      recordContribution, updateMember, removeMember, changeRole,
+      recordContribution, setContributionSchedule, setContributionOverride,
+      updateMember, removeMember, changeRole,
       inviteMember, cancelInvite,
       applyForLoan, updateLoanStatus,
     }),
     [chama, members, loans, roles, currentMember, sharedData,
      contributions, invites, isLoadingMembers, permissions, can, updateChama,
-     fetchData, recordContribution, updateMember, removeMember, changeRole,
-     inviteMember, cancelInvite, applyForLoan, updateLoanStatus]
+     fetchData, recordContribution, setContributionSchedule, setContributionOverride,
+     updateMember, removeMember, changeRole, inviteMember, cancelInvite,
+     applyForLoan, updateLoanStatus]
   )
 
   return <ChamaContext.Provider value={value}>{children}</ChamaContext.Provider>

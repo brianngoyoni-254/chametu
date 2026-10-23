@@ -1,12 +1,15 @@
 # app/services/member_service.py
-from datetime import datetime, timedelta
+import logging
 import secrets
+from datetime import datetime, timedelta
+
 from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member
 from app.models.invite import Invite
 from app.models.contribution import MemberInvite
-from app.services import contribution_service
+
+logger = logging.getLogger(__name__)
 
 ADMIN_ROLES = ['Chairman', 'Treasurer', 'Secretary']
 INVITE_TTL_DAYS = 7
@@ -30,6 +33,11 @@ def list_members(chama_id):
             'role': m.role,
             'status': m.status,
             'savings': float(m.savings or 0),
+            'contributionOverride': (
+                float(m.contribution_override)
+                if m.contribution_override is not None
+                else None
+            ),
         }
         for m, u in rows
     ]
@@ -49,6 +57,11 @@ def get_member(chama_id, member_id):
         'role': m.role,
         'status': m.status,
         'savings': float(m.savings or 0),
+        'contributionOverride': (
+            float(m.contribution_override)
+            if m.contribution_override is not None
+            else None
+        ),
     }
 
 
@@ -89,7 +102,24 @@ def update_member(chama_id, member_id, patch):
     if 'status' in patch and patch['status'] in ('active', 'inactive', 'invited'):
         m.status = patch['status']
 
+    # Allow clearing or setting the per-member contribution override
+    # via the same update path (used by the Members page).
+    if 'contributionOverride' in patch:
+        raw = patch['contributionOverride']
+        if raw is None or raw == '':
+            m.contribution_override = None
+        else:
+            try:
+                v = float(raw)
+            except (TypeError, ValueError):
+                raise ValueError('Invalid contribution override')
+            if v < 0:
+                raise ValueError('Contribution override cannot be negative')
+            m.contribution_override = v
+
     db.session.commit()
+    logger.info('member updated: chama=%s member=%s fields=%s',
+                chama_id, member_id, list(patch.keys()))
     return get_member(chama_id, member_id)
 
 
@@ -99,8 +129,10 @@ def change_role(chama_id, member_id, new_role):
     m = Member.query.filter_by(id=member_id, chama_id=chama_id).first()
     if not m:
         raise ValueError('Member not found')
+    old = m.role
     m.role = new_role
     db.session.commit()
+    logger.info('role change: member=%s %s -> %s', member_id, old, new_role)
     return get_member(chama_id, member_id)
 
 
@@ -109,14 +141,12 @@ def remove_member(chama_id, member_id):
     m = Member.query.filter_by(id=member_id, chama_id=chama_id).first()
     if not m:
         raise ValueError('Member not found')
-
-    # Deactivate rather than hard delete — preserves the audit trail
     m.status = 'inactive'
     db.session.commit()
+    logger.info('member deactivated: chama=%s member=%s', chama_id, member_id)
 
 
 def hard_delete_member(chama_id, member_id):
-    """Use only when cleaning up test data."""
     m = Member.query.filter_by(id=member_id, chama_id=chama_id).first()
     if not m:
         raise ValueError('Member not found')
@@ -125,6 +155,7 @@ def hard_delete_member(chama_id, member_id):
     if user and user.memberships and len(user.memberships) <= 1:
         db.session.delete(user)
     db.session.commit()
+    logger.warning('member HARD-DELETED: chama=%s member=%s', chama_id, member_id)
 
 
 # ============================ INVITES ============================
@@ -155,18 +186,21 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     if not chama:
         raise ValueError('Chama not found')
 
-    # Cap enforcement — based on active members
     tier_caps = {'Starter': 10, 'Growth': 50, 'Business': 150, 'Gold': 250}
     cap = tier_caps.get(chama.base_tier, 10)
     active_count = Member.query.filter_by(chama_id=chama_id, status='active').count()
     if active_count >= cap:
+        logger.warning(
+            'invite rejected: chama=%s tier=%s at cap (%s/%s)',
+            chama_id, chama.base_tier, active_count, cap,
+        )
         raise ValueError(f'Your {chama.base_tier} plan allows up to {cap} members')
 
-    # Reuse an existing pending invite for the same contact
     existing = MemberInvite.query.filter_by(
         chama_id=chama_id, contact=contact, status='pending',
     ).first()
     if existing:
+        logger.debug('reusing pending invite for %s', contact)
         return {
             'id': existing.id,
             'contact': existing.contact,
@@ -190,7 +224,6 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     )
     db.session.add(invite)
 
-    # Also write a legacy `Invite` row for the public join page
     db.session.add(Invite(
         chama_id=chama_id,
         contact=contact,
@@ -201,6 +234,10 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     ))
     db.session.commit()
 
+    logger.info(
+        'invite created: chama=%s contact=%s role=%s actor=%s',
+        chama_id, contact, role, actor_user_id,
+    )
     return {
         'id': invite.id,
         'contact': invite.contact,
@@ -221,17 +258,17 @@ def cancel_invite(chama_id, invite_id):
     if legacy:
         db.session.delete(legacy)
     db.session.commit()
+    logger.info('invite cancelled: chama=%s invite=%s', chama_id, invite_id)
 
 
-# ============================ FINANCE (existing helpers) ============================
+# ============================ FINANCE HELPERS ============================
 def get_member_finance_data(user_id):
-    from app.models.finance import Loan
+    from app.models.finance import Loan, Transaction
     member = Member.query.filter_by(user_id=user_id).first()
     if not member:
         return None
 
     loans = Loan.query.filter_by(member_id=member.id).order_by(Loan.created_at.desc()).all()
-    from app.models.finance import Transaction
     contributions = Transaction.query.filter_by(
         member_id=member.id, type='contribution',
     ).order_by(Transaction.created_at.desc()).all()
@@ -242,20 +279,15 @@ def get_member_finance_data(user_id):
         'savings': member.savings,
         'loans': [
             {
-                'id': l.id,
-                'amount': l.amount,
-                'balance': l.balance,
-                'status': l.status,
-                'purpose': l.purpose,
+                'id': l.id, 'amount': l.amount, 'balance': l.balance,
+                'status': l.status, 'purpose': l.purpose,
                 'created_at': l.created_at.isoformat(),
             }
             for l in loans
         ],
         'contributions': [
             {
-                'id': t.id,
-                'amount': t.amount,
-                'reference': t.reference,
+                'id': t.id, 'amount': t.amount, 'reference': t.reference,
                 'created_at': t.created_at.isoformat(),
             }
             for t in contributions
@@ -264,6 +296,7 @@ def get_member_finance_data(user_id):
     }
 
 
+# ============================ INVITE ACCEPTANCE ============================
 def accept_member_invite(email, name, password, chama_code, role, phone=None):
     chama = Chama.query.filter_by(code=chama_code).first()
     if not chama:
@@ -300,6 +333,11 @@ def accept_member_invite(email, name, password, chama_code, role, phone=None):
         mi.joined_at = datetime.utcnow()
 
     db.session.commit()
+
+    logger.info(
+        'invite accepted: chama=%s email=%s role=%s',
+        chama.code, email, role,
+    )
 
     portal = 'member' if role.lower() == 'member' else 'admin'
     return {

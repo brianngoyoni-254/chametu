@@ -1,22 +1,23 @@
 # app/services/ledger_service.py
 import json
+import logging
 from datetime import datetime
+
 from sqlalchemy import func, or_
+
 from app import db
 from app.models.chama import Member
-from app.models.finance import Transaction, Loan, WelfareClaim
+from app.models.finance import Transaction, WelfareClaim
 from app.models.ledger import (
     SavingsLedger, Payment, WelfareContribution, AuditLogEntry,
 )
 from app.services import rewards_service
 
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------- savings
 def record_savings_entry(chama_id, member_id, kind, amount, note=''):
-    """
-    Append a savings ledger row and update the member's running total.
-    `kind` = 'deposit' | 'withdrawal'.
-    """
     if kind not in ('deposit', 'withdrawal'):
         raise ValueError("kind must be 'deposit' or 'withdrawal'")
     if amount <= 0:
@@ -44,6 +45,11 @@ def record_savings_entry(chama_id, member_id, kind, amount, note=''):
     )
     db.session.add(entry)
     db.session.commit()
+
+    logger.info(
+        'savings %s: chama=%s member=%s amount=%s balance=%s',
+        kind, chama_id, member_id, amount, member.savings,
+    )
     return entry
 
 
@@ -67,6 +73,20 @@ def savings_history(chama_id, member_id=None, limit=100):
 
 
 def savings_summary(chama_id):
+    """
+    All figures derive from real rows — nothing is seeded or faked.
+
+    - memberSavings: sum of all Member.savings in this chama
+    - totalDeposits: sum of 'deposit' rows in savings_ledger
+    - totalWithdrawals: sum of 'withdrawal' rows in savings_ledger
+    - totalSavings: same as memberSavings (reserve is now a separate
+      concept that would need its own table; we're not inventing it)
+    - monthlyProfitTarget: from ChamaSettings (0 = not configured)
+    - monthNet: this calendar month's (deposits - withdrawals) for the chama
+    - progressPct: monthNet / monthlyProfitTarget  (0 if no target)
+    """
+    from app.models.chama import ChamaSettings
+
     member_savings = db.session.query(
         func.coalesce(func.sum(Member.savings), 0)
     ).filter(Member.chama_id == chama_id).scalar() or 0
@@ -85,12 +105,39 @@ def savings_summary(chama_id):
         SavingsLedger.kind == 'withdrawal',
     ).scalar() or 0
 
+    # Current calendar month net movement
+    now = datetime.utcnow()
+    month_start = datetime(now.year, now.month, 1)
+    month_deposits = db.session.query(
+        func.coalesce(func.sum(SavingsLedger.amount), 0)
+    ).filter(
+        SavingsLedger.chama_id == chama_id,
+        SavingsLedger.kind == 'deposit',
+        SavingsLedger.created_at >= month_start,
+    ).scalar() or 0
+    month_withdrawals = db.session.query(
+        func.coalesce(func.sum(SavingsLedger.amount), 0)
+    ).filter(
+        SavingsLedger.chama_id == chama_id,
+        SavingsLedger.kind == 'withdrawal',
+        SavingsLedger.created_at >= month_start,
+    ).scalar() or 0
+    month_net = float(month_deposits) - float(month_withdrawals)
+
+    settings = ChamaSettings.query.filter_by(chama_id=chama_id).first()
+    monthly_target = float(settings.monthly_profit_target or 0) if settings else 0.0
+    progress = 0
+    if monthly_target > 0:
+        progress = max(0, min(100, round((month_net / monthly_target) * 100)))
+
     return {
         'memberSavings': float(member_savings),
         'totalDeposits': float(total_deposits),
         'totalWithdrawals': float(total_withdrawals),
-        'groupReserve': 600000.0,  # placeholder — swap for real reserve table later
-        'totalSavings': float(member_savings) + 600000.0,
+        'totalSavings': float(member_savings),
+        'monthNet': month_net,
+        'monthlyProfitTarget': monthly_target,
+        'progressPct': progress,
     }
 
 
@@ -144,7 +191,6 @@ def match_payment(chama_id, payment_id, member_id, actor_user_id):
     payment.matched_at = datetime.utcnow()
     payment.matched_by_user_id = actor_user_id
 
-    # Match = deposit into savings + transaction + points
     record_savings_entry(
         chama_id, member_id, 'deposit', payment.amount,
         note=f'M-Pesa {payment.reference}',
@@ -159,6 +205,11 @@ def match_payment(chama_id, payment_id, member_id, actor_user_id):
         reference=payment.reference or 'M-Pesa',
     ))
     db.session.commit()
+
+    logger.info(
+        'payment matched: payment=%s ref=%s member=%s amount=%s',
+        payment.id, payment.reference, member_id, payment.amount,
+    )
 
     rewards_service.emit_event(
         chama_id, 'subscription_paid',
@@ -190,7 +241,6 @@ def list_transactions(chama_id, limit=200):
 
 
 def add_manual_transaction(chama_id, kind, description, amount, actor_user_id):
-    """kind = 'credit' | 'debit'. Creates a Transaction row and returns it."""
     if kind not in ('credit', 'debit'):
         raise ValueError("kind must be 'credit' or 'debit'")
     if amount <= 0:
@@ -207,6 +257,11 @@ def add_manual_transaction(chama_id, kind, description, amount, actor_user_id):
     db.session.add(row)
     _audit(chama_id, actor_user_id, f'transaction.{kind}', description, {'amount': amount})
     db.session.commit()
+
+    logger.info(
+        'manual transaction: chama=%s kind=%s amount=%s desc=%r',
+        chama_id, kind, amount, description,
+    )
     return row
 
 
@@ -281,11 +336,7 @@ def list_audit(chama_id, limit=200):
         .limit(limit).all()
     )
     return [
-        {
-            'id': r.id,
-            'action': r.action,
-            'target': r.target,
-            'createdAt': r.created_at.isoformat(),
-        }
+        {'id': r.id, 'action': r.action, 'target': r.target,
+         'createdAt': r.created_at.isoformat()}
         for r in rows
     ]

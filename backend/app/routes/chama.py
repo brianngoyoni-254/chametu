@@ -1,18 +1,22 @@
 # app/routes/chama.py
+import logging
+import secrets
+from datetime import datetime
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
+
 from app import db
 from app.models.chama import Chama, Member
-from app.models.user import User
 from app.models.finance import (
     WelfareClaim, Meeting, Proposal, MemberVote, Asset, Payout, PayoutOrder,
 )
 from app.models.invite import Invite
 from app.services import member_service, contribution_service
-from datetime import datetime
-import secrets
+from app.logging_utils import log_writes
 
 chama_bp = Blueprint('chama', __name__)
+logger = logging.getLogger(__name__)
 
 
 def _cid():
@@ -21,10 +25,6 @@ def _cid():
 
 def _role():
     return get_jwt().get('role')
-
-
-def is_admin(role):
-    return role in ['Chairman', 'Treasurer', 'Secretary']
 
 
 # ============================ CHAMA ============================
@@ -38,23 +38,34 @@ def get_chama_details():
         'id': chama.id, 'name': chama.name, 'code': chama.code,
         'type': chama.type, 'base_tier': chama.base_tier,
         'monthly_contribution': chama.monthly_contribution,
-        'due_day': chama.due_day, 'late_fee': chama.late_fee,
+        'contribution_frequency': chama.contribution_frequency,
+        'due_day': chama.due_day, 'due_weekday': chama.due_weekday,
+        'late_fee': chama.late_fee,
     }), 200
 
 
 @chama_bp.route('/settings', methods=['PUT'])
 @jwt_required()
+@log_writes(logger, 'chama.settings_update')
 def update_settings():
     if _role() not in ['Chairman', 'Treasurer']:
         return jsonify({'message': 'Unauthorized'}), 403
     chama = Chama.query.get(_cid())
     data = request.get_json() or {}
+
+    if 'contribution_frequency' in data:
+        if data['contribution_frequency'] not in ('weekly', 'monthly', 'quarterly'):
+            return jsonify({'message': 'Invalid frequency'}), 400
+        chama.contribution_frequency = data['contribution_frequency']
     if 'monthly_contribution' in data:
         chama.monthly_contribution = float(data['monthly_contribution'])
     if 'due_day' in data:
         chama.due_day = int(data['due_day'])
+    if 'due_weekday' in data:
+        chama.due_weekday = int(data['due_weekday'])
     if 'late_fee' in data:
         chama.late_fee = float(data['late_fee'])
+
     db.session.commit()
     return jsonify({'message': 'Settings updated'}), 200
 
@@ -68,6 +79,7 @@ def get_members():
 
 @chama_bp.route('/members/<member_id>', methods=['PUT', 'PATCH'])
 @jwt_required()
+@log_writes(logger, 'member.update')
 def update_member(member_id):
     if _role() not in ['Chairman', 'Treasurer']:
         return jsonify({'message': 'Unauthorized'}), 403
@@ -80,6 +92,7 @@ def update_member(member_id):
 
 @chama_bp.route('/members/<member_id>', methods=['DELETE'])
 @jwt_required()
+@log_writes(logger, 'member.deactivate')
 def delete_member(member_id):
     if _role() != 'Chairman':
         return jsonify({'message': 'Only Chairman can remove members'}), 403
@@ -92,6 +105,7 @@ def delete_member(member_id):
 
 @chama_bp.route('/members/<member_id>/role', methods=['PATCH'])
 @jwt_required()
+@log_writes(logger, 'member.role_change')
 def change_member_role(member_id):
     if _role() != 'Chairman':
         return jsonify({'message': 'Only Chairman can change roles'}), 403
@@ -103,6 +117,26 @@ def change_member_role(member_id):
     return jsonify(result), 200
 
 
+@chama_bp.route('/members/<member_id>/contribution-override', methods=['PATCH'])
+@jwt_required()
+@log_writes(logger, 'member.contribution_override')
+def set_member_override(member_id):
+    if _role() not in ['Chairman', 'Treasurer']:
+        return jsonify({'message': 'Unauthorized'}), 403
+    data = request.get_json() or {}
+    try:
+        member = contribution_service.set_member_override(
+            _cid(), member_id, data.get('amount'),
+        )
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
+
+    return jsonify({
+        'memberId': member.id,
+        'contributionOverride': member.contribution_override,
+    }), 200
+
+
 # ============================ INVITES ============================
 @chama_bp.route('/invites', methods=['GET'])
 @jwt_required()
@@ -112,6 +146,7 @@ def list_invites():
 
 @chama_bp.route('/invites', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'member.invite_create')
 def create_invite():
     if _role() not in ['Chairman', 'Treasurer', 'Secretary']:
         return jsonify({'message': 'Unauthorized'}), 403
@@ -133,6 +168,7 @@ def create_invite():
 
 @chama_bp.route('/invites/<invite_id>', methods=['DELETE'])
 @jwt_required()
+@log_writes(logger, 'member.invite_cancel')
 def cancel_invite(invite_id):
     if _role() not in ['Chairman', 'Treasurer', 'Secretary']:
         return jsonify({'message': 'Unauthorized'}), 403
@@ -153,6 +189,7 @@ def list_contributions():
 
 @chama_bp.route('/contributions', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'contribution.record')
 def record_contribution():
     if _role() not in ['Chairman', 'Treasurer']:
         return jsonify({'message': 'Unauthorized'}), 403
@@ -172,13 +209,39 @@ def record_contribution():
     return jsonify({'id': row.id, 'amount': row.amount, 'period': row.period}), 201
 
 
+@chama_bp.route('/contributions/schedule', methods=['PUT'])
+@jwt_required()
+@log_writes(logger, 'contribution.schedule')
+def set_contribution_schedule():
+    if _role() not in ['Chairman', 'Treasurer']:
+        return jsonify({'message': 'Unauthorized'}), 403
+    data = request.get_json() or {}
+    try:
+        chama = contribution_service.set_schedule(
+            _cid(),
+            amount=data.get('amount'),
+            frequency=data.get('frequency'),
+            due_day=data.get('due_day'),
+            due_weekday=data.get('due_weekday'),
+        )
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
+
+    return jsonify({
+        'amount': chama.monthly_contribution,
+        'frequency': chama.contribution_frequency,
+        'due_day': chama.due_day,
+        'due_weekday': chama.due_weekday,
+    }), 200
+
+
 @chama_bp.route('/members/<member_id>/contributions', methods=['GET'])
 @jwt_required()
 def member_contribution_history(member_id):
     return jsonify(contribution_service.history_for_member(_cid(), member_id)), 200
 
 
-# ============================ SHARED DATA (unchanged) ============================
+# ============================ SHARED DATA ============================
 @chama_bp.route('/shared_data', methods=['GET'])
 @jwt_required()
 def get_shared_data():
@@ -236,9 +299,11 @@ def get_shared_data():
     }), 200
 
 
-# ============================ ASSETS ============================
+# ============================ ASSETS / MEETINGS / PROPOSALS / WELFARE / PAYOUTS ============================
+# ... (unchanged from your existing file — copy the remaining routes below)
 @chama_bp.route('/assets', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'asset.create')
 def add_asset():
     d = request.get_json() or {}
     a = Asset(chama_id=_cid(), name=d['name'], type=d['type'], price=d['price'],
@@ -251,6 +316,7 @@ def add_asset():
 
 @chama_bp.route('/assets/<id>', methods=['PATCH'])
 @jwt_required()
+@log_writes(logger, 'asset.update')
 def update_asset(id):
     a = Asset.query.filter_by(id=id, chama_id=_cid()).first()
     if not a:
@@ -262,9 +328,9 @@ def update_asset(id):
     return jsonify({'message': 'Asset updated'}), 200
 
 
-# ============================ MEETINGS ============================
 @chama_bp.route('/meetings', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'meeting.create')
 def add_meeting():
     d = request.get_json() or {}
     m = Meeting(chama_id=_cid(), title=d['title'], date=d['date'], time=d['time'],
@@ -276,6 +342,7 @@ def add_meeting():
 
 @chama_bp.route('/meetings/<id>/lock', methods=['PATCH'])
 @jwt_required()
+@log_writes(logger, 'meeting.lock')
 def lock_meeting(id):
     m = Meeting.query.filter_by(id=id, chama_id=_cid()).first()
     if not m:
@@ -285,9 +352,9 @@ def lock_meeting(id):
     return jsonify({'message': 'Minutes locked'}), 200
 
 
-# ============================ PROPOSALS ============================
 @chama_bp.route('/proposals', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'proposal.create')
 def add_proposal():
     d = request.get_json() or {}
     p = Proposal(chama_id=_cid(), title=d['title'], amount=d.get('amount'), closes=d['closes'])
@@ -296,9 +363,9 @@ def add_proposal():
     return jsonify({'message': 'Proposal created'}), 201
 
 
-# ============================ WELFARE ============================
 @chama_bp.route('/welfare/claim', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'welfare.claim_create')
 def add_welfare_claim():
     uid = get_jwt_identity()
     d = request.get_json() or {}
@@ -314,6 +381,7 @@ def add_welfare_claim():
 
 @chama_bp.route('/welfare/<id>/review', methods=['PATCH'])
 @jwt_required()
+@log_writes(logger, 'welfare.claim_review')
 def review_welfare(id):
     w = WelfareClaim.query.filter_by(id=id, chama_id=_cid()).first()
     if not w:
@@ -326,9 +394,9 @@ def review_welfare(id):
     return jsonify({'message': 'Claim reviewed'}), 200
 
 
-# ============================ PAYOUTS ============================
 @chama_bp.route('/payouts', methods=['POST'])
 @jwt_required()
+@log_writes(logger, 'payout.create')
 def record_payout():
     d = request.get_json() or {}
     member = Member.query.filter_by(chama_id=_cid(), user_id=d['member_id']).first()
