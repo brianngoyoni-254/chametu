@@ -8,7 +8,7 @@ import {
   FiUsers,
   FiZap,
 } from 'react-icons/fi'
-import { CATALOG } from '../lib/catalog'
+import { usePublicRewards } from '../lib/usePublicRewards'
 import Reveal from './Reveal'
 
 const EARN = [
@@ -21,8 +21,9 @@ const EARN = [
 const REDEEM_PREVIEW = 5
 
 export default function Rewards() {
-  const perks = CATALOG.slice(0, REDEEM_PREVIEW)
-  const extra = CATALOG.length - perks.length
+  const { catalog } = usePublicRewards()
+  const perks = catalog.slice(0, REDEEM_PREVIEW)
+  const extra = Math.max(0, catalog.length - perks.length)
 
   return (
     <section id="rewards" className="py-16 sm:py-20 md:py-24">
@@ -88,6 +89,11 @@ export default function Rewards() {
                     </b>
                   </li>
                 ))}
+                {perks.length === 0 && (
+                  <li className="py-3 text-[0.82rem] text-white/60">
+                    Loading rewards…
+                  </li>
+                )}
               </ul>
 
               {extra > 0 && (

@@ -1,52 +1,39 @@
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
+import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
 
-const badge = { done: 'bg-[#E9F5EF] text-forest', pending: 'bg-[#FBF1E0] text-[#8A6417]', overdue: 'bg-[#FBEAE8] text-red-600' }
-
-function fmt(n) {
-  return 'KSh ' + n.toLocaleString('en-KE')
+const badge = {
+  done: 'bg-[#E9F5EF] text-forest',
+  partial: 'bg-[#FBF1E0] text-[#8A6417]',
+  pending: 'bg-[#FBF1E0] text-[#8A6417]',
+  overdue: 'bg-[#FBEAE8] text-red-600',
 }
 
+const fmt = (n) => 'KSh ' + Number(n).toLocaleString('en-KE')
+
 export default function Contributions() {
-  const { members, chama, recordContribution } = useChama()
+  const { contributions, recordContribution, isLoadingMembers } = useChama()
   const [query, setQuery] = useState('')
-  
-  const expectedPerMember = chama?.monthly_contribution || 5000
+  const [busyId, setBusyId] = useState(null)
 
-  const rows = useMemo(() => {
-    return members.filter(m => m.status === 'active').map((m) => {
-      const paid = Number(m.savings || 0)
-      let status = 'pending'
-      if (paid >= expectedPerMember) status = 'done'
-      else if (chama?.due_day && new Date().getDate() > chama.due_day) status = 'overdue'
-
-      return {
-        id: m.id,
-        name: m.name,
-        expected: expectedPerMember,
-        paid,
-        status,
-      }
-    })
-  }, [members, expectedPerMember, chama?.due_day])
+  const rows = contributions?.members || []
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
     return q ? rows.filter((r) => r.name.toLowerCase().includes(q)) : rows
   }, [rows, query])
 
-  const collected = rows.reduce((s, r) => s + Math.min(r.paid, r.expected), 0)
-  const expected = rows.length * expectedPerMember
-  const pct = expected > 0 ? Math.round((collected / expected) * 100) : 0
+  const collected = contributions?.totalCollected || 0
+  const expected = contributions?.totalExpected || 0
+  const pct = contributions?.pct || 0
 
-  const handleMarkPaid = async (id, name) => {
-    const res = await recordContribution(id, expectedPerMember, 'CASH')
-    if (res.ok) {
-      toast.success(`Marked contribution for ${name.split(' ')[0]}`)
-    } else {
-      toast.error(res.message)
-    }
+  const handleMarkPaid = async (memberId, name, amount) => {
+    setBusyId(memberId)
+    const res = await recordContribution(memberId, amount, 'cash')
+    setBusyId(null)
+    if (res.ok) toast.success(`Recorded ${fmt(amount)} for ${name.split(' ')[0]}`)
+    else toast.error(res.message)
   }
 
   return (
@@ -55,7 +42,12 @@ export default function Contributions() {
         <div>
           <h1 className="font-display text-xl text-navy">Contributions</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            This month — {fmt(collected)} of {fmt(expected)} ({pct}%)
+            {fmt(collected)} of {fmt(expected)} this month ({pct}%)
+            {contributions?.period && (
+              <span className="ml-2 text-[0.78rem] text-ink-soft">
+                · {contributions.period}
+              </span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-line bg-white px-3.5 py-2.5 text-sm text-ink-soft">
@@ -82,32 +74,40 @@ export default function Contributions() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => (
-              <tr key={r.id} className="border-b border-line last:border-none">
-                <td className="py-2.5">{r.name}</td>
-                <td className="py-2.5 font-mono">{r.expected.toLocaleString()}</td>
-                <td className="py-2.5 font-mono">{r.paid.toLocaleString()}</td>
-                <td className="py-2.5 font-mono">{Math.max(0, r.expected - r.paid).toLocaleString()}</td>
-                <td className="py-2.5">
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${badge[r.status]}`}>
-                    {r.status === 'done' ? 'Paid' : r.status}
-                  </span>
-                </td>
-                <td className="py-2.5 text-right">
-                  {r.status !== 'done' && (
-                    <button onClick={() => handleMarkPaid(r.id, r.name)} className="text-xs font-semibold text-forest">
-                      Record payment
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={6} className="py-6 text-center text-ink-soft">
-                  No members match your search.
-                </td>
-              </tr>
+            {isLoadingMembers ? (
+              <tr><td colSpan={6} className="py-8 text-center text-ink-soft">Loading…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={6} className="py-6 text-center text-ink-soft">
+                {rows.length === 0 ? 'No active members yet.' : 'No members match your search.'}
+              </td></tr>
+            ) : (
+              filtered.map((r) => (
+                <tr key={r.memberId} className="border-b border-line last:border-none">
+                  <td className="py-2.5">
+                    <div className="font-medium text-navy">{r.name}</div>
+                    <div className="text-[0.72rem] text-ink-soft">{r.role}</div>
+                  </td>
+                  <td className="py-2.5 font-mono">{r.expected.toLocaleString()}</td>
+                  <td className="py-2.5 font-mono">{r.paid.toLocaleString()}</td>
+                  <td className="py-2.5 font-mono">{r.balance.toLocaleString()}</td>
+                  <td className="py-2.5">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${badge[r.status]}`}>
+                      {r.status === 'done' ? 'Paid' : r.status}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-right">
+                    {r.status !== 'done' && r.balance > 0 && (
+                      <button
+                        onClick={() => handleMarkPaid(r.memberId, r.name, r.balance)}
+                        disabled={busyId === r.memberId}
+                        className="text-xs font-semibold text-forest disabled:opacity-50"
+                      >
+                        {busyId === r.memberId ? 'Recording…' : `Record ${fmt(r.balance)}`}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

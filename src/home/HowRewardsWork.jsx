@@ -8,7 +8,7 @@ import {
   Receipt,
 } from 'lucide-react'
 import { ORDER, TIERS } from '../lib/tiers'
-import { CATALOG } from '../lib/catalog'
+import { usePublicRewards } from '../lib/usePublicRewards'
 import { useAuth } from '../context/AuthContext'
 
 const EARN_RULES = [
@@ -43,6 +43,7 @@ const SAFEGUARDS = [
 
 export default function HowRewardsWork() {
   const { isAuthenticated } = useAuth()
+  const { catalog } = usePublicRewards()
 
   return (
     <main className="bg-paper">
@@ -153,7 +154,7 @@ export default function HowRewardsWork() {
           </p>
 
           <div className="mt-6 grid gap-3 nav:grid-cols-3">
-            {CATALOG.map((perk) => (
+            {catalog.map((perk) => (
               <div key={perk.id} className="card-v2 flex flex-col gap-2">
                 <b className="font-display text-[.96rem] text-navy">{perk.name}</b>
                 <p className="text-[.84rem] text-ink-soft">{perk.desc}</p>
@@ -163,6 +164,11 @@ export default function HowRewardsWork() {
                 </div>
               </div>
             ))}
+            {catalog.length === 0 && (
+              <div className="col-span-full rounded-2xl border border-dashed border-line bg-white p-10 text-center text-ink-soft">
+                Rewards will appear here shortly.
+              </div>
+            )}
           </div>
         </div>
       </section>

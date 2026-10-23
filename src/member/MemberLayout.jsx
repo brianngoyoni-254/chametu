@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { Outlet, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   LogOut, Bell, Menu, CheckCheck, Trash2, X,
-  AlertTriangle, Info, CheckCircle2, ArrowRight,
+  AlertTriangle, Info, CheckCircle2, ArrowRight, LayoutDashboard,
 } from 'lucide-react'
 import MemberSidebar from './MemberSidebar'
-import { useAuth } from '../context/AuthContext'
+import { useMemberAuth } from '../lib/memberAuth'
 import { useMemberNotifications } from '../lib/memberNotifications'
 
 const TITLES = {
@@ -33,9 +33,9 @@ const SUBTITLES = {
 
 const TONE = {
   critical: { cls: 'bg-red-500/15 text-red-600', Icon: AlertTriangle },
-  warning:  { cls: 'bg-gold/15 text-[#8A6417]', Icon: AlertTriangle },
-  success:  { cls: 'bg-emerald/15 text-forest', Icon: CheckCircle2 },
-  info:     { cls: 'bg-blue-500/15 text-blue-600', Icon: Info },
+  warning: { cls: 'bg-gold/15 text-[#8A6417]', Icon: AlertTriangle },
+  success: { cls: 'bg-emerald/15 text-forest', Icon: CheckCircle2 },
+  info: { cls: 'bg-blue-500/15 text-blue-600', Icon: Info },
 }
 
 function ago(iso) {
@@ -47,16 +47,13 @@ function ago(iso) {
 }
 
 export default function MemberLayout() {
-  const { user, logout } = useAuth()
+  const { user, chama, logout } = useMemberAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
 
-  // Get chama data saved by AuthContext during login
-  const chamaData = JSON.parse(localStorage.getItem('chama_data') || '{}')
-  
   const { items, unread, markAllRead, markRead, dismiss, clearAll } = useMemberNotifications(user?.id)
 
   useEffect(() => {
@@ -72,17 +69,11 @@ export default function MemberLayout() {
     }
   }, [])
 
-  // 1. If not logged in, go to login
   if (!user) return <Navigate to="/login" replace />
-
-  // 2. If the logged-in user is an Admin (Chairman/Treasurer/Secretary), kick them to the Admin Dashboard
-  if (user.portal === 'admin') {
-    return <Navigate to="/dashboard" replace />
-  }
 
   const segment = location.pathname.split('/member/')[1] || ''
   const title = TITLES[segment] || 'Overview'
-  const subtitle = SUBTITLES[segment] || `${chamaData.name || 'My Chama'} / member account`
+  const subtitle = SUBTITLES[segment] || `${chama?.name || 'My Chama'} / member account`
 
   function handleLogout() {
     logout()
@@ -104,7 +95,7 @@ export default function MemberLayout() {
       <MemberSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        chamaName={chamaData.name || 'My Chama'}
+        chamaName={chama?.name || 'My Chama'}
       />
 
       <main className="min-w-0 flex-1">
@@ -119,13 +110,19 @@ export default function MemberLayout() {
             </button>
 
             <div className="min-w-0 flex-1">
-              <h2 className="truncate font-display text-base font-bold text-navy">
-                {title}
-              </h2>
+              <h2 className="truncate font-display text-base font-bold text-navy">{title}</h2>
               <p className="truncate text-[0.72rem] text-ink-soft">{subtitle}</p>
             </div>
 
-            {/* NOTIFICATIONS BELL */}
+            {user.portal === 'admin' && (
+              <Link
+                to="/dashboard"
+                className="hidden items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-[0.72rem] font-semibold text-navy transition hover:border-forest sm:inline-flex"
+              >
+                <LayoutDashboard size={13} /> Admin Dashboard
+              </Link>
+            )}
+
             <div className="relative" ref={bellRef}>
               <button
                 onClick={() => setBellOpen((v) => !v)}
@@ -142,7 +139,7 @@ export default function MemberLayout() {
               </button>
 
               {bellOpen && (
-                <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
                   <div className="flex items-center justify-between border-b border-line px-4 py-3">
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-[0.9rem] font-bold text-navy">Notifications</h3>
@@ -199,10 +196,16 @@ export default function MemberLayout() {
                                 <p className="truncate text-[0.82rem] font-semibold text-navy">
                                   {n.title}
                                 </p>
-                                {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald" />}
+                                {!n.read && (
+                                  <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald" />
+                                )}
                               </div>
-                              <p className="mt-0.5 line-clamp-2 text-[0.73rem] text-ink-soft">{n.desc}</p>
-                              <p className="mt-0.5 text-[0.66rem] text-ink-soft/70">{ago(n.time)}</p>
+                              <p className="mt-0.5 line-clamp-2 text-[0.73rem] text-ink-soft">
+                                {n.desc}
+                              </p>
+                              <p className="mt-0.5 text-[0.66rem] text-ink-soft/70">
+                                {ago(n.time)}
+                              </p>
                             </div>
                             <span
                               onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
@@ -238,9 +241,7 @@ export default function MemberLayout() {
                 <div className="truncate text-[0.78rem] font-semibold leading-tight text-navy">
                   {user.name}
                 </div>
-                <div className="text-[0.65rem] capitalize text-ink-soft">
-                  {user.role}
-                </div>
+                <div className="text-[0.65rem] capitalize text-ink-soft">{user.role}</div>
               </div>
               <button
                 onClick={handleLogout}

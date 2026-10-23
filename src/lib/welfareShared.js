@@ -1,10 +1,10 @@
 // src/lib/welfareShared.js
 // Shared read-only helpers for the welfare fund.
-// Imported by both admin and member pages so both see the same ledger.
+// Legacy local-storage version — used only by the member demo flow.
 
 const WELFARE_KEY = 'chametu_welfare_v1'
 const CONTRIBUTIONS_KEY = 'chametu_welfare_contributions_v1'
-const MONTHLY_WELFARE_FEE = 500 // KSh per member per month
+const MONTHLY_WELFARE_FEE = 500
 
 function read(key, fb) {
   try {
@@ -28,20 +28,15 @@ export function getWelfareContributions() {
   return read(CONTRIBUTIONS_KEY, [])
 }
 
-/**
- * Summary of the fund's overall position.
- * - collected: sum of member contributions (or a seeded baseline)
- * - paid: sum of all approved claims
- * - pending: sum of pending claims
- * - balance: collected − paid
- */
 export function getWelfareSummary(members = []) {
   const claims = getAllClaims()
   const contributions = getWelfareContributions()
 
-  const activeMembers = members.filter((m) => m.status !== 'inactive' && m.status !== 'invited')
+  const activeMembers = members.filter(
+    (m) => m.status !== 'inactive' && m.status !== 'invited'
+  )
   const expectedMonthly = activeMembers.length * MONTHLY_WELFARE_FEE
-  const seededCollected = 340000 // starting balance in demo
+  const seededCollected = 340000
 
   const collected =
     contributions.reduce((s, c) => s + Number(c.amount || 0), 0) || seededCollected
@@ -74,10 +69,6 @@ export function getWelfareSummary(members = []) {
   }
 }
 
-/**
- * Public ledger of approved payouts — safe for every member to see.
- * Returns only amount, member, reason, date. No phone/email.
- */
 export function getPublicPayouts() {
   return getAllClaims()
     .filter((c) => c.status === 'paid')
@@ -88,9 +79,6 @@ export function getPublicPayouts() {
     )
 }
 
-/**
- * Filter an array of claims by free-text search and status tab.
- */
 export function filterClaims(claims, tab, query) {
   return claims
     .filter((c) => tab === 'all' || c.status === tab)

@@ -1,6 +1,8 @@
-/* ============================================================
-   chametuStorage.js - local-only persistence layer
-   ============================================================ */
+// src/lib/chametuStorage.js
+// Legacy local-only persistence layer.
+// NOTE: payments, savings, transactions, welfare, contributions and loans
+// have been migrated to the backend — the keys below are only used by the
+// demo-member entry flow and any remaining legacy helpers.
 
 const CHAMA_KEY          = 'chametu_chama_v1'
 const INVITES_KEY        = 'chametu_invites_v1'
@@ -32,11 +34,7 @@ function write(key, value) {
 }
 
 function uid(prefix = '') {
-  return (
-    prefix +
-    Date.now().toString(36) +
-    Math.random().toString(36).slice(2, 10)
-  )
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
 }
 
 function makeToken(len = 32) {
@@ -55,9 +53,7 @@ function makeToken(len = 32) {
 const DAY_MS = 24 * 60 * 60 * 1000
 const INVITE_TTL_DAYS = 7
 
-/* ============================================================
-   CHAMA
-   ============================================================ */
+/* ============================ CHAMA ============================ */
 
 export function getChama() {
   return read(CHAMA_KEY, null)
@@ -75,9 +71,7 @@ export function getMemberChama(session) {
   return { ...local, name, code }
 }
 
-/* ============================================================
-   INVITES
-   ============================================================ */
+/* ============================ INVITES ============================ */
 
 export function getInvites() {
   return read(INVITES_KEY, [])
@@ -159,9 +153,7 @@ export function findValidInvite(chamaCode, token) {
 
   if (invite.expiresAt && Date.now() > invite.expiresAt) {
     saveInvites(
-      getInvites().map((i) =>
-        i.id === invite.id ? { ...i, status: 'expired' } : i
-      )
+      getInvites().map((i) => (i.id === invite.id ? { ...i, status: 'expired' } : i))
     )
     return { ok: false, reason: 'expired' }
   }
@@ -169,9 +161,7 @@ export function findValidInvite(chamaCode, token) {
   return { ok: true, invite, chama }
 }
 
-/* ============================================================
-   MEMBERS
-   ============================================================ */
+/* ============================ MEMBERS ============================ */
 
 export function getMembers() {
   return read(MEMBERS_KEY, [])
@@ -224,9 +214,7 @@ export function createMemberFromInvite({ invite, chama, name, contact, password 
   return member
 }
 
-/* ============================================================
-   MEMBER SESSION
-   ============================================================ */
+/* ============================ MEMBER SESSION ============================ */
 
 export function getMemberSession() {
   return read(MEMBER_SESSION_KEY, null)
@@ -258,9 +246,9 @@ export function loginMember(chamaCode, contact, password) {
   return member
 }
 
-/* ============================================================
-   LOANS - LIVE AGGREGATION
-   ============================================================ */
+/* ============================ LEGACY LOAN HELPERS ============================ */
+// These are kept for backward-compat only. The backend is the source of truth
+// for loans now, but the demo-member flow still calls into these functions.
 
 export function getMemberLiveLoan(session) {
   if (!session) return null
@@ -305,9 +293,8 @@ export function getMemberLoanUsed(session) {
     .reduce((s, l) => s + Number(l.balance ?? l.amount ?? 0), 0)
 }
 
-/* ============================================================
-   PER-MEMBER FINANCE (view layer)
-   ============================================================ */
+/* ============================ LEGACY FINANCE VIEW ============================ */
+// Left in place because DemoMemberEntry still calls getMemberFinance().
 
 function readLedger() {
   return read(MEMBER_LEDGER_KEY, {})
@@ -360,9 +347,9 @@ export function getMemberTransactions(session) {
   return (ledger[key] && ledger[key].transactions) || []
 }
 
-/* ============================================================
-   WRITE-BACK ACTIONS
-   ============================================================ */
+/* ============================ LEGACY WRITE-BACK ACTIONS ============================ */
+// Kept for backward-compat. The migrated dashboard pages now use
+// /api/ledger/* endpoints instead.
 
 export function payMemberContribution(session, amount) {
   const members = getMembers()
@@ -446,10 +433,6 @@ export function applyMemberWelfare(session, { reason, amount }) {
   })
   write(WELFARE_KEY, welfare)
 }
-
-/* ============================================================
-   LOAN REPAYMENT
-   ============================================================ */
 
 export function repayMemberLoan(session, { loanId, amount, method = 'mpesa' }) {
   const loans = read(LOANS_KEY, [])
