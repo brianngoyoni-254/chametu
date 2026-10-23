@@ -8,17 +8,31 @@ import {
 
 const PointsContext = createContext(null)
 
+const TOKEN_KEY = 'auth_token'
+export const AUTH_CHANGED_EVENT = 'auth-changed'
+
+const DEFAULT_STATE = {
+  balance: 0, redeemedThisYear: 0, ledger: [], lots: [],
+  redemptions: [], tier: 'Starter', baseTier: 'Starter',
+  config: { annualRedeemCap: 1000 },
+  baseConfig: { annualRedeemCap: 1000 },
+}
+
 export function PointsProvider({ children }) {
-  const [state, setState] = useState({
-    balance: 0, redeemedThisYear: 0, ledger: [], lots: [],
-    redemptions: [], tier: 'Starter', baseTier: 'Starter',
-    config: { annualRedeemCap: 1000 },
-    baseConfig: { annualRedeemCap: 1000 },
-  })
+  const [state, setState] = useState(DEFAULT_STATE)
   const [catalog, setCatalog] = useState([])
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
+    // These endpoints require a JWT. Without one they would just return 401,
+    // so skip the calls and reset to defaults (e.g. after logout).
+    if (!localStorage.getItem(TOKEN_KEY)) {
+      setState(DEFAULT_STATE)
+      setCatalog([])
+      setLoading(false)
+      return
+    }
+
     try {
       const [s, c] = await Promise.all([fetchState(), fetchCatalog()])
       setState(s)
@@ -30,7 +44,15 @@ export function PointsProvider({ children }) {
     }
   }, [])
 
+  // Initial load
   useEffect(() => { refresh() }, [refresh])
+
+  // Re-run when the user logs in, registers or logs out (AuthContext fires this)
+  useEffect(() => {
+    const onAuthChanged = () => { refresh() }
+    window.addEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+    return () => window.removeEventListener(AUTH_CHANGED_EVENT, onAuthChanged)
+  }, [refresh])
 
   const redeem = useCallback(async (rewardId) => {
     try {
