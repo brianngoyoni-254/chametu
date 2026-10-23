@@ -1,14 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Copy, Check, Send, Mail, Phone, MessageCircle, ExternalLink, Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Check, Send, Mail, Phone, MessageCircle, ExternalLink } from 'lucide-react'
-import {
-  getChama,
-  getInvites,
-  createInvite,
-  inviteLink,
-  resendInvite,
-  cancelInvite,
-} from '../../lib/chametuStorage'
+import { toast } from 'sonner'
+import { useChama } from '../../context/ChamaContext'
+import { api } from '../../lib/api'
 
 const badge = {
   pending: 'bg-[#FBF1E0] text-[#8A6417]',
@@ -18,49 +13,77 @@ const badge = {
 const badgeLabel = { pending: 'PENDING', joined: 'JOINED', expired: 'EXPIRED' }
 
 export default function InviteMembers() {
-  const chama = getChama()
   const navigate = useNavigate()
-  const [invites, setInvites] = useState(getInvites())
+  const { chama } = useChama() 
+  
+  const [invites, setInvites] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ contact: '', role: 'Member' })
   const [copiedId, setCopiedId] = useState(null)
 
-  function refresh() {
-    setInvites(getInvites())
+  const fetchInvites = async () => {
+    try {
+      const data = await api('/api/chama/invites', { token: localStorage.getItem('auth_token') })
+      setInvites(data)
+    } catch (err) {
+      toast.error('Failed to load invites')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function sendInvite(e) {
+  useEffect(() => {
+    fetchInvites()
+  }, [])
+
+  async function sendInvite(e) {
     e.preventDefault()
     const contact = form.contact.trim()
     if (!contact) return
-    const method = contact.includes('@') ? 'email' : 'phone'
-    createInvite({ contact, method, role: form.role })
-    setForm({ contact: '', role: 'Member' })
-    refresh()
+    setBusy(true)
+
+    try {
+      const newInvite = await api('/api/chama/invites', {
+        method: 'POST',
+        token: localStorage.getItem('auth_token'),
+        body: { contact, role: form.role }
+      })
+      setInvites((prev) => [newInvite, ...prev])
+      setForm({ contact: '', role: 'Member' })
+      toast.success('Invite generated successfully')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   function copy(invite) {
-    navigator.clipboard?.writeText(inviteLink(invite)).catch(() => {})
+    const link = `${window.location.origin}/join/${chama?.code}/${invite.token}`
+    navigator.clipboard?.writeText(link).catch(() => {})
     setCopiedId(invite.id)
     setTimeout(() => setCopiedId(null), 1500)
   }
 
   function shareWhatsapp(invite) {
-    const text = `You're invited to join ${chama.name} on Chametu: ${inviteLink(invite)}`
+    const link = `${window.location.origin}/join/${chama?.code}/${invite.token}`
+    const text = `You're invited to join ${chama?.name} on Chametu: ${link}`
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
   }
 
-  /**
-   * On localhost, allows the admin to hop into the invitee experience
-   * directly without needing a second device. Uses the same token URL.
-   */
   function previewInvite(invite) {
-    const link = inviteLink(invite)
+    navigate(`/join/${chama?.code}/${invite.token}`)
+  }
+
+  async function cancelInvite(id) {
+    if (!confirm('Cancel this invite?')) return
     try {
-      const url = new URL(link)
-      navigate(url.pathname + url.search)
-    } catch {
-      // If inviteLink returns a relative path, navigate directly
-      navigate(link)
+      await api(`/api/chama/invites/${id}`, { method: 'DELETE', token: localStorage.getItem('auth_token') })
+      setInvites((prev) => prev.filter((i) => i.id !== id))
+      toast.success('Invite cancelled')
+    } catch (err) {
+      toast.error(err.message)
     }
   }
 
@@ -68,17 +91,15 @@ export default function InviteMembers() {
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-2xl font-bold text-navy">Invite Members</h1>
-        <p className="mt-1 text-sm text-ink-soft">Add people to {chama.name}</p>
+        <p className="mt-1 text-sm text-ink-soft">Add people to {chama?.name || 'your chama'}</p>
       </div>
 
-      {/* Invite form */}
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
         <h3 className="font-display text-sm font-semibold text-navy">
           Invite by email or phone
         </h3>
         <p className="mt-1 text-sm text-ink-soft">
-          Each invite gets its own link, tied to <b className="text-navy">{chama.name}</b> only —
-          it won't work for any other chama.
+          Each invite gets its own link, tied to <b className="text-navy">{chama?.name || 'this chama'}</b> only — it won't work for any other chama.
         </p>
         <form onSubmit={sendInvite} className="mt-4 flex flex-wrap items-end gap-3">
           <label className="min-w-55 flex-1 text-xs font-semibold text-ink">
@@ -100,22 +121,26 @@ export default function InviteMembers() {
               <option>Member</option>
               <option>Secretary</option>
               <option>Treasurer</option>
-              <option>Chairperson</option>
+              <option>Chairman</option>
             </select>
           </label>
           <button
             type="submit"
-            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+            disabled={busy}
+            className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
           >
-            <Send size={15} /> Generate invite
+            {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {busy ? 'Generating...' : 'Generate invite'}
           </button>
         </form>
       </div>
 
-      {/* Invites list */}
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
-        <h3 className="mb-3.5 font-display text-sm font-semibold text-navy">Invites</h3>
-        {invites.length === 0 ? (
+        <h3 className="mb-3.5 font-display text-sm font-semibold text-navy">Recent Invites</h3>
+        
+        {loading ? (
+          <div className="py-8 text-center text-ink-soft">Loading invites...</div>
+        ) : invites.length === 0 ? (
           <p className="text-sm text-ink-soft">No invites sent yet — generate one above.</p>
         ) : (
           <div className="space-y-2.5">
@@ -123,7 +148,7 @@ export default function InviteMembers() {
               <div key={inv.id} className="rounded-xl border border-line p-3.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-sm text-navy">
-                    {inv.method === 'email' ? (
+                    {inv.contact.includes('@') ? (
                       <Mail size={13} className="text-ink-soft" />
                     ) : (
                       <Phone size={13} className="text-ink-soft" />
@@ -133,17 +158,17 @@ export default function InviteMembers() {
                   </span>
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${
-                      badge[inv.status]
+                      badge[inv.status] || badge.expired
                     }`}
                   >
-                    {badgeLabel[inv.status]}
+                    {badgeLabel[inv.status] || 'EXPIRED'}
                   </span>
                 </div>
 
                 {inv.status === 'pending' && (
                   <>
                     <div className="mt-2 truncate rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs text-ink">
-                      {inviteLink(inv)}
+                      {window.location.origin}/join/{chama?.code}/{inv.token}
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       <button
@@ -154,11 +179,9 @@ export default function InviteMembers() {
                         {copiedId === inv.id ? 'Copied' : 'Copy link'}
                       </button>
 
-                      {/* Localhost helper — hops into the invitee flow */}
                       <button
                         onClick={() => previewInvite(inv)}
                         className="flex items-center gap-1.5 rounded-md border border-forest bg-forest/[0.05] px-3 py-1.5 text-xs font-semibold text-forest transition hover:bg-forest/10"
-                        title="Open the invite as if you were the invited person"
                       >
                         <ExternalLink size={13} /> Preview as invitee
                       </button>
@@ -171,28 +194,13 @@ export default function InviteMembers() {
                       </button>
 
                       <button
-                        onClick={() => {
-                          cancelInvite(inv.id)
-                          refresh()
-                        }}
+                        onClick={() => cancelInvite(inv.id)}
                         className="ml-auto text-xs font-semibold text-red-600"
                       >
                         Cancel
                       </button>
                     </div>
                   </>
-                )}
-
-                {inv.status === 'expired' && (
-                  <button
-                    onClick={() => {
-                      resendInvite(inv.id)
-                      refresh()
-                    }}
-                    className="mt-2 text-xs font-semibold text-forest"
-                  >
-                    Resend
-                  </button>
                 )}
               </div>
             ))}

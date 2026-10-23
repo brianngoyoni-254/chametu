@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Percent, PiggyBank, ArrowRightLeft, Receipt,
   Heart, User, X, Sparkles, Package, CalendarDays, RefreshCw, Vote,
-  LifeBuoy,
+  LifeBuoy, LayoutGrid,
 } from 'lucide-react'
 import logo from '../assets/logos.png'
 

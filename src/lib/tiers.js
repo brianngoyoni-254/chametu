@@ -1,3 +1,6 @@
+// src/lib/tiers.js
+// Static fallback defaults. The backend is authoritative — see catalog.js.
+
 export const TIERS = {
   Starter:  { rank: 0, price: 500,  maxMembers: 10,  pointsMultiplier: 1.0, annualRedeemCap: 1000 },
   Growth:   { rank: 1, price: 1000, maxMembers: 50,  pointsMultiplier: 1.0, annualRedeemCap: 2000 },
@@ -8,7 +11,7 @@ export const TIERS = {
 export const ORDER = ['Starter', 'Growth', 'Business', 'Gold']
 
 export const current  = (name) => TIERS[name] ?? TIERS[ORDER[0]]
-export const canEarn  = () => true                        // every paid tier earns
+export const canEarn  = () => true
 export const nextTier = (name) => ORDER[Math.min(ORDER.indexOf(name) + 1, ORDER.length - 1)]
 export const prevTier = (name) => ORDER[Math.max(ORDER.indexOf(name) - 1, 0)]
 

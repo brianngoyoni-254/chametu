@@ -1,72 +1,51 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Smartphone, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
+import { Search, Smartphone, CheckCircle2, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { readMembers } from '../../lib/superadminBridge'
-import { publishMemberNotification } from '../../lib/memberNotifications'
-
-const PAYMENTS_KEY = 'chametu_payments_v1'
-const EVENT = 'chametu:storage-updated'
-
-function read(key, fb) {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fb } catch { return fb }
-}
-function write(key, v) {
-  try { localStorage.setItem(key, JSON.stringify(v)) } catch {}
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: { key } }))
-}
-function fmt(n) {
-  return 'KSh ' + n.toLocaleString('en-KE')
-}
+import { useChama } from '../../context/ChamaContext'
+import { ledgerApi } from '../../lib/ledgerApi'
 
 const statusStyle = {
   matched: 'bg-[#E9F5EF] text-forest',
   unmatched: 'bg-[#FBF1E0] text-[#8A6417]',
 }
 
+const fmt = (n) => 'KSh ' + Number(n).toLocaleString('en-KE')
+
 export default function Payments() {
-  const members = readMembers()
-  const [payments, setPayments] = useState(() => read(PAYMENTS_KEY, []))
+  const { members } = useChama()
+  const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
 
-  const refresh = () => setPayments(read(PAYMENTS_KEY, []))
-  useEffect(() => {
-    const onStorage = () => refresh()
-    window.addEventListener(EVENT, onStorage)
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener(EVENT, onStorage)
-      window.removeEventListener('storage', onStorage)
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const data = await ledgerApi.getPayments(query.trim() || undefined)
+      setPayments(data)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return payments
-    return payments.filter((p) => (p.name || '').toLowerCase().includes(q) || (p.ref || '').toLowerCase().includes(q) || (p.phone || '').includes(q))
-  }, [payments, query])
+  useEffect(() => { refresh() /* eslint-disable-line react-hooks/exhaustive-deps */ }, [])
 
-  const todayTotal = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+  const filtered = useMemo(() => payments, [payments])
+
+  const todayTotal = payments.reduce((s, p) => s + Number(p.amount || 0), 0)
   const matchedCount = payments.filter((p) => p.status === 'matched').length
-  const unmatchedCount = payments.length - matchedCount
+  const unmatchedCount = payments.filter((p) => p.status === 'unmatched').length
 
-  function matchTo(id, memberName) {
-    if (!memberName) return
-    const target = payments.find((p) => p.id === id)
-    const next = payments.map((p) => (p.id === id ? { ...p, status: 'matched', matchedTo: memberName } : p))
-    write(PAYMENTS_KEY, next)
-    setPayments(next)
-    if (target) {
-      const member = members.find((m) => m.name === memberName)
-      publishMemberNotification({
-        memberId: member?.id || memberName,
-        type: 'success',
-        event: 'paymentConfirmations',
-        title: 'Payment received ✅',
-        desc: `We've matched ${fmt(Number(target.amount))} from M-Pesa ${target.ref || ''} to your account.`,
-        link: '/member/contributions',
-      })
+  const handleMatch = async (paymentId, memberId) => {
+    if (!memberId) return
+    try {
+      await ledgerApi.matchPayment(paymentId, memberId)
+      toast.success('Payment matched')
+      refresh()
+    } catch (err) {
+      toast.error(err.message)
     }
-    toast.success(`Matched to ${memberName}`)
   }
 
   return (
@@ -82,14 +61,20 @@ export default function Payments() {
           </button>
           <div className="flex items-center gap-2 rounded-lg border border-line bg-white px-3.5 py-2 text-sm text-ink-soft">
             <Search size={15} />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, phone or reference…" className="w-56 bg-transparent outline-none placeholder:text-ink-soft" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && refresh()}
+              placeholder="Search name, phone or reference…"
+              className="w-56 bg-transparent outline-none placeholder:text-ink-soft"
+            />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-3 gap-3.5 sm:grid-cols-1">
         <div className="rounded-xl border border-line bg-white p-4.5">
-          <div className="text-xs text-ink-soft">Today's total</div>
+          <div className="text-xs text-ink-soft">Total recorded</div>
           <div className="mt-2.5 font-display font-mono text-xl font-bold text-navy">{fmt(todayTotal)}</div>
         </div>
         <div className="rounded-xl border border-line bg-white p-4.5">
@@ -103,7 +88,11 @@ export default function Payments() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-line bg-white p-5">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="py-12 text-center text-ink-soft">
+            <Loader2 className="mx-auto animate-spin text-forest" size={22} />
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="py-12 text-center">
             <Smartphone size={26} className="mx-auto text-ink-soft/40" />
             <p className="mt-2 text-sm text-ink-soft">No payments recorded yet.</p>
@@ -123,16 +112,18 @@ export default function Payments() {
             <tbody>
               {filtered.map((p) => (
                 <tr key={p.id} className="border-b border-line last:border-none">
-                  <td className="py-2.5 text-ink-soft">{p.time ? new Date(p.time).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—'}</td>
+                  <td className="py-2.5 text-ink-soft">
+                    {p.time ? new Date(p.time).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                  </td>
                   <td className="py-2.5">
                     <span className="flex items-center gap-1.5">
                       <Smartphone size={13} className="text-ink-soft" />
-                      {p.name}
+                      {p.name || '—'}
                     </span>
                   </td>
-                  <td className="py-2.5 font-mono text-ink-soft">{p.phone}</td>
-                  <td className="py-2.5 font-mono">{fmt(Number(p.amount))}</td>
-                  <td className="py-2.5 font-mono text-ink-soft">{p.ref}</td>
+                  <td className="py-2.5 font-mono text-ink-soft">{p.phone || '—'}</td>
+                  <td className="py-2.5 font-mono">{fmt(p.amount)}</td>
+                  <td className="py-2.5 font-mono text-ink-soft">{p.ref || '—'}</td>
                   <td className="py-2.5">
                     {p.status === 'matched' ? (
                       <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle.matched}`}>
@@ -143,12 +134,12 @@ export default function Payments() {
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusStyle.unmatched}`}>Unmatched</span>
                         <select
                           defaultValue=""
-                          onChange={(e) => matchTo(p.id, e.target.value)}
+                          onChange={(e) => handleMatch(p.id, e.target.value)}
                           className="rounded-md border border-line bg-paper px-2 py-1 text-xs text-ink"
                         >
                           <option value="" disabled>Match to…</option>
                           {members.map((m) => (
-                            <option key={m.id || m.name} value={m.name}>{m.name}</option>
+                            <option key={m.id} value={m.id}>{m.name}</option>
                           ))}
                         </select>
                       </div>

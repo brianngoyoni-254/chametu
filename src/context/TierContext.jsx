@@ -1,93 +1,96 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { current, canEarn as canEarnFn, ORDER, TRIAL_DAYS, DAY } from '../lib/tiers'
+// src/context/TierContext.jsx
+import {
+  createContext, useCallback, useContext, useEffect, useMemo, useState,
+} from 'react'
+import { current, ORDER, TRIAL_DAYS, DAY } from '../lib/tiers'
+import {
+  fetchState, setBaseTier as apiSetBaseTier,
+  startTrial as apiStartTrial, upgradeTier as apiUpgradeTier,
+} from '../lib/catalog'
 
-const KEY = 'chametu_tier_v1'
 const TierContext = createContext(null)
 
 export function TierProvider({ children }) {
-  // baseTier: what the chama pays for (set at signup / upgrade).
-  // tier:     effective tier (baseTier, or 'Gold' while the trial is active).
   const [baseTier, setBaseTierState] = useState(ORDER[0])
   const [tier, setTier] = useState(ORDER[0])
   const [trialExpiresAt, setTrialExpiresAt] = useState(null)
   const [hydrated, setHydrated] = useState(false)
 
-  // Hydrate from storage, resolve trial expiry
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     try {
-      const raw = JSON.parse(localStorage.getItem(KEY))
-      if (raw) {
-        const storedBase = ORDER.includes(raw.baseTier)
-          ? raw.baseTier
-          : ORDER.includes(raw.tier)
-            ? raw.tier
-            : ORDER[0]
-        const trialActive = raw.trialExpiresAt && Date.now() < raw.trialExpiresAt
-
-        setBaseTierState(storedBase)
-        setTier(trialActive ? 'Gold' : storedBase)
-        setTrialExpiresAt(trialActive ? raw.trialExpiresAt : null)
-      }
-    } catch {}
-    setHydrated(true)
+      const s = await fetchState()
+      setBaseTierState(s.baseTier || ORDER[0])
+      setTier(s.tier || s.baseTier || ORDER[0])
+      setTrialExpiresAt(s.trialExpiresAt ? Date.parse(s.trialExpiresAt) : null)
+    } catch {
+      // not logged in / offline
+    } finally {
+      setHydrated(true)
+    }
   }, [])
 
-  // Persist
-  useEffect(() => {
-    if (!hydrated) return
-    try {
-      localStorage.setItem(KEY, JSON.stringify({ baseTier, tier, trialExpiresAt }))
-    } catch {}
-  }, [baseTier, tier, trialExpiresAt, hydrated])
+  useEffect(() => { refresh() }, [refresh])
 
-  /** Set the base tier (called from Register and from the Upgrade page). */
-  const setBaseTier = useCallback(
-    (next) => {
-      if (!ORDER.includes(next)) return
-      setBaseTierState(next)
-      // If not on an active trial, effective tier jumps immediately
+  const setBaseTier = useCallback(async (next) => {
+    if (!ORDER.includes(next)) return
+    try {
+      const res = await apiSetBaseTier(next)
+      setBaseTierState(res.baseTier)
       setTier((t) =>
-        t === 'Gold' && trialExpiresAt && Date.now() < trialExpiresAt ? t : next
+        t === 'Gold' && trialExpiresAt && Date.now() < trialExpiresAt
+          ? t : res.baseTier,
       )
-    },
-    [trialExpiresAt]
-  )
+    } catch {
+      setBaseTierState(next)
+      setTier((t) =>
+        t === 'Gold' && trialExpiresAt && Date.now() < trialExpiresAt
+          ? t : next,
+      )
+    }
+  }, [trialExpiresAt])
 
-  /** Start a 14-day Gold trial on top of the base tier. */
-  const startTrial = useCallback(() => {
-    setTier('Gold')
-    setTrialExpiresAt(Date.now() + TRIAL_DAYS * DAY)
+  const startTrial = useCallback(async () => {
+    try {
+      const res = await apiStartTrial()
+      setTier('Gold')
+      setTrialExpiresAt(
+        res.trialExpiresAt
+          ? Date.parse(res.trialExpiresAt)
+          : Date.now() + TRIAL_DAYS * DAY,
+      )
+    } catch {
+      setTier('Gold')
+      setTrialExpiresAt(Date.now() + TRIAL_DAYS * DAY)
+    }
   }, [])
 
-  /** Legacy upgrade — used by the rewards marketplace. Ends trial and sets base. */
-  const upgrade = useCallback((to) => {
+  const upgrade = useCallback(async (to) => {
     if (!ORDER.includes(to)) return
-    setBaseTierState(to)
-    setTier(to)
-    setTrialExpiresAt(null)
+    try {
+      const res = await apiUpgradeTier(to)
+      setBaseTierState(res.baseTier)
+      setTier(res.baseTier)
+      setTrialExpiresAt(null)
+    } catch {
+      setBaseTierState(to)
+      setTier(to)
+      setTrialExpiresAt(null)
+    }
   }, [])
 
   const isTrial = useMemo(
     () => Boolean(trialExpiresAt) && Date.now() < trialExpiresAt,
-    [trialExpiresAt]
+    [trialExpiresAt],
   )
-  const canEarn = useMemo(() => canEarnFn(tier), [tier])
 
   const value = useMemo(
     () => ({
-      tier,               // effective
-      baseTier,           // what they pay for
-      trialExpiresAt,
-      isTrial,
-      canEarn,
-      config: current(tier),
-      baseConfig: current(baseTier),
-      order: ORDER,
-      setBaseTier,
-      startTrial,
-      upgrade,
+      tier, baseTier, trialExpiresAt, isTrial, canEarn: true,
+      config: current(tier), baseConfig: current(baseTier),
+      order: ORDER, setBaseTier, startTrial, upgrade, refresh, hydrated,
     }),
-    [tier, baseTier, trialExpiresAt, isTrial, canEarn, setBaseTier, startTrial, upgrade]
+    [tier, baseTier, trialExpiresAt, isTrial,
+     setBaseTier, startTrial, upgrade, refresh, hydrated],
   )
 
   return <TierContext.Provider value={value}>{children}</TierContext.Provider>

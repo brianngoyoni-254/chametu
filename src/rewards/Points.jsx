@@ -1,25 +1,37 @@
-import { Coins, Receipt, Sparkles, ArrowUpCircle, Users, CalendarCheck } from 'lucide-react'
+// src/rewards/Points.jsx
+import {
+  Coins, Receipt, CalendarCheck, Sparkles, ArrowUpCircle, Users,
+  Loader2,
+} from 'lucide-react'
 import { usePoints } from '../context/PointsContext'
 import { useTier } from '../context/TierContext'
 import { nextTier } from '../lib/tiers'
 
 export default function Points() {
-  const { balance, state, emit, redeemedThisYear } = usePoints()
+  const { balance, state, redeemedThisYear, loading, refresh } = usePoints()
   const { tier, isTrial, order, upgrade } = useTier()
 
-  const handleUpgrade = () => {
+  const handleUpgrade = async () => {
     const next = nextTier(tier)
     if (!next || order.indexOf(next) <= order.indexOf(tier)) return
-    upgrade(next)
-    emit('tier_upgraded', { from: tier, to: next })
+    await upgrade(next)
+    await refresh()
+  }
+
+  if (loading) {
+    return (
+      <div className="grid place-items-center py-24">
+        <Loader2 className="animate-spin text-forest" size={26} />
+      </div>
+    )
   }
 
   const actions = [
-    { icon: CalendarCheck, label: 'Paid KSh 500 on time',   run: () => emit('subscription_paid', { amountKsh: 500, onTime: true }) },
-    { icon: CalendarCheck, label: 'Paid KSh 1,000 on time', run: () => emit('subscription_paid', { amountKsh: 1000, onTime: true }) },
-    { icon: Sparkles,      label: 'Annual prepay',          run: () => emit('annual_prepay', { amountKsh: 6000 }) },
-    { icon: ArrowUpCircle, label: 'Upgrade tier',           run: handleUpgrade },
-    { icon: Users,         label: 'Referral paid',          run: () => emit('referral_paid', { phone: '0712345678' }) },
+    { icon: CalendarCheck, label: 'Paid KSh 500 on time',   note: 'contribution' },
+    { icon: CalendarCheck, label: 'Paid KSh 1,000 on time', note: 'contribution' },
+    { icon: Sparkles,      label: 'Annual prepay',          note: 'prepay' },
+    { icon: ArrowUpCircle, label: 'Upgrade tier',           note: 'upgrade' },
+    { icon: Users,         label: 'Referral paid',          note: 'referral' },
   ]
 
   return (
@@ -27,7 +39,8 @@ export default function Points() {
       <header className="mb-5">
         <h1 className="font-display font-bold text-2xl text-navy">Chametu Points</h1>
         <p className="mt-1.5 text-ink-soft max-w-[60ch]">
-          Earn points on the actions that keep your chama healthy. Redeem for subscription credit and digital rewards.
+          Earn points on the actions that keep your chama healthy.
+          Redeem for subscription credit and digital rewards.
         </p>
       </header>
 
@@ -37,9 +50,13 @@ export default function Points() {
             <Coins size={18} strokeWidth={2} />
             <span>{tier} plan{isTrial ? ' · trial' : ''}</span>
           </div>
-          <div className="font-display font-extrabold text-4xl text-navy mt-2 mb-1.5">{balance.toLocaleString()}</div>
+          <div className="font-display font-extrabold text-4xl text-navy mt-2 mb-1.5">
+            {balance.toLocaleString()}
+          </div>
           <div className="text-[0.84rem] text-ink-soft">
-            points · worth <b className="text-forest">KSh {(balance / 10).toLocaleString()}</b> in subscription credit
+            points · worth <b className="text-forest">
+              KSh {(balance / 10).toLocaleString()}
+            </b> in subscription credit
           </div>
           <div className="text-[0.84rem] text-ink-soft mt-1">
             {redeemedThisYear.toLocaleString()} redeemed in {new Date().getFullYear()}
@@ -47,19 +64,27 @@ export default function Points() {
         </div>
 
         <div className="bg-white border border-line rounded-2xl p-5">
-          <h3 className="font-display font-semibold text-navy text-[0.98rem] mb-2.5">Simulate an earning event</h3>
+          <h3 className="font-display font-semibold text-navy text-[0.98rem] mb-2.5">
+            Simulate an earning event
+          </h3>
           <div className="flex flex-col gap-2">
             {actions.map((a) => (
               <button
                 key={a.label}
-                onClick={a.run}
-                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white text-left text-sm font-medium text-navy hover:border-forest transition"
+                onClick={a.note === 'upgrade' ? handleUpgrade : undefined}
+                disabled={a.note !== 'upgrade'}
+                className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-line bg-white text-left text-sm font-medium text-navy hover:border-forest transition disabled:opacity-50 disabled:cursor-not-allowed"
+                title={a.note !== 'upgrade' ? 'Triggered by real finance events' : ''}
               >
                 <a.icon size={14} strokeWidth={2} className="text-forest" />
                 {a.label}
               </button>
             ))}
           </div>
+          <p className="mt-2 text-[0.72rem] text-ink-soft">
+            Points are granted server-side when the matching finance event
+            commits. Only tier upgrades can be triggered manually.
+          </p>
         </div>
       </div>
 
@@ -82,16 +107,25 @@ export default function Points() {
             <tbody>
               {state.ledger.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-ink-soft">No activity yet. Fire an event above.</td>
+                  <td colSpan={4} className="px-4 py-10 text-center text-ink-soft">
+                    No activity yet.
+                  </td>
                 </tr>
               ) : (
-                state.ledger.map((l, i) => (
-                  <tr key={i} className="hover:bg-forest/[0.03]">
+                state.ledger.map((l) => (
+                  <tr key={l.id} className="hover:bg-forest/[0.03]">
                     <td className="px-4 py-3 border-b border-line">
-                      {new Date(l.t).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(l.t).toLocaleDateString('en-KE', {
+                        day: 'numeric', month: 'short', year: 'numeric',
+                      })}
                     </td>
-                    <td className="px-4 py-3 border-b border-line font-mono text-[0.82rem] text-ink-soft">{l.ev}</td>
-                    <td className={`px-4 py-3 border-b border-line font-semibold ${l.pts > 0 ? 'text-forest' : l.pts < 0 ? 'text-red-600' : 'text-ink-soft'}`}>
+                    <td className="px-4 py-3 border-b border-line font-mono text-[0.82rem] text-ink-soft">
+                      {l.ev}
+                    </td>
+                    <td className={`px-4 py-3 border-b border-line font-semibold ${
+                      l.pts > 0 ? 'text-forest'
+                      : l.pts < 0 ? 'text-red-600' : 'text-ink-soft'
+                    }`}>
                       {l.pts > 0 ? '+' : ''}{l.pts}
                     </td>
                     <td className="px-4 py-3 border-b border-line text-ink-soft">{l.note}</td>

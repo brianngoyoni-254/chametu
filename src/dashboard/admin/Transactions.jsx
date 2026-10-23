@@ -1,49 +1,62 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Plus, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { ledgerApi } from '../../lib/ledgerApi'
 
-const INITIAL = [
-  { date: 'Sep 24', desc: 'Contribution — Jane W.', debit: 0, credit: 5000 },
-  { date: 'Sep 23', desc: 'Loan repayment — David O.', debit: 0, credit: 9167 },
-  { date: 'Sep 22', desc: 'Expense — meeting venue', debit: 2000, credit: 0 },
-  { date: 'Sep 20', desc: 'Loan disbursed — Mary N.', debit: 40000, credit: 0 },
-  { date: 'Sep 18', desc: 'Investment income — MMF', debit: 0, credit: 12400 },
-  { date: 'Sep 12', desc: 'Contribution — Kevin M.', debit: 0, credit: 5000 },
-]
-const OPENING_BALANCE = 1415333
+const fmt = (n) => Number(n).toLocaleString('en-KE')
 
-function fmt(n) {
-  return n.toLocaleString('en-KE')
-}
-
-function withBalances(rows) {
-  // rows are newest-first; compute balance walking backward from the opening balance
-  let balance = OPENING_BALANCE
-  const reversed = [...rows].reverse().map((r) => {
-    balance = balance + r.credit - r.debit
-    return { ...r, balance }
-  })
-  return reversed.reverse()
+const TYPE_LABEL = {
+  contribution: 'Contribution',
+  loan_disbursement: 'Loan disbursed',
+  loan_repayment: 'Loan repayment',
+  credit: 'Money in',
+  debit: 'Money out',
 }
 
 export default function Transactions() {
-  const [rows, setRows] = useState(INITIAL)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ desc: '', type: 'credit', amount: '' })
 
-  const withBal = withBalances(rows)
+  const refresh = async () => {
+    setLoading(true)
+    try {
+      const data = await ledgerApi.getTransactions()
+      setRows(data)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  function addTransaction(e) {
+  useEffect(() => { refresh() }, [])
+
+  const add = async (e) => {
     e.preventDefault()
     const amount = Number(form.amount)
-    if (!form.desc.trim() || !amount || amount <= 0) return
-    const today = new Date()
-    const label = today.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    setRows((r) => [
-      { date: label, desc: form.desc.trim(), debit: form.type === 'debit' ? amount : 0, credit: form.type === 'credit' ? amount : 0 },
-      ...r,
-    ])
-    setForm({ desc: '', type: 'credit', amount: '' })
-    setOpen(false)
+    if (!form.desc.trim() || !amount || amount <= 0) {
+      toast.error('Enter a description and a positive amount')
+      return
+    }
+    setBusy(true)
+    try {
+      await ledgerApi.addTransaction({
+        kind: form.type,
+        description: form.desc.trim(),
+        amount,
+      })
+      toast.success('Transaction added')
+      setForm({ desc: '', type: 'credit', amount: '' })
+      setOpen(false)
+      refresh()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -62,7 +75,7 @@ export default function Transactions() {
       </div>
 
       {open && (
-        <form onSubmit={addTransaction} className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white p-4.5">
+        <form onSubmit={add} className="flex flex-wrap items-end gap-3 rounded-xl border border-line bg-white p-4.5">
           <label className="flex-1 min-w-50 text-xs font-semibold text-ink">
             Description
             <input
@@ -93,35 +106,43 @@ export default function Transactions() {
               className="mt-1.5 block w-32 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-forest"
             />
           </label>
-          <button type="submit" className="rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white">
-            Save
+          <button type="submit" disabled={busy} className="rounded-lg bg-forest px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+            {busy ? 'Saving…' : 'Save'}
           </button>
         </form>
       )}
 
       <div className="overflow-x-auto rounded-xl border border-line bg-white p-5">
-        <table className="w-full min-w-135 text-sm">
-          <thead>
-            <tr className="border-b border-line text-left text-xs text-ink-soft">
-              <th className="py-2">Date</th>
-              <th className="py-2">Description</th>
-              <th className="py-2">Debit</th>
-              <th className="py-2">Credit</th>
-              <th className="py-2">Balance</th>
-            </tr>
-          </thead>
-          <tbody>
-            {withBal.map((r, i) => (
-              <tr key={i} className="border-b border-line last:border-none">
-                <td className="py-2.5">{r.date}</td>
-                <td className="py-2.5">{r.desc}</td>
-                <td className="py-2.5 font-mono">{r.debit ? fmt(r.debit) : '—'}</td>
-                <td className="py-2.5 font-mono">{r.credit ? fmt(r.credit) : '—'}</td>
-                <td className="py-2.5 font-mono font-semibold text-navy">{fmt(r.balance)}</td>
+        {loading ? (
+          <div className="py-12 text-center"><Loader2 className="mx-auto animate-spin text-forest" size={22} /></div>
+        ) : rows.length === 0 ? (
+          <div className="py-12 text-center text-ink-soft text-sm">No transactions yet.</div>
+        ) : (
+          <table className="w-full min-w-135 text-sm">
+            <thead>
+              <tr className="border-b border-line text-left text-xs text-ink-soft">
+                <th className="py-2">Date</th>
+                <th className="py-2">Type</th>
+                <th className="py-2">Reference</th>
+                <th className="py-2">Amount</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-line last:border-none">
+                  <td className="py-2.5 text-ink-soft">
+                    {new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  </td>
+                  <td className="py-2.5">{TYPE_LABEL[r.type] || r.type}</td>
+                  <td className="py-2.5 text-ink-soft">{r.reference || '—'}</td>
+                  <td className={`py-2.5 font-mono ${r.type === 'debit' ? 'text-red-600' : 'text-forest'}`}>
+                    {r.type === 'debit' ? '−' : '+'}{fmt(r.amount)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   )

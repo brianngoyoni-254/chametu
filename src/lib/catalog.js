@@ -1,10 +1,40 @@
-export const CATALOG = [
-  { id: 'badge',     icon: 'BadgeCheck', pts: 100,  costKsh: 0,   name: 'Active Chama Badge',          desc: 'Shown on your group profile and monthly statements.' },
-  { id: 'tpl',       icon: 'FileText',   pts: 300,  costKsh: 0,   name: 'Template Pack',               desc: 'Constitution, minutes and loan-agreement templates.' },
-  { id: 'trial',     icon: 'Sparkles',   pts: 500,  costKsh: 0,   name: '7-Day Premium Trial',         desc: 'Unlock Silver features for 7 days.' },
-  { id: 'credit100', icon: 'Ticket',     pts: 1000, costKsh: 100, name: 'KSh 100 Subscription Credit', desc: 'Applied to your next invoice. Not cash.' },
-  { id: 'credit250', icon: 'Ticket',     pts: 2500, costKsh: 250, name: 'KSh 250 Subscription Credit', desc: 'Applied to your next invoice. Not cash.' },
-  { id: 'credit500', icon: 'Gift',       pts: 5000, costKsh: 500, name: 'KSh 500 Subscription Credit', desc: 'Equivalent to one free Bronze month.' },
-]
+// src/lib/catalog.js
+import { api } from './api'
 
-export const byId = (id) => CATALOG.find((c) => c.id === id)
+function token() {
+  return localStorage.getItem('auth_token')
+}
+
+export async function fetchCatalog() {
+  return api('/api/rewards/catalog', { token: token() })
+}
+
+export async function fetchTiers() {
+  return api('/api/rewards/tiers', { token: token() })
+}
+
+export async function fetchState() {
+  return api('/api/rewards/state', { token: token() })
+}
+
+export async function redeemReward(rewardId) {
+  return api('/api/rewards/redeem', {
+    method: 'POST', token: token(), body: { rewardId },
+  })
+}
+
+export async function setBaseTier(tier) {
+  return api('/api/rewards/tier/base', {
+    method: 'PUT', token: token(), body: { tier },
+  })
+}
+
+export async function startTrial() {
+  return api('/api/rewards/tier/trial', { method: 'POST', token: token() })
+}
+
+export async function upgradeTier(tier) {
+  return api('/api/rewards/tier/upgrade', {
+    method: 'POST', token: token(), body: { tier },
+  })
+}
