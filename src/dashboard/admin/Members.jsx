@@ -18,8 +18,6 @@ const FILTERS = [
   { key: 'inactive', label: 'Inactive' },
 ]
 
-const ROLES = ['Member', 'Chairman', 'Treasurer', 'Secretary']
-
 const STATUS_STYLE = {
   active:   'bg-emerald/10 text-forest',
   invited:  'bg-gold/15 text-[#8A6112]',
@@ -161,7 +159,7 @@ function RowMenu({ member, onAction }) {
   )
 }
 
-function ProfileModal({ member, open, onClose, onSave }) {
+function ProfileModal({ member, open, onClose, onSave, roleNames }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(null)
 
@@ -233,7 +231,7 @@ function ProfileModal({ member, open, onClose, onSave }) {
                 Role
                 <select value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })}
                   className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] outline-none focus:border-forest">
-                  {ROLES.map((r) => <option key={r}>{r}</option>)}
+                  {roleNames.map((r) => <option key={r}>{r}</option>)}
                 </select>
               </label>
             </>
@@ -281,7 +279,7 @@ function Field({ label, value, mono }) {
   )
 }
 
-function RoleModal({ member, open, onClose, onSave }) {
+function RoleModal({ member, open, onClose, onSave, roleNames }) {
   const [role, setRole] = useState('Member')
   useEffect(() => { if (open && member) setRole(member.role) }, [open, member])
   if (!open || !member) return null
@@ -296,7 +294,7 @@ function RoleModal({ member, open, onClose, onSave }) {
         <div className="px-5 py-4">
           <select value={role} onChange={(e) => setRole(e.target.value)}
             className="w-full px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] outline-none focus:border-forest">
-            {ROLES.map((r) => <option key={r}>{r}</option>)}
+            {roleNames.map((r) => <option key={r}>{r}</option>)}
           </select>
         </div>
         <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
@@ -330,7 +328,7 @@ function ConfirmDialog({ open, title, body, confirmLabel, danger, onClose, onCon
   )
 }
 
-function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo }) {
+function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo, roleNames }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState('Member')
@@ -400,7 +398,7 @@ function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo }
                   Role
                   <select value={role} onChange={(e) => setRole(e.target.value)} disabled={busy}
                     className="px-3.5 py-2.5 rounded-xl border border-line bg-white text-[0.92rem] outline-none focus:border-forest disabled:opacity-50">
-                    {ROLES.map((r) => <option key={r}>{r}</option>)}
+                    {roleNames.map((r) => <option key={r}>{r}</option>)}
                   </select>
                 </label>
                 {error && (
@@ -434,12 +432,18 @@ function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo }
 
 export default function Members() {
   const {
-    members, contributions, refetchMembers,
+    members, contributions, refetchMembers, roles,
     updateMember, removeMember, changeRole,
     inviteMember, recordContribution,
     isLoadingMembers,
   } = useChama()
   const { tier, config } = useTier()
+
+  // Dynamically derive roles from the backend context
+  const roleNames = useMemo(() => {
+    const names = (roles || []).map((r) => r.name)
+    return names.length > 0 ? names : ['Member', 'Chairman', 'Treasurer', 'Secretary']
+  }, [roles])
 
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
@@ -672,12 +676,14 @@ export default function Members() {
         existingEmails={existingEmails}
         atCap={atCap}
         capInfo={{ tier, maxMembers: config?.maxMembers || 10 }}
+        roleNames={roleNames}
       />
 
       <ProfileModal
         open={!!profileTarget}
         member={profileTarget}
         onClose={() => setProfileTarget(null)}
+        roleNames={roleNames}
         onSave={async (patch) => {
           const res = await updateMember(profileTarget.id, patch)
           if (res.ok) {
@@ -692,6 +698,7 @@ export default function Members() {
         open={!!roleTarget}
         member={roleTarget}
         onClose={() => setRoleTarget(null)}
+        roleNames={roleNames}
         onSave={async (role) => {
           const res = await changeRole(roleTarget.id, role)
           if (res.ok) {

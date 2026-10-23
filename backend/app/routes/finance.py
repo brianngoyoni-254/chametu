@@ -9,6 +9,7 @@ from app.models.finance import Transaction, Loan
 from app.models.chama import Member
 from app.models.user import User
 from app.logging_utils import log_writes
+from app.utils.decorators import require_permission # <-- NEW IMPORT
 
 finance_bp = Blueprint('finance', __name__)
 logger = logging.getLogger(__name__)
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 @finance_bp.route('/contribution', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Dynamic permission
 @log_writes(logger, 'finance.contribution')
 def record_contribution():
     claims = get_jwt()
@@ -75,6 +77,7 @@ def get_loans():
 
 @finance_bp.route('/loans/apply', methods=['POST'])
 @jwt_required()
+@require_permission('requestLoans') # NEW: Dynamic permission
 @log_writes(logger, 'loan.apply')
 def apply_loan():
     claims = get_jwt()
@@ -115,16 +118,12 @@ def apply_loan():
 
 @finance_bp.route('/loans/<loan_id>/status', methods=['PATCH'])
 @jwt_required()
+@require_permission('approveLoans') # NEW: Dynamic permission replaces hardcoded check
 @log_writes(logger, 'loan.status_change')
 def update_loan_status(loan_id):
     claims = get_jwt()
     chama_id = claims.get('chama_id')
-    role = claims.get('role')
     data = request.get_json() or {}
-
-    if role not in ['Chairman', 'Treasurer']:
-        logger.warning('loan status change denied for role=%s', role)
-        return jsonify({"message": "Unauthorized. Admin access required."}), 403
 
     loan = Loan.query.filter_by(id=loan_id, chama_id=chama_id).first()
     if not loan:
@@ -153,6 +152,7 @@ def update_loan_status(loan_id):
 
 @finance_bp.route('/loans/<loan_id>/repay', methods=['POST'])
 @jwt_required()
+@require_permission('makePayments') # NEW: Dynamic permission
 @log_writes(logger, 'loan.repay')
 def repay_loan(loan_id):
     chama_id = get_jwt().get('chama_id')

@@ -40,6 +40,7 @@ import Meetings from '../dashboard/admin/Meetings'
 import Voting from '../dashboard/admin/Voting'
 
 import Members from '../dashboard/admin/Members'
+import RolesPermissions from '../dashboard/admin/RolesPermissions'
 import Statements from '../dashboard/admin/Statements'
 import Reports from '../dashboard/admin/Reports'
 
@@ -121,7 +122,7 @@ export default function AppRoutes() {
           <Route path="/dashboard/voting" element={<Voting />} />
 
           <Route path="/dashboard/members" element={<Members />} />
-          <Route path="/dashboard/roles" element={<Soon title="Roles & Permissions" />} />
+          <Route path="/dashboard/roles" element={<RolesPermissions />} />
           <Route path="/dashboard/statements" element={<Statements />} />
           <Route path="/dashboard/reports" element={<Reports />} />
 

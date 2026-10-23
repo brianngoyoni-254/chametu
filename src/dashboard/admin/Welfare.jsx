@@ -3,6 +3,7 @@ import { Plus, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
 import { ledgerApi } from '../../lib/ledgerApi'
+import { api } from '../../lib/api' // NEW: Import centralized API
 
 const fmt = (n) => 'KSh ' + Number(n).toLocaleString('en-KE')
 
@@ -43,13 +44,11 @@ export default function Welfare() {
     }
     setBusy(true)
     try {
-      // Uses the existing chama route (unchanged)
-      const token = localStorage.getItem('auth_token')
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/chama/welfare/claim`, {
+      // NEW: Uses centralized API helper instead of raw fetch + localStorage
+      await api('/api/chama/welfare/claim', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount, reason: form.reason.trim() }),
-      }).then((r) => { if (!r.ok) throw new Error('Failed'); return r.json() })
+        body: { amount, reason: form.reason.trim() },
+      })
 
       toast.success('Claim submitted')
       setForm({ member_id: '', reason: '', amount: '' })

@@ -23,10 +23,10 @@ export default function Assets() {
   async function addAsset(e) {
     e.preventDefault()
     setBusy(true)
-    const token = localStorage.getItem('auth_token')
     try {
+      // Cleaned: No more localStorage token passing
       await api('/api/chama/assets', {
-        method: 'POST', token,
+        method: 'POST',
         body: { ...form, price: Number(form.price), ownership: Number(form.ownership), acquired: new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) }
       })
       toast.success('Asset added')

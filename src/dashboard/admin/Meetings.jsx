@@ -16,7 +16,8 @@ export default function Meetings() {
     e.preventDefault()
     setBusy(true)
     try {
-      await api('/api/chama/meetings', { method: 'POST', token: localStorage.getItem('auth_token'), body: form })
+      // Cleaned: No more localStorage token passing
+      await api('/api/chama/meetings', { method: 'POST', body: form })
       toast.success('Meeting scheduled')
       setOpen(false); setForm({ title: '', date: '', time: '', agenda: '', location: '' })
       refetchMembers()
@@ -25,7 +26,8 @@ export default function Meetings() {
 
   async function lock(id) {
     try {
-      await api(`/api/chama/meetings/${id}/lock`, { method: 'PATCH', token: localStorage.getItem('auth_token') })
+      // Cleaned: No more localStorage token passing
+      await api(`/api/chama/meetings/${id}/lock`, { method: 'PATCH' })
       toast.success('Minutes locked')
       refetchMembers()
     } catch (err) { toast.error(err.message) }

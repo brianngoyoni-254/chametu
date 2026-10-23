@@ -14,7 +14,8 @@ export default function Voting() {
   async function createProposal(e) {
     e.preventDefault()
     try {
-      await api('/api/chama/proposals', { method: 'POST', token: localStorage.getItem('auth_token'), body: form })
+      // Cleaned: No more localStorage token passing
+      await api('/api/chama/proposals', { method: 'POST', body: form })
       toast.success('Proposal created')
       setOpen(false); setForm({ title: '', amount: '', closes: '' })
       refetchMembers()

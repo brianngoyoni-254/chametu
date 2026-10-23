@@ -3,7 +3,6 @@ from app import db
 from datetime import datetime
 import uuid
 
-
 class Chama(db.Model):
     __tablename__ = 'chamas'
 
@@ -24,6 +23,30 @@ class Chama(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     members = db.relationship('Member', backref='chama', lazy=True)
+    roles = db.relationship('Role', backref='chama', lazy=True, cascade="all, delete-orphan")
+
+
+class Role(db.Model):
+    """
+    Dynamic roles for each chama. Permissions are stored as JSON.
+    System roles (Chairman, Treasurer, etc.) are seeded automatically 
+    and cannot be deleted.
+    """
+    __tablename__ = 'roles'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    chama_id = db.Column(db.String(36), db.ForeignKey('chamas.id'), nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.String(255), default='')
+    icon = db.Column(db.String(50), default='UserCog')
+    system = db.Column(db.Boolean, default=False)
+    
+    # Stores the exact structure frontend expects: {"manageMembers": true, "approveLoans": false, ...}
+    perms = db.Column(db.JSON, nullable=False, default=dict)
+
+    __table_args__ = (
+        db.UniqueConstraint('chama_id', 'name', name='_chama_role_name_uc'),
+    )
 
 
 class Member(db.Model):

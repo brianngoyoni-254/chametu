@@ -10,19 +10,14 @@ from app.models.chama import Member
 from app.models.finance import WelfareClaim
 from app.services import ledger_service as ls
 from app.logging_utils import log_writes
+from app.utils.decorators import require_permission # <-- NEW IMPORT
 
 ledger_bp = Blueprint('ledger', __name__)
 logger = logging.getLogger(__name__)
 
-ADMIN_ROLES = ['Chairman', 'Treasurer']
-
 
 def _cid():
     return get_jwt().get('chama_id')
-
-
-def _role():
-    return get_jwt().get('role')
 
 
 @ledger_bp.route('/savings', methods=['GET'])
@@ -39,10 +34,9 @@ def savings_list():
 
 @ledger_bp.route('/savings', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Dynamic permission
 @log_writes(logger, 'savings.record')
 def savings_add():
-    if _role() not in ADMIN_ROLES:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
 
     try:
@@ -70,10 +64,9 @@ def payments_list():
 
 @ledger_bp.route('/payments', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Dynamic permission
 @log_writes(logger, 'payment.ingest')
 def payments_add():
-    if _role() not in ADMIN_ROLES:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
 
     from app.models.ledger import Payment
@@ -93,10 +86,9 @@ def payments_add():
 
 @ledger_bp.route('/payments/<payment_id>/match', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Dynamic permission
 @log_writes(logger, 'payment.match')
 def payments_match(payment_id):
-    if _role() not in ADMIN_ROLES:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     member_id = data.get('member_id')
     if not member_id:
@@ -120,10 +112,9 @@ def transactions_list():
 
 @ledger_bp.route('/transactions', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Dynamic permission
 @log_writes(logger, 'transaction.create')
 def transactions_add():
-    if _role() not in ADMIN_ROLES:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     try:
         row = ls.add_manual_transaction(
@@ -149,10 +140,9 @@ def welfare_list():
 
 @ledger_bp.route('/welfare/<claim_id>/review', methods=['PATCH'])
 @jwt_required()
+@require_permission('manageMembers') # NEW: Only those who can manage members can approve funds (adjust if needed)
 @log_writes(logger, 'welfare.review')
 def welfare_review(claim_id):
-    if _role() not in ADMIN_ROLES:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     status = data.get('status')
     if status not in ('paid', 'rejected', 'pending'):

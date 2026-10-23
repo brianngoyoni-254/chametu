@@ -7,13 +7,14 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 
 from app import db
-from app.models.chama import Chama, Member
+from app.models.chama import Chama, Member, Role
 from app.models.finance import (
     WelfareClaim, Meeting, Proposal, MemberVote, Asset, Payout, PayoutOrder,
 )
 from app.models.invite import Invite
 from app.services import member_service, contribution_service
 from app.logging_utils import log_writes
+from app.utils.decorators import require_permission
 
 chama_bp = Blueprint('chama', __name__)
 logger = logging.getLogger(__name__)
@@ -25,6 +26,123 @@ def _cid():
 
 def _role():
     return get_jwt().get('role')
+
+
+# ============================ ROLES & PERMISSIONS ============================
+
+@chama_bp.route('/roles', methods=['GET'])
+@jwt_required()
+def list_roles():
+    cid = _cid()
+    roles = Role.query.filter_by(chama_id=cid).all()
+    
+    # Auto-seed default roles if the chama has none
+    if not roles:
+        empty_perms = {
+            'manageMembers': False, 'manageContrib': False, 'recordPayments': False,
+            'approveLoans': False, 'manageInvestments': False, 'manageMeetings': False,
+            'viewReports': False, 'editRoles': False, 'requestLoans': False,
+            'makePayments': False, 'raiseIssue': False, 'viewOwnData': False,
+        }
+        
+        defaults = [
+            {'name': 'Chairman', 'icon': 'Shield', 'system': True, 'description': 'Chairs meetings, approves loans and oversees the chama.',
+             'perms': {**empty_perms, 'manageMembers': True, 'manageContrib': True, 'recordPayments': True, 'approveLoans': True, 'manageInvestments': True, 'manageMeetings': True, 'viewReports': True, 'editRoles': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
+            
+            {'name': 'Treasurer', 'icon': 'Wallet', 'system': True, 'description': 'Handles contributions, disbursements and financial records.',
+             'perms': {**empty_perms, 'manageContrib': True, 'recordPayments': True, 'manageInvestments': True, 'viewReports': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
+            
+            {'name': 'Secretary', 'icon': 'FileText', 'system': True, 'description': 'Records minutes, manages members and documentation.',
+             'perms': {**empty_perms, 'manageMembers': True, 'manageMeetings': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
+            
+            {'name': 'Member', 'icon': 'User', 'system': True, 'description': 'Can view their own data, pay, request loans and raise issues.',
+             'perms': {**empty_perms, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
+        ]
+        for d in defaults:
+            r = Role(chama_id=cid, name=d['name'], icon=d['icon'], system=d['system'], description=d['description'], perms=d['perms'])
+            db.session.add(r)
+        db.session.commit()
+        roles = Role.query.filter_by(chama_id=cid).all()
+
+    return jsonify([{
+        'id': r.id, 'name': r.name, 'description': r.description,
+        'icon': r.icon, 'system': r.system, 'perms': r.perms
+    } for r in roles]), 200
+
+
+@chama_bp.route('/roles', methods=['POST'])
+@jwt_required()
+@log_writes(logger, 'chama.role_create')
+def create_role():
+    cid = _cid()
+    data = request.get_json() or {}
+    
+    if not data.get('name'):
+        return jsonify({'message': 'Role name is required'}), 400
+        
+    existing = Role.query.filter_by(chama_id=cid, name=data['name']).first()
+    if existing:
+        return jsonify({'message': 'Role name already exists'}), 400
+        
+    role = Role(
+        chama_id=cid, 
+        name=data['name'], 
+        description=data.get('description', ''),
+        icon=data.get('icon', 'UserCog'),
+        system=False, 
+        perms=data.get('perms', {})
+    )
+    db.session.add(role)
+    db.session.commit()
+    
+    return jsonify({
+        'id': role.id, 'name': role.name, 'description': role.description,
+        'icon': role.icon, 'system': role.system, 'perms': role.perms
+    }), 201
+
+
+@chama_bp.route('/roles/<role_id>', methods=['PUT'])
+@jwt_required()
+@log_writes(logger, 'chama.role_update')
+def update_role(role_id):
+    cid = _cid()
+    role = Role.query.filter_by(id=role_id, chama_id=cid).first()
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+        
+    data = request.get_json() or {}
+    
+    # System roles cannot have their name changed, but permissions can be updated
+    if 'name' in data and not role.system:
+        role.name = data['name']
+    if 'description' in data:
+        role.description = data['description']
+    if 'perms' in data:
+        role.perms = data['perms']
+        
+    db.session.commit()
+    
+    return jsonify({
+        'id': role.id, 'name': role.name, 'description': role.description,
+        'icon': role.icon, 'system': role.system, 'perms': role.perms
+    }), 200
+
+
+@chama_bp.route('/roles/<role_id>', methods=['DELETE'])
+@jwt_required()
+@log_writes(logger, 'chama.role_delete')
+def delete_role(role_id):
+    cid = _cid()
+    role = Role.query.filter_by(id=role_id, chama_id=cid).first()
+    if not role:
+        return jsonify({'message': 'Role not found'}), 404
+        
+    if role.system:
+        return jsonify({'message': 'Cannot delete default system roles'}), 400
+        
+    db.session.delete(role)
+    db.session.commit()
+    return jsonify({'message': 'Role deleted'}), 200
 
 
 # ============================ CHAMA ============================
@@ -79,10 +197,9 @@ def get_members():
 
 @chama_bp.route('/members/<member_id>', methods=['PUT', 'PATCH'])
 @jwt_required()
+@require_permission('manageMembers') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.update')
 def update_member(member_id):
-    if _role() not in ['Chairman', 'Treasurer']:
-        return jsonify({'message': 'Unauthorized'}), 403
     try:
         result = member_service.update_member(_cid(), member_id, request.get_json() or {})
     except ValueError as e:
@@ -92,10 +209,9 @@ def update_member(member_id):
 
 @chama_bp.route('/members/<member_id>', methods=['DELETE'])
 @jwt_required()
+@require_permission('manageMembers') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.deactivate')
 def delete_member(member_id):
-    if _role() != 'Chairman':
-        return jsonify({'message': 'Only Chairman can remove members'}), 403
     try:
         member_service.remove_member(_cid(), member_id)
     except ValueError as e:
@@ -105,10 +221,9 @@ def delete_member(member_id):
 
 @chama_bp.route('/members/<member_id>/role', methods=['PATCH'])
 @jwt_required()
+@require_permission('editRoles') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.role_change')
 def change_member_role(member_id):
-    if _role() != 'Chairman':
-        return jsonify({'message': 'Only Chairman can change roles'}), 403
     data = request.get_json() or {}
     try:
         result = member_service.change_role(_cid(), member_id, data.get('role'))
@@ -119,10 +234,9 @@ def change_member_role(member_id):
 
 @chama_bp.route('/members/<member_id>/contribution-override', methods=['PATCH'])
 @jwt_required()
+@require_permission('manageContrib') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.contribution_override')
 def set_member_override(member_id):
-    if _role() not in ['Chairman', 'Treasurer']:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     try:
         member = contribution_service.set_member_override(
@@ -146,10 +260,9 @@ def list_invites():
 
 @chama_bp.route('/invites', methods=['POST'])
 @jwt_required()
+@require_permission('manageMembers') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.invite_create')
 def create_invite():
-    if _role() not in ['Chairman', 'Treasurer', 'Secretary']:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     contact = (data.get('contact') or '').strip()
     if not contact:
@@ -168,10 +281,9 @@ def create_invite():
 
 @chama_bp.route('/invites/<invite_id>', methods=['DELETE'])
 @jwt_required()
+@require_permission('manageMembers') # NEW: Using dynamic permission!
 @log_writes(logger, 'member.invite_cancel')
 def cancel_invite(invite_id):
-    if _role() not in ['Chairman', 'Treasurer', 'Secretary']:
-        return jsonify({'message': 'Unauthorized'}), 403
     try:
         member_service.cancel_invite(_cid(), invite_id)
     except ValueError as e:
@@ -189,10 +301,9 @@ def list_contributions():
 
 @chama_bp.route('/contributions', methods=['POST'])
 @jwt_required()
+@require_permission('recordPayments') # NEW: Using dynamic permission!
 @log_writes(logger, 'contribution.record')
 def record_contribution():
-    if _role() not in ['Chairman', 'Treasurer']:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     try:
         row = contribution_service.record_contribution(
@@ -211,10 +322,9 @@ def record_contribution():
 
 @chama_bp.route('/contributions/schedule', methods=['PUT'])
 @jwt_required()
+@require_permission('manageContrib') # NEW: Using dynamic permission!
 @log_writes(logger, 'contribution.schedule')
 def set_contribution_schedule():
-    if _role() not in ['Chairman', 'Treasurer']:
-        return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     try:
         chama = contribution_service.set_schedule(
@@ -300,9 +410,10 @@ def get_shared_data():
 
 
 # ============================ ASSETS / MEETINGS / PROPOSALS / WELFARE / PAYOUTS ============================
-# ... (unchanged from your existing file — copy the remaining routes below)
+
 @chama_bp.route('/assets', methods=['POST'])
 @jwt_required()
+@require_permission('manageInvestments')
 @log_writes(logger, 'asset.create')
 def add_asset():
     d = request.get_json() or {}
@@ -316,6 +427,7 @@ def add_asset():
 
 @chama_bp.route('/assets/<id>', methods=['PATCH'])
 @jwt_required()
+@require_permission('manageInvestments')
 @log_writes(logger, 'asset.update')
 def update_asset(id):
     a = Asset.query.filter_by(id=id, chama_id=_cid()).first()
@@ -330,6 +442,7 @@ def update_asset(id):
 
 @chama_bp.route('/meetings', methods=['POST'])
 @jwt_required()
+@require_permission('manageMeetings')
 @log_writes(logger, 'meeting.create')
 def add_meeting():
     d = request.get_json() or {}
@@ -342,6 +455,7 @@ def add_meeting():
 
 @chama_bp.route('/meetings/<id>/lock', methods=['PATCH'])
 @jwt_required()
+@require_permission('manageMeetings')
 @log_writes(logger, 'meeting.lock')
 def lock_meeting(id):
     m = Meeting.query.filter_by(id=id, chama_id=_cid()).first()
@@ -354,6 +468,7 @@ def lock_meeting(id):
 
 @chama_bp.route('/proposals', methods=['POST'])
 @jwt_required()
+@require_permission('manageMeetings')
 @log_writes(logger, 'proposal.create')
 def add_proposal():
     d = request.get_json() or {}
@@ -365,6 +480,7 @@ def add_proposal():
 
 @chama_bp.route('/welfare/claim', methods=['POST'])
 @jwt_required()
+@require_permission('raiseIssue')
 @log_writes(logger, 'welfare.claim_create')
 def add_welfare_claim():
     uid = get_jwt_identity()
@@ -381,6 +497,7 @@ def add_welfare_claim():
 
 @chama_bp.route('/welfare/<id>/review', methods=['PATCH'])
 @jwt_required()
+@require_permission('manageMembers') # Or a dedicated approveWelfare permission
 @log_writes(logger, 'welfare.claim_review')
 def review_welfare(id):
     w = WelfareClaim.query.filter_by(id=id, chama_id=_cid()).first()
@@ -396,6 +513,7 @@ def review_welfare(id):
 
 @chama_bp.route('/payouts', methods=['POST'])
 @jwt_required()
+@require_permission('manageContrib')
 @log_writes(logger, 'payout.create')
 def record_payout():
     d = request.get_json() or {}
