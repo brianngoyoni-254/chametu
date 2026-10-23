@@ -1,9 +1,10 @@
 # app/__init__.py
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from flask_migrate import Migrate
+from werkzeug.exceptions import HTTPException
 
 from app.config import Config
 
@@ -70,13 +71,24 @@ def create_app(config_class=Config):
     def health():
         return jsonify({"status": "ok"}), 200
 
-    @app.errorhandler(404)
-    def not_found(_e):
-        return jsonify({"message": "Not found"}), 404
+    # ------------------------------------------------------------------
+    # Error handling
+    # A single catch-all that ALWAYS returns JSON. Because the response goes
+    # through Flask's normal after_request chain, flask-cors adds its headers,
+    # so a crash shows up in the browser as a real 500 (with the error text in
+    # dev) instead of a misleading CORS error.
+    # ------------------------------------------------------------------
+    @app.errorhandler(Exception)
+    def handle_any_error(e):
+        if isinstance(e, HTTPException):
+            message = "Not found" if e.code == 404 else (e.description or e.name)
+            return jsonify({"message": message}), e.code
 
-    @app.errorhandler(500)
-    def server_error(_e):
-        return jsonify({"message": "Internal server error"}), 500
+        app.logger.exception("Unhandled error on %s %s", request.method, request.path)
+        body = {"message": "Internal server error"}
+        if app.debug:
+            body["detail"] = f"{type(e).__name__}: {e}"
+        return jsonify(body), 500
 
     @jwt.unauthorized_loader
     def missing_token(reason):

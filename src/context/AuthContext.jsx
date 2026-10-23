@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
 const CHAMA_KEY = 'chama_data'
+const AUTH_CHANGED_EVENT = 'auth-changed'
 
 const AuthContext = createContext(null)
 
@@ -21,6 +22,11 @@ function readStoredUser() {
   } catch {
     return null
   }
+}
+
+// Lets other providers (e.g. PointsProvider) refetch after login/logout.
+function notifyAuthChanged() {
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
 }
 
 export function AuthProvider({ children }) {
@@ -54,6 +60,7 @@ export function AuthProvider({ children }) {
       }
 
       setUser(sessionUser)
+      notifyAuthChanged()
       return sessionUser
     } finally {
       setLoading(false)
@@ -87,6 +94,7 @@ export function AuthProvider({ children }) {
       }
 
       setUser(sessionUser)
+      notifyAuthChanged()
       return sessionUser
     } finally {
       setLoading(false)
@@ -145,6 +153,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('member_user')
     localStorage.removeItem('member_chama')
     setUser(null)
+    notifyAuthChanged()
   }
 
   const value = {
