@@ -1,8 +1,17 @@
 # run.py
+import logging
+import os
+
 from app import create_app
 
 app = create_app()
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    # host="0.0.0.0" so 127.0.0.1 AND localhost both reach it
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "5000"))
+    logger.info(
+        "Starting Chametu dev server on http://%s:%s (debug=%s)",
+        host, port, app.debug,
+    )
+    app.run(host=host, port=port, debug=True)

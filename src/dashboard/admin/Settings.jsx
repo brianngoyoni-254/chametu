@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   User, Bell, Building2, ShieldCheck, Save, Loader2, Camera,
   Mail, Smartphone, Lock, Globe, Check, AlertCircle,
-  BadgeCheck, Building, MapPin,
+  BadgeCheck, Building, MapPin, Target, TrendingUp, Calendar, Coins,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
@@ -28,14 +28,11 @@ const isValidPhone = (v) => {
   return !digits || /^0[17]\d{8}$/.test(digits)
 }
 
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
 function initials(name) {
   if (!name) return '?'
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase())
-    .join('')
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
 }
 
 export default function Settings() {
@@ -52,9 +49,7 @@ export default function Settings() {
     <div className="mx-auto max-w-[1100px] space-y-5">
       <div>
         <h1 className="font-display text-2xl font-bold text-navy">Settings</h1>
-        <p className="mt-1 text-sm text-ink-soft">
-          Manage your account, chama rules, and security.
-        </p>
+        <p className="mt-1 text-sm text-ink-soft">Manage your account, chama rules, and security.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[240px_1fr]">
@@ -64,9 +59,7 @@ export default function Settings() {
               key={t.key}
               onClick={() => switchTab(t.key)}
               className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-[0.85rem] font-semibold transition ${
-                tab === t.key
-                  ? 'bg-navy text-white shadow-sm'
-                  : 'text-navy/70 hover:bg-paper'
+                tab === t.key ? 'bg-navy text-white shadow-sm' : 'text-navy/70 hover:bg-paper'
               }`}
             >
               <t.icon size={16} /> {t.label}
@@ -86,7 +79,7 @@ export default function Settings() {
 }
 
 /* ==========================================================
-   PROFILE TAB — fixed + redesigned
+   PROFILE TAB
    ========================================================== */
 function ProfileTab() {
   const { user, refreshProfile, updateUser } = useAuth()
@@ -98,7 +91,6 @@ function ProfileTab() {
   const [hydrating, setHydrating] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  // 1) Hydrate from whatever we already have in AuthContext — instant, no spinner trap
   useEffect(() => {
     if (!user) return
     const seed = { name: user.name || '', phone: user.phone || '' }
@@ -107,7 +99,6 @@ function ProfileTab() {
     setHydrating(false)
   }, [user])
 
-  // 2) Then, in the background, quietly refresh from the backend (best effort)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
@@ -154,15 +145,11 @@ function ProfileTab() {
     }
   }
 
-  if (hydrating && !user) {
-    return <ProfileSkeleton />
-  }
+  if (hydrating && !user) return <ProfileSkeleton />
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_300px]">
-      {/* ---------- Main card ---------- */}
       <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-        {/* Gradient banner */}
         <div className="relative h-28 bg-gradient-to-br from-navy via-[#0A2A3E] to-forest">
           <div
             className="pointer-events-none absolute inset-0 opacity-30"
@@ -173,7 +160,6 @@ function ProfileTab() {
           />
         </div>
 
-        {/* Avatar + identity */}
         <div className="relative px-6 pb-6">
           <div className="-mt-10 flex items-end justify-between gap-4">
             <div className="relative">
@@ -204,14 +190,9 @@ function ProfileTab() {
             </p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSave} className="mt-6 space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Field
-                label="Full name"
-                icon={<User size={15} />}
-                error={touched.name && errors.name}
-              >
+              <Field label="Full name" icon={<User size={15} />} error={touched.name && errors.name}>
                 <input
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -222,11 +203,7 @@ function ProfileTab() {
                 />
               </Field>
 
-              <Field
-                label="Phone number"
-                icon={<Smartphone size={15} />}
-                error={touched.phone && errors.phone}
-              >
+              <Field label="Phone number" icon={<Smartphone size={15} />} error={touched.phone && errors.phone}>
                 <input
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
@@ -244,15 +221,10 @@ function ProfileTab() {
                 hint="Email is used to sign in and can't be changed here."
                 className="sm:col-span-2"
               >
-                <input
-                  value={user?.email || ''}
-                  disabled
-                  className={inputCls}
-                />
+                <input value={user?.email || ''} disabled className={inputCls} />
               </Field>
             </div>
 
-            {/* Footer */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
               <p className="text-[0.78rem] text-ink-soft">
                 {dirty ? (
@@ -269,10 +241,7 @@ function ProfileTab() {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    setForm(initial)
-                    setTouched({ name: false, phone: false })
-                  }}
+                  onClick={() => { setForm(initial); setTouched({ name: false, phone: false }) }}
                   disabled={!dirty || saving}
                   className="rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-navy transition hover:border-navy disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -292,43 +261,25 @@ function ProfileTab() {
         </div>
       </div>
 
-      {/* ---------- Side: account card ---------- */}
       <aside className="space-y-4">
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <h3 className="font-display text-sm font-bold text-navy">Account</h3>
           <dl className="mt-3 space-y-3 text-sm">
             <InfoRow icon={<Mail size={13} />} label="Email" value={user?.email || '—'} />
-            <InfoRow
-              icon={<ShieldCheck size={13} />}
-              label="Role"
-              value={user?.role || '—'}
-            />
-            <InfoRow
-              icon={<Building size={13} />}
-              label="Chama"
-              value={chama?.name || '—'}
-            />
-            <InfoRow
-              icon={<MapPin size={13} />}
-              label="Chama code"
-              value={chama?.code || '—'}
-              mono
-            />
+            <InfoRow icon={<ShieldCheck size={13} />} label="Role" value={user?.role || '—'} />
+            <InfoRow icon={<Building size={13} />} label="Chama" value={chama?.name || '—'} />
+            <InfoRow icon={<MapPin size={13} />} label="Chama code" value={chama?.code || '—'} mono />
           </dl>
         </div>
 
         <div className="rounded-2xl border border-dashed border-line bg-paper/40 p-4 text-[0.78rem] leading-relaxed text-ink-soft">
           <p className="font-semibold text-navy">Need to change your email?</p>
-          <p className="mt-1">
-            Contact your chairman — email changes affect login and chama records.
-          </p>
+          <p className="mt-1">Contact your chairman — email changes affect login and chama records.</p>
         </div>
       </aside>
     </div>
   )
 }
-
-/* ---------- small building blocks ---------- */
 
 function Field({ label, icon, error, hint, className = '', children }) {
   return (
@@ -393,7 +344,7 @@ function ProfileSkeleton() {
 }
 
 /* ==========================================================
-   CHAMA TAB (unchanged behaviour, minor polish)
+   CHAMA TAB — Target Profit + Contribution Schedule
    ========================================================== */
 function ChamaTab() {
   const [data, setData] = useState(null)
@@ -403,10 +354,23 @@ function ChamaTab() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await api('/api/settings/', {
-          token: localStorage.getItem('auth_token'),
+        const res = await api('/api/settings/', { token: localStorage.getItem('auth_token') })
+        const details = await api('/api/chama/details', { token: localStorage.getItem('auth_token') })
+        setData({
+          chama: {
+            ...res.chama,
+            monthly_contribution: details.monthly_contribution ?? 0,
+            contribution_frequency: details.contribution_frequency ?? 'monthly',
+            due_day: details.due_day ?? 30,
+            due_weekday: details.due_weekday ?? 1,
+          },
+          settings: {
+            ...res.settings,
+            monthlyProfitTarget: res.settings.monthlyProfitTarget ?? 0,
+            profitTargetBasis: res.settings.profitTargetBasis ?? 'savings',
+            profitTargetPeriod: res.settings.profitTargetPeriod ?? 'month',
+          },
         })
-        setData(res)
       } catch {
         toast.error('Failed to load chama settings')
       } finally {
@@ -420,6 +384,19 @@ function ChamaTab() {
     e.preventDefault()
     setSaving(true)
     try {
+      // 1. Chama details + schedule
+      await api('/api/chama/settings', {
+        method: 'PUT',
+        token: localStorage.getItem('auth_token'),
+        body: {
+          monthly_contribution: Number(data.chama.monthly_contribution || 0),
+          contribution_frequency: data.chama.contribution_frequency,
+          due_day: Number(data.chama.due_day || 30),
+          due_weekday: Number(data.chama.due_weekday ?? 1),
+        },
+      })
+
+      // 2. Workspace + target profit
       await api('/api/settings/', {
         method: 'PUT',
         token: localStorage.getItem('auth_token'),
@@ -433,6 +410,9 @@ function ChamaTab() {
           autoBlockDays: data.settings.autoBlockDays,
           paybill: data.settings.paybill,
           accountRef: data.settings.accountRef,
+          monthlyProfitTarget: Number(data.settings.monthlyProfitTarget || 0),
+          profitTargetBasis: data.settings.profitTargetBasis,
+          profitTargetPeriod: data.settings.profitTargetPeriod,
         },
       })
       toast.success('Chama settings saved')
@@ -443,11 +423,13 @@ function ChamaTab() {
     }
   }
 
-  if (loading || !data)
+  if (loading || !data) {
     return <div className="p-8 text-center text-ink-soft">Loading chama settings…</div>
+  }
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
+      {/* Chama details */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
           <Building2 size={18} className="text-forest" />
@@ -458,9 +440,7 @@ function ChamaTab() {
             <span className={labelCls}>Chama Name</span>
             <input
               value={data.chama.name}
-              onChange={(e) =>
-                setData({ ...data, chama: { ...data.chama, name: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, chama: { ...data.chama, name: e.target.value } })}
               className={inputCls}
             />
           </label>
@@ -468,15 +448,162 @@ function ChamaTab() {
             <span className={labelCls}>Location</span>
             <input
               value={data.chama.location || ''}
-              onChange={(e) =>
-                setData({ ...data, chama: { ...data.chama, location: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, chama: { ...data.chama, location: e.target.value } })}
               className={inputCls}
             />
           </label>
         </div>
       </div>
 
+      {/* ---------- Contribution Schedule ---------- */}
+      <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center gap-2">
+          <Coins size={18} className="text-forest" />
+          <h2 className="font-display text-lg font-bold text-navy">Contribution Schedule</h2>
+        </div>
+        <p className="mb-4 text-[0.84rem] leading-relaxed text-ink-soft">
+          Set how much each active member contributes and how often. Individual members can be
+          overridden from the Contributions page if the group agrees on a different amount.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label>
+            <span className={labelCls}>Amount per member (KSh)</span>
+            <input
+              type="number" min="0" step="100"
+              value={data.chama.monthly_contribution}
+              onChange={(e) =>
+                setData({ ...data, chama: { ...data.chama, monthly_contribution: e.target.value } })
+              }
+              className={inputCls}
+            />
+          </label>
+
+          <label>
+            <span className={labelCls}>Frequency</span>
+            <select
+              value={data.chama.contribution_frequency}
+              onChange={(e) =>
+                setData({ ...data, chama: { ...data.chama, contribution_frequency: e.target.value } })
+              }
+              className={inputCls}
+            >
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+            </select>
+          </label>
+
+          {data.chama.contribution_frequency === 'weekly' ? (
+            <label>
+              <span className={labelCls}>Due every</span>
+              <select
+                value={data.chama.due_weekday}
+                onChange={(e) =>
+                  setData({ ...data, chama: { ...data.chama, due_weekday: Number(e.target.value) } })
+                }
+                className={inputCls}
+              >
+                {WEEKDAYS.map((d, i) => <option key={d} value={i}>{d}</option>)}
+              </select>
+            </label>
+          ) : (
+            <label>
+              <span className={labelCls}>
+                Due day of {data.chama.contribution_frequency === 'quarterly' ? 'the last month in the quarter' : 'the month'}
+              </span>
+              <input
+                type="number" min="1" max="31"
+                value={data.chama.due_day}
+                onChange={(e) =>
+                  setData({ ...data, chama: { ...data.chama, due_day: e.target.value } })
+                }
+                className={inputCls}
+              />
+            </label>
+          )}
+        </div>
+
+        <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-3.5 py-3 text-[0.82rem] text-navy ring-1 ring-emerald/10">
+          <Calendar size={14} className="mt-0.5 shrink-0 text-forest" />
+          <span>
+            Members are expected to contribute{' '}
+            <b>KSh {Number(data.chama.monthly_contribution || 0).toLocaleString()}</b>{' '}
+            <b>{data.chama.contribution_frequency}</b>. Contributions in the current period
+            are visible on the Contributions page and update automatically as deposits land.
+          </span>
+        </div>
+      </div>
+
+      {/* ---------- Target profit ---------- */}
+      <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Target size={18} className="text-forest" />
+            <h2 className="font-display text-lg font-bold text-navy">Target Profit</h2>
+          </div>
+          <span className="rounded-full bg-emerald/10 px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-wider text-forest">
+            Tracked on Savings
+          </span>
+        </div>
+
+        <p className="mb-4 text-[0.84rem] leading-relaxed text-ink-soft">
+          Set a monthly net-movement goal for the chama. Savings shows progress toward this
+          based on real deposits minus withdrawals. Leave at zero to disable.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <label>
+            <span className={labelCls}>Monthly target (KSh)</span>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-soft">
+                KSh
+              </span>
+              <input
+                type="number" min="0" step="100"
+                value={data.settings.monthlyProfitTarget}
+                onChange={(e) =>
+                  setData({
+                    ...data,
+                    settings: { ...data.settings, monthlyProfitTarget: e.target.value },
+                  })
+                }
+                className={`${inputCls} pl-12`}
+                placeholder="0"
+              />
+            </div>
+          </label>
+          <label>
+            <span className={labelCls}>Based on</span>
+            <select
+              value={data.settings.profitTargetBasis}
+              onChange={(e) =>
+                setData({ ...data, settings: { ...data.settings, profitTargetBasis: e.target.value } })
+              }
+              className={inputCls}
+            >
+              <option value="savings">Savings net movement</option>
+              <option value="contributions">Contributions collected</option>
+            </select>
+          </label>
+          <label>
+            <span className={labelCls}>Period</span>
+            <select
+              value={data.settings.profitTargetPeriod}
+              onChange={(e) =>
+                setData({ ...data, settings: { ...data.settings, profitTargetPeriod: e.target.value } })
+              }
+              className={inputCls}
+            >
+              <option value="month">Monthly</option>
+              <option value="quarter">Quarterly</option>
+              <option value="year">Annual</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      {/* Workspace */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
           <Globe size={18} className="text-forest" />
@@ -519,6 +646,7 @@ function ChamaTab() {
         </div>
       </div>
 
+      {/* Enforcement */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
           <ShieldCheck size={18} className="text-forest" />
@@ -550,6 +678,7 @@ function ChamaTab() {
         </div>
       </div>
 
+      {/* M-Pesa */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
           <Smartphone size={18} className="text-forest" />
@@ -594,7 +723,7 @@ function ChamaTab() {
 }
 
 /* ==========================================================
-   SECURITY TAB (unchanged)
+   SECURITY TAB
    ========================================================== */
 function SecurityTab() {
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
@@ -608,7 +737,6 @@ function SecurityTab() {
     if (form.newPassword.length < 6) {
       return toast.error('Password must be at least 6 characters')
     }
-
     setSaving(true)
     try {
       await api('/api/auth/password', {
@@ -631,13 +759,11 @@ function SecurityTab() {
         <Lock size={18} className="text-forest" />
         <h2 className="font-display text-lg font-bold text-navy">Change Password</h2>
       </div>
-
       <form onSubmit={handleSave} className="max-w-md space-y-4">
         <label className="block">
           <span className={labelCls}>Current Password</span>
           <input
-            type="password"
-            required
+            type="password" required
             value={form.currentPassword}
             onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
             className={inputCls}
@@ -646,8 +772,7 @@ function SecurityTab() {
         <label className="block">
           <span className={labelCls}>New Password</span>
           <input
-            type="password"
-            required
+            type="password" required
             value={form.newPassword}
             onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
             className={inputCls}
@@ -656,18 +781,15 @@ function SecurityTab() {
         <label className="block">
           <span className={labelCls}>Confirm New Password</span>
           <input
-            type="password"
-            required
+            type="password" required
             value={form.confirmPassword}
             onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
             className={inputCls}
           />
         </label>
-
         <div className="pt-2">
           <button
-            type="submit"
-            disabled={saving}
+            type="submit" disabled={saving}
             className="flex items-center gap-2 rounded-xl bg-forest px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-dark disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
@@ -680,7 +802,7 @@ function SecurityTab() {
 }
 
 /* ==========================================================
-   NOTIFICATIONS TAB (unchanged)
+   NOTIFICATIONS TAB
    ========================================================== */
 function NotificationsTab() {
   const [enabled, setEnabled] = useState(true)
@@ -692,7 +814,6 @@ function NotificationsTab() {
         <Bell size={18} className="text-forest" />
         <h2 className="font-display text-lg font-bold text-navy">Notification Preferences</h2>
       </div>
-
       <div className="space-y-4">
         <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line p-4 transition hover:bg-paper/50">
           <div>
@@ -700,21 +821,18 @@ function NotificationsTab() {
             <div className="text-xs text-ink-soft">Show alerts in the notification bell.</div>
           </div>
           <input
-            type="checkbox"
-            checked={enabled}
+            type="checkbox" checked={enabled}
             onChange={(e) => setEnabled(e.target.checked)}
             className="h-5 w-5 rounded border-gray-300 accent-forest focus:ring-forest"
           />
         </label>
-
         <label className="flex cursor-pointer items-center justify-between rounded-xl border border-line p-4 transition hover:bg-paper/50">
           <div>
             <div className="text-sm font-semibold text-navy">Email Digests</div>
             <div className="text-xs text-ink-soft">Receive weekly summary emails.</div>
           </div>
           <input
-            type="checkbox"
-            checked={emailEnabled}
+            type="checkbox" checked={emailEnabled}
             onChange={(e) => setEmailEnabled(e.target.checked)}
             className="h-5 w-5 rounded border-gray-300 accent-forest focus:ring-forest"
           />

@@ -16,3 +16,15 @@ class Config:
 
     # Comma-separated extra origins for CORS (e.g. "https://app.chametu.co.ke")
     FRONTEND_ORIGINS = os.environ.get("FRONTEND_ORIGINS", "")
+
+    # ------------------------------------------------------------------
+    # Logging (read by app.logging_config)
+    # ------------------------------------------------------------------
+    # LOG_LEVEL: DEBUG | INFO | WARNING | ERROR  (default: DEBUG in dev, INFO in prod)
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "")
+    # LOG_FORMAT: '' (human) or 'json'
+    LOG_FORMAT = os.environ.get("LOG_FORMAT", "")
+    # LOG_FILE: optional path; if set, also writes rotating log file
+    LOG_FILE = os.environ.get("LOG_FILE", "")
+    # FLASK_ENV: 'development' | 'production' — drives format defaults
+    FLASK_ENV = os.environ.get("FLASK_ENV", "development")

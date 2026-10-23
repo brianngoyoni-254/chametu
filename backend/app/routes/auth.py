@@ -1,15 +1,20 @@
 # app/routes/auth.py
+import logging
+import random
+import string
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
     create_access_token, jwt_required, get_jwt_identity,
 )
+
 from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member, ChamaSettings
-import random
-import string
+from app.logging_utils import log_writes
 
 auth_bp = Blueprint("auth", __name__)
+logger = logging.getLogger(__name__)
 
 ADMIN_ROLES = ["Chairman", "Treasurer", "Secretary"]
 
@@ -24,9 +29,10 @@ def _portal_for(role: str) -> str:
 
 
 # ---------------------------------------------------------------------
-# REGISTER — creates User + Chama + Member(Chairman) in one shot
+# REGISTER
 # ---------------------------------------------------------------------
 @auth_bp.route("/register", methods=["POST"])
+@log_writes(logger, 'auth.register')
 def register():
     data = request.get_json(silent=True) or {}
 
@@ -39,21 +45,22 @@ def register():
     monthly = float(data.get("amount") or 1000)
 
     if not name or not email or len(password) < 8:
+        logger.warning('register validation failed: name=%r email=%r', name, email)
         return jsonify({"message": "Name, email and password (min 8 chars) are required"}), 400
 
     if User.query.filter_by(email=email).first():
+        logger.warning('register duplicate email: %s', email)
         return jsonify({"message": "An account with that email already exists"}), 409
 
     if phone and User.query.filter_by(phone=phone).first():
+        logger.warning('register duplicate phone: %s', phone)
         return jsonify({"message": "That phone number is already in use"}), 409
 
-    # 1. User
     user = User(name=name, email=email, phone=phone)
     user.set_password(password)
     db.session.add(user)
     db.session.flush()
 
-    # 2. Chama
     chama = Chama(
         name=chama_name,
         code=generate_chama_code(),
@@ -64,10 +71,8 @@ def register():
     db.session.add(chama)
     db.session.flush()
 
-    # 3. Default settings row
     db.session.add(ChamaSettings(chama_id=chama.id))
 
-    # 4. Membership as Chairman
     member = Member(
         user_id=user.id,
         chama_id=chama.id,
@@ -78,6 +83,11 @@ def register():
     )
     db.session.add(member)
     db.session.commit()
+
+    logger.info(
+        'registered user=%s chama=%s code=%s',
+        user.email, chama.name, chama.code,
+    )
 
     token = create_access_token(
         identity=user.id,
@@ -110,9 +120,10 @@ def register():
 
 
 # ---------------------------------------------------------------------
-# LOGIN — single endpoint that works for admin + member portals
+# LOGIN
 # ---------------------------------------------------------------------
 @auth_bp.route("/login", methods=["POST"])
+@log_writes(logger, 'auth.login')
 def login():
     data = request.get_json(silent=True) or {}
     email = (data.get("email") or "").lower().strip()
@@ -123,14 +134,18 @@ def login():
 
     user = User.query.filter_by(email=email).first()
     if not user or not user.check_password(password):
+        logger.warning('login failed for email=%s', email)
         return jsonify({"message": "Invalid email or password"}), 401
 
     member = Member.query.filter_by(user_id=user.id).first()
     if not member:
+        logger.warning('login: user %s has no membership', email)
         return jsonify({"message": "No chama membership found for this account"}), 404
 
     chama = Chama.query.get(member.chama_id)
     if not chama:
+        logger.error('login: user %s membership points to missing chama %s',
+                     email, member.chama_id)
         return jsonify({"message": "Chama not found"}), 404
 
     portal = _portal_for(member.role)
@@ -142,6 +157,11 @@ def login():
             "role": member.role,
             "portal": portal,
         },
+    )
+
+    logger.info(
+        'login ok: user=%s role=%s chama=%s',
+        user.email, member.role, chama.code,
     )
 
     return jsonify({
@@ -166,10 +186,11 @@ def login():
 
 
 # ---------------------------------------------------------------------
-# PROFILE / PASSWORD (already existed — kept)
+# PROFILE
 # ---------------------------------------------------------------------
 @auth_bp.route("/profile", methods=["PUT"])
 @jwt_required()
+@log_writes(logger, 'auth.profile_update')
 def update_profile():
     uid = get_jwt_identity()
     user = User.query.get(uid)
@@ -180,6 +201,7 @@ def update_profile():
 
     if "phone" in data and data["phone"] != user.phone:
         if data["phone"] and User.query.filter_by(phone=data["phone"]).first():
+            logger.warning('profile: phone already in use: %s', data["phone"])
             return jsonify({"message": "Phone number already in use"}), 400
 
     if "name" in data and data["name"]:
@@ -192,6 +214,7 @@ def update_profile():
         member.phone = user.phone
 
     db.session.commit()
+    logger.info('profile updated for %s', user.email)
     return jsonify({
         "message": "Profile updated",
         "user": {"name": user.name, "phone": user.phone},
@@ -200,6 +223,7 @@ def update_profile():
 
 @auth_bp.route("/password", methods=["PUT"])
 @jwt_required()
+@log_writes(logger, 'auth.password_change')
 def change_password():
     uid = get_jwt_identity()
     user = User.query.get(uid)
@@ -211,6 +235,7 @@ def change_password():
     new_pw = data.get("newPassword")
 
     if not user.check_password(current_pw):
+        logger.warning('password change: wrong current password for %s', user.email)
         return jsonify({"message": "Incorrect current password"}), 401
 
     if not new_pw or len(new_pw) < 6:
@@ -218,4 +243,5 @@ def change_password():
 
     user.set_password(new_pw)
     db.session.commit()
+    logger.info('password changed for %s', user.email)
     return jsonify({"message": "Password updated successfully"}), 200

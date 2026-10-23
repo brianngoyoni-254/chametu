@@ -1,10 +1,14 @@
 # app/services/rewards_service.py
+import logging
 from datetime import datetime, timedelta
+
 from app import db
 from app.models.rewards import (
     TierConfig, ChamaSubscription, Reward, PointLot,
     PointLedgerEntry, RewardRedemption,
 )
+
+logger = logging.getLogger(__name__)
 
 INACTIVITY_DAYS = 365
 POINT_LOT_DAYS = 365
@@ -28,6 +32,7 @@ def seed_tiers_if_empty():
             points_multiplier=mult, annual_redeem_cap=cap,
         ))
     db.session.commit()
+    logger.info('seeded tier configs: %s', [r[0] for r in rows])
 
 
 def seed_rewards_if_empty():
@@ -47,6 +52,7 @@ def seed_rewards_if_empty():
             points_cost=pts, cash_value_ksh=cash, sort_order=order,
         ))
     db.session.commit()
+    logger.info('seeded reward catalog: %s', [r[0] for r in rows])
 
 
 # ------------------------------------------------------------------ tiers
@@ -57,6 +63,7 @@ def get_or_create_subscription(chama_id, default_tier='Starter'):
     sub = ChamaSubscription(chama_id=chama_id, base_tier=default_tier)
     db.session.add(sub)
     db.session.commit()
+    logger.info('subscription created for chama=%s tier=%s', chama_id, default_tier)
     return sub
 
 
@@ -107,6 +114,8 @@ def sweep_expired(chama_id):
                 chama_id=chama_id, event='expiry', points=-total,
                 note=f'{INACTIVITY_DAYS} days inactive — all points expired',
             ))
+            logger.info('swept %s expired points for chama=%s (inactivity)',
+                        total, chama_id)
         db.session.commit()
         return
 
@@ -119,6 +128,7 @@ def sweep_expired(chama_id):
             chama_id=chama_id, event='expiry', points=-total,
             note='Batches older than 12 months expired',
         ))
+        logger.info('swept %s expired points for chama=%s', total, chama_id)
     db.session.commit()
 
 
@@ -128,6 +138,7 @@ def grant_points(chama_id, event, raw_amount, note, idempotency_key=None):
             idempotency_key=idempotency_key
         ).first()
         if exists:
+            logger.debug('grant skipped (duplicate): key=%s', idempotency_key)
             return {'granted': 0, 'balance': _balance(chama_id), 'duplicate': True}
 
     sub = get_or_create_subscription(chama_id)
@@ -149,6 +160,11 @@ def grant_points(chama_id, event, raw_amount, note, idempotency_key=None):
         idempotency_key=idempotency_key,
     ))
     db.session.commit()
+
+    logger.info(
+        'granted %s pts to chama=%s (event=%s, note=%r)',
+        final, chama_id, event, note,
+    )
     return {'granted': final, 'balance': _balance(chama_id), 'duplicate': False}
 
 
@@ -218,6 +234,11 @@ def redeem_reward(chama_id, reward_id):
         note=f'{reward.name} · {code}', reward_id=reward.id,
     ))
     db.session.commit()
+
+    logger.info(
+        'redeemed %s pts for %r (code=%s, chama=%s)',
+        reward.points_cost, reward.name, code, chama_id,
+    )
 
     return {
         'ok': True,

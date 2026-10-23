@@ -6,3 +6,4 @@ venv/
 instance/*.db
 instance/*.sqlite
 .pytest_cache/
+.tmp/
