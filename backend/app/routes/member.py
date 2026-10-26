@@ -1,14 +1,17 @@
+# app/routes/member.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
+
 from app.models.user import User
 from app.models.chama import Chama, Member
 from app.services.member_service import (
-    get_member_finance_data, 
-    accept_member_invite, 
-    verify_chama_invite
+    get_member_finance_data,
+    accept_member_invite,
+    verify_chama_invite,
 )
 
 member_bp = Blueprint('member', __name__)
+
 
 # ---------- LOGIN ----------
 @member_bp.route('/login', methods=['POST'])
@@ -27,7 +30,7 @@ def member_login():
 
     chama = Chama.query.get(member.chama_id)
     portal = "member" if member.role.lower() == "member" else "admin"
-    
+
     token = create_access_token(
         identity=user.id,
         additional_claims={
@@ -57,6 +60,7 @@ def member_login():
         },
     }), 200
 
+
 # ---------- VERIFY INVITE ----------
 @member_bp.route('/invites/<chama_code>/<token>', methods=['GET'])
 def verify_invite(chama_code, token):
@@ -66,11 +70,12 @@ def verify_invite(chama_code, token):
     except ValueError as e:
         return jsonify({"message": str(e)}), 400
 
+
 # ---------- ACCEPT INVITE ----------
 @member_bp.route('/accept-invite', methods=['POST'])
 def accept_invite():
     data = request.get_json() or {}
-    
+
     try:
         result = accept_member_invite(
             email=(data.get('email') or '').lower().strip(),
@@ -78,10 +83,10 @@ def accept_invite():
             password=data.get('password') or '',
             chama_code=data.get('chama_code') or '',
             role=data.get('role') or 'Member',
-            phone=data.get('phone')
+            phone=data.get('phone'),
+            token=data.get('token'),
         )
-        
-        # Generate token for the newly created user
+
         token = create_access_token(
             identity=result['user']['id'],
             additional_claims={
@@ -90,15 +95,16 @@ def accept_invite():
                 "portal": result['user']['portal'],
             },
         )
-        
+
         return jsonify({
             "token": token,
             "user": result['user'],
             "chama": result['chama'],
         }), 201
-        
+
     except ValueError as e:
         return jsonify({"message": str(e)}), 400
+
 
 # ---------- PROFILE ----------
 @member_bp.route('/me', methods=['GET'])
@@ -108,14 +114,14 @@ def me():
     user = User.query.get(user_id)
     if not user:
         return jsonify({"message": "User not found"}), 404
-        
+
     member = Member.query.filter_by(user_id=user_id).first()
     if not member:
         return jsonify({"message": "Membership not found"}), 404
-        
+
     chama = Chama.query.get(member.chama_id)
     portal = "member" if member.role.lower() == "member" else "admin"
-    
+
     return jsonify({
         "user": {
             "id": user.id, "name": user.name, "email": user.email,
@@ -131,14 +137,13 @@ def me():
         "savings": member.savings,
     }), 200
 
+
 # ---------- FINANCE ----------
 @member_bp.route('/finance', methods=['GET'])
 @jwt_required()
 def finance():
     user_id = get_jwt_identity()
     data = get_member_finance_data(user_id)
-    
     if not data:
         return jsonify({"message": "Membership not found"}), 404
-        
     return jsonify(data), 200

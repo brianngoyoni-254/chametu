@@ -1,16 +1,17 @@
 # app/services/member_service.py
 import logging
 import secrets
+import uuid
 from datetime import datetime, timedelta
 
-from flask import current_app # <-- NEW IMPORT
+from flask import current_app
 
 from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member
 from app.models.invite import Invite
 from app.models.contribution import MemberInvite
-from app.services.email_service import send_email # <-- NEW IMPORT
+from app.services.email_service import send_email
 
 logger = logging.getLogger(__name__)
 
@@ -105,8 +106,6 @@ def update_member(chama_id, member_id, patch):
     if 'status' in patch and patch['status'] in ('active', 'inactive', 'invited'):
         m.status = patch['status']
 
-    # Allow clearing or setting the per-member contribution override
-    # via the same update path (used by the Members page).
     if 'contributionOverride' in patch:
         raw = patch['contributionOverride']
         if raw is None or raw == '':
@@ -121,8 +120,10 @@ def update_member(chama_id, member_id, patch):
             m.contribution_override = v
 
     db.session.commit()
-    logger.info('member updated: chama=%s member=%s fields=%s',
-                chama_id, member_id, list(patch.keys()))
+    logger.info(
+        'member updated: chama=%s member=%s fields=%s',
+        chama_id, member_id, list(patch.keys()),
+    )
     return get_member(chama_id, member_id)
 
 
@@ -169,31 +170,30 @@ def list_invites(chama_id):
         .order_by(MemberInvite.created_at.desc())
         .all()
     )
-    
+
     now = datetime.utcnow()
     results = []
-    
+
     for i in rows:
-        # Dynamically flag expired invites so the frontend shows the correct button
         status = i.status
         if status == 'pending' and i.expires_at and now > i.expires_at:
             status = 'expired'
-            
+
         results.append({
             'id': i.id,
             'contact': i.contact,
             'role': i.role,
-            'status': status, # Now returns 'expired' if the 7 days have passed
+            'status': status,
             'token': i.token,
             'createdAt': i.created_at.isoformat(),
             'expiresAt': i.expires_at.isoformat() if i.expires_at else None,
         })
-        
+
     return results
 
 
 def create_invite(chama_id, contact, role='Member', invited_name=None,
-                 actor_user_id=None):
+                  actor_user_id=None):
     chama = Chama.query.get(chama_id)
     if not chama:
         raise ValueError('Chama not found')
@@ -211,8 +211,7 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     existing = MemberInvite.query.filter_by(
         chama_id=chama_id, contact=contact, status='pending',
     ).first()
-    
-    # Ensure existing invites that are expired aren't reused blindly
+
     now = datetime.utcnow()
     if existing and existing.expires_at and now > existing.expires_at:
         db.session.delete(existing)
@@ -254,37 +253,30 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
     ))
     db.session.commit()
 
-    # ------------------------------------------------------------------
-    # Send Email via Brevo if contact is an email address
-    # ------------------------------------------------------------------
     if '@' in contact:
         frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
         invite_link = f"{frontend_url}/join/{chama.code}/{token}"
         display_name = invited_name or contact.split('@')[0]
-        
+
         subject = f"Invitation to join {chama.name} on Chametu"
         html_content = f"""
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #0B1F33; padding: 20px;">
             <div style="text-align: center; margin-bottom: 20px;">
                 <h2 style="color: #0B7A5A; margin: 0; font-size: 24px;">Chametu</h2>
             </div>
-            
             <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 30px; text-align: center;">
                 <h3 style="margin-top: 0; color: #0B1F33; font-size: 20px;">You're Invited!</h3>
                 <p style="color: #475569; font-size: 15px; line-height: 1.6; margin-bottom: 24px;">
                     <b>{display_name}</b>, you have been invited to join <b>{chama.name}</b> as a <b>{role}</b>.
                 </p>
-                
                 <a href="{invite_link}" style="display: inline-block; background-color: #0B7A5A; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 15px;">
                     Join {chama.name}
                 </a>
-                
                 <p style="color: #64748B; font-size: 13px; margin-top: 24px;">
                     Or copy and paste this link into your browser:<br>
                     <a href="{invite_link}" style="color: #0B7A5A; word-break: break-all;">{invite_link}</a>
                 </p>
             </div>
-            
             <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #94A3B8;">
                 Sent by Chametu on behalf of {chama.name}.<br>
                 This invitation expires in 7 days.
@@ -292,7 +284,6 @@ def create_invite(chama_id, contact, role='Member', invited_name=None,
         </div>
         """
         send_email(contact, subject, html_content)
-    # ------------------------------------------------------------------
 
     logger.info(
         'invite created: chama=%s contact=%s role=%s actor=%s',
@@ -313,16 +304,14 @@ def cancel_invite(chama_id, invite_id):
     inv = MemberInvite.query.filter_by(id=invite_id, chama_id=chama_id).first()
     if not inv:
         raise ValueError('Invite not found')
-        
-    # Hard delete the legacy invite if it exists
+
     legacy = Invite.query.filter_by(token=inv.token).first()
     if legacy:
         db.session.delete(legacy)
-        
-    # Hard delete the main invite from the database
+
     db.session.delete(inv)
     db.session.commit()
-    
+
     logger.info('invite deleted: chama=%s invite=%s', chama_id, invite_id)
 
 
@@ -362,10 +351,29 @@ def get_member_finance_data(user_id):
 
 
 # ============================ INVITE ACCEPTANCE ============================
-def accept_member_invite(email, name, password, chama_code, role, phone=None):
+def accept_member_invite(email, name, password, chama_code, role,
+                         phone=None, token=None):
     chama = Chama.query.filter_by(code=chama_code).first()
     if not chama:
         raise ValueError('Invalid chama code')
+
+    invite = None
+    if token:
+        invite = MemberInvite.query.filter_by(
+            chama_id=chama.id, token=token, status='pending',
+        ).first()
+        if not invite:
+            raise ValueError('This invite link is invalid or already used')
+        if invite.expires_at and datetime.utcnow() > invite.expires_at:
+            raise ValueError('This invite has expired')
+
+    if (
+        invite
+        and invite.contact
+        and '@' in invite.contact
+        and invite.contact.lower() != email.lower()
+    ):
+        raise ValueError('This invite was sent to a different email address')
 
     user = User.query.filter_by(email=email).first()
     if user:
@@ -375,40 +383,57 @@ def accept_member_invite(email, name, password, chama_code, role, phone=None):
         if password:
             user.set_password(password)
     else:
-        user = User(name=name, email=email, phone=phone)
+        user = User(
+            id=str(uuid.uuid4()),
+            name=name,
+            email=email,
+            phone=phone,
+        )
         user.set_password(password)
         db.session.add(user)
         db.session.flush()
 
-    member = Member(user_id=user.id, chama_id=chama.id, role=role,
-                    status='active', savings=0.0)
+    # Explicit UUID — member.id is guaranteed non-None even before flush.
+    member = Member(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        chama_id=chama.id,
+        role=role,
+        status='active',
+        savings=0.0,
+        phone=phone,
+    )
     db.session.add(member)
+    db.session.flush()
 
-    legacy_invite = Invite.query.filter_by(
-        chama_id=chama.id, contact=email, status='pending',
-    ).first()
-    if legacy_invite:
-        legacy_invite.status = 'joined'
+    if invite:
+        invite.status = 'joined'
+        invite.joined_at = datetime.utcnow()
+        invite.joined_member_id = member.id
 
-    mi = MemberInvite.query.filter_by(
-        chama_id=chama.id, contact=email, status='pending',
+    legacy = Invite.query.filter_by(
+        chama_id=chama.id,
+        contact=(invite.contact if invite else email),
+        status='pending',
     ).first()
-    if mi:
-        mi.status = 'joined'
-        mi.joined_at = datetime.utcnow()
+    if legacy:
+        legacy.status = 'joined'
 
     db.session.commit()
 
     logger.info(
-        'invite accepted: chama=%s email=%s role=%s',
-        chama.code, email, role,
+        'invite accepted: chama=%s email=%s role=%s member_id=%s token_used=%s',
+        chama.code, email, role, member.id, bool(invite),
     )
 
     portal = 'member' if role.lower() == 'member' else 'admin'
     return {
         'user': {
-            'id': user.id, 'name': user.name, 'email': user.email,
-            'role': member.role, 'portal': portal,
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'role': member.role,
+            'portal': portal,
         },
         'chama': {'id': chama.id, 'name': chama.name, 'code': chama.code},
     }

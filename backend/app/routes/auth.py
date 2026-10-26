@@ -12,7 +12,7 @@ from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member, ChamaSettings
 from app.logging_utils import log_writes
-from app.services import member_service # <-- NEW IMPORT
+from app.services import member_service
 
 auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ def _portal_for(role: str) -> str:
 
 
 # ---------------------------------------------------------------------
-# INVITE VERIFICATION & ACCEPTANCE (NEW)
+# INVITE VERIFICATION & ACCEPTANCE
 # ---------------------------------------------------------------------
 @auth_bp.route("/invites/<chama_code>/<token>", methods=["GET"])
 def verify_invite(chama_code, token):
@@ -47,13 +47,14 @@ def verify_invite(chama_code, token):
 def accept_invite():
     """Creates a new user account from an invite and logs them in."""
     data = request.get_json() or {}
-    
+
     email = (data.get("email") or "").lower().strip()
     name = (data.get("name") or "").strip()
     password = data.get("password") or ""
     chama_code = data.get("chamaCode")
     role = data.get("role", "Member")
     phone = data.get("phone")
+    token = data.get("token")
 
     if not email or not name or len(password) < 6 or not chama_code:
         return jsonify({"message": "Name, email, password and chama code are required"}), 400
@@ -65,15 +66,15 @@ def accept_invite():
             password=password,
             chama_code=chama_code,
             role=role,
-            phone=phone
+            phone=phone,
+            token=token,
         )
     except ValueError as e:
         return jsonify({"message": str(e)}), 400
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to accept invite")
         return jsonify({"message": "An error occurred while creating the account"}), 500
 
-    # Generate a JWT token for immediate login
     portal = _portal_for(result['user']['role'])
     token = create_access_token(
         identity=result['user']['id'],
@@ -210,8 +211,10 @@ def login():
 
     chama = Chama.query.get(member.chama_id)
     if not chama:
-        logger.error('login: user %s membership points to missing chama %s',
-                     email, member.chama_id)
+        logger.error(
+            'login: user %s membership points to missing chama %s',
+            email, member.chama_id,
+        )
         return jsonify({"message": "Chama not found"}), 404
 
     portal = _portal_for(member.role)
