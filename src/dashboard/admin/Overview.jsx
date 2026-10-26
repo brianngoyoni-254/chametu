@@ -1,17 +1,28 @@
 // src/dashboard/admin/Overview.jsx
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  Wallet, Percent, ArrowLeftRight, TrendingUp,
-  ArrowRight, Users, PiggyBank, Target,
+  Wallet,
+  Percent,
+  ArrowLeftRight,
+  TrendingUp,
+  ArrowRight,
+  Users,
+  PiggyBank,
+  Target,
 } from 'lucide-react'
 import { useChama } from '../../context/ChamaContext'
+import { ledgerApi } from '../../lib/ledgerApi'
 
 const ksh = (n) => 'KSh ' + Math.round(n || 0).toLocaleString('en-KE')
 
 export default function Overview() {
   const { members, loans, chama, contributions, sharedData } = useChama()
 
-  const totalSavings = members.reduce((s, m) => s + Number(m.savings || 0), 0)
+  const totalSavings = members.reduce(
+    (s, m) => s + Number(m.savings || 0),
+    0,
+  )
   const activeMembers = members.filter((m) => m.status === 'active').length
   const outstandingLoans = loans
     .filter((l) => l.status === 'disbursed')
@@ -19,23 +30,27 @@ export default function Overview() {
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length
 
   const assetsValue = (sharedData?.assets || []).reduce(
-    (s, a) => s + Number(a.value || 0), 0,
+    (s, a) => s + Number(a.value || 0),
+    0,
   )
 
-  // Contributions this month (real)
   const monthCollected = Number(contributions?.totalCollected || 0)
   const monthExpected = Number(contributions?.totalExpected || 0)
   const contributionPct = contributions?.pct || 0
 
   const today = new Date().toLocaleDateString('en-KE', {
-    weekday: 'long', month: 'long', day: 'numeric',
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
   })
 
   return (
     <div className="mx-auto max-w-[1180px] space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
-          <h1 className="font-display text-2xl font-bold tracking-tight text-navy">Dashboard</h1>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-navy">
+            Dashboard
+          </h1>
           <p className="mt-1 text-sm text-ink-soft">
             {chama?.name || 'My Chama'} / {activeMembers} active members
           </p>
@@ -61,7 +76,11 @@ export default function Overview() {
           icon={Percent}
           tint="bg-emerald/10 text-emerald"
           value={ksh(monthCollected)}
-          sub={monthExpected > 0 ? `${contributionPct}% of ${ksh(monthExpected)}` : 'Nothing expected yet'}
+          sub={
+            monthExpected > 0
+              ? `${contributionPct}% of ${ksh(monthExpected)}`
+              : 'Nothing expected yet'
+          }
           subTone={monthExpected > 0 ? 'text-emerald' : 'text-ink-soft'}
         />
         <Stat
@@ -73,7 +92,9 @@ export default function Overview() {
           sub={
             pendingLoansCount > 0
               ? `${pendingLoansCount} pending approval`
-              : outstandingLoans > 0 ? 'No pending approvals' : 'No active loans'
+              : outstandingLoans > 0
+              ? 'No pending approvals'
+              : 'No active loans'
           }
           subTone={pendingLoansCount > 0 ? 'text-red-600' : 'text-ink-soft'}
         />
@@ -95,7 +116,9 @@ export default function Overview() {
               <Users size={18} />
             </span>
             <div>
-              <div className="font-display text-lg font-bold text-navy">{members.length}</div>
+              <div className="font-display text-lg font-bold text-navy">
+                {members.length}
+              </div>
               <div className="text-xs text-ink-soft">{activeMembers} active</div>
             </div>
           </div>
@@ -114,23 +137,21 @@ export default function Overview() {
 }
 
 function TargetRow() {
-  // Read from savings summary via a light fetch — avoids pulling the whole
-  // savings page into the context just for one number.
   const [summary, setSummary] = useState(null)
+
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/ledger/savings`,
-          { headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` } },
-        )
-        if (!res.ok) return
-        const data = await res.json()
+        const data = await ledgerApi.getSavings()
         if (!cancelled) setSummary(data.summary)
-      } catch {}
+      } catch {
+        // not logged in / not ready — silently ignore
+      }
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const target = summary?.monthlyProfitTarget || 0
@@ -152,7 +173,9 @@ function TargetRow() {
           <b className="font-mono text-navy">{ksh(net)}</b> of{' '}
           <b className="font-mono text-navy">{ksh(target)}</b>
         </span>
-        <b className={`font-mono ${progress >= 100 ? 'text-forest' : 'text-navy'}`}>{progress}%</b>
+        <b className={`font-mono ${progress >= 100 ? 'text-forest' : 'text-navy'}`}>
+          {progress}%
+        </b>
       </div>
       <div className="h-2 w-full overflow-hidden rounded-full bg-line">
         <div
@@ -170,7 +193,10 @@ function Card({ title, to, linkLabel = 'View all', children }) {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h3 className="font-display text-sm font-semibold text-navy">{title}</h3>
         {to && (
-          <Link to={to} className="flex items-center gap-1 text-xs font-semibold text-forest hover:underline">
+          <Link
+            to={to}
+            className="flex items-center gap-1 text-xs font-semibold text-forest hover:underline"
+          >
             {linkLabel} <ArrowRight size={12} />
           </Link>
         )}
@@ -192,10 +218,10 @@ function Stat({ to, label, value, sub, subTone, icon: Icon, tint }) {
           <Icon size={16} />
         </span>
       </div>
-      <div className="mt-3 font-display text-2xl font-bold tracking-tight text-navy">{value}</div>
+      <div className="mt-3 font-display text-2xl font-bold tracking-tight text-navy">
+        {value}
+      </div>
       <div className={`mt-1.5 text-xs font-semibold ${subTone}`}>{sub}</div>
     </Link>
   )
 }
-
-import { useEffect, useState } from 'react'

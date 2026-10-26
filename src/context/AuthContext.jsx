@@ -4,11 +4,9 @@ import { api } from '../lib/api'
 
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
-const CHAMA_KEY = 'chama_data'
 const AUTH_CHANGED_EVENT = 'auth-changed'
 
 const AuthContext = createContext(null)
-
 const ADMIN_ROLES = ['Chairman', 'Treasurer', 'Secretary']
 
 export function portalForRole(role) {
@@ -24,7 +22,6 @@ function readStoredUser() {
   }
 }
 
-// Lets other providers (e.g. PointsProvider) refetch after login/logout.
 function notifyAuthChanged() {
   window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
 }
@@ -33,7 +30,6 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(readStoredUser)
   const [loading, setLoading] = useState(false)
 
-  // Persist user to storage whenever it changes (single source of truth).
   useEffect(() => {
     try {
       if (user) localStorage.setItem(USER_KEY, JSON.stringify(user))
@@ -44,21 +40,13 @@ export function AuthProvider({ children }) {
   const login = async ({ email, password }) => {
     setLoading(true)
     try {
-      const data = await api('/api/auth/login', {
-        method: 'POST',
-        body: { email, password },
-      })
-
+      const data = await api('/api/auth/login', { method: 'POST', body: { email, password } })
       const sessionUser = {
         ...data.user,
         portal: data.user.portal || portalForRole(data.user.role),
       }
-
       localStorage.setItem(TOKEN_KEY, data.token)
-      if (data.chama) {
-        localStorage.setItem(CHAMA_KEY, JSON.stringify(data.chama))
-      }
-
+      // NOTE: do NOT persist chama in localStorage — ChamaContext fetches it.
       setUser(sessionUser)
       notifyAuthChanged()
       return sessionUser
@@ -73,26 +61,17 @@ export function AuthProvider({ children }) {
       const data = await api('/api/auth/register', {
         method: 'POST',
         body: {
-          name,
-          email,
-          password,
-          phone,
+          name, email, password, phone,
           chama_name: chamaName,
           tier: tier || 'Starter',
           amount: 1000,
         },
       })
-
       const sessionUser = {
         ...data.user,
         portal: data.user.portal || portalForRole(data.user.role),
       }
-
       localStorage.setItem(TOKEN_KEY, data.token)
-      if (data.chama) {
-        localStorage.setItem(CHAMA_KEY, JSON.stringify(data.chama))
-      }
-
       setUser(sessionUser)
       notifyAuthChanged()
       return sessionUser
@@ -101,14 +80,9 @@ export function AuthProvider({ children }) {
     }
   }
 
-  /**
-   * Re-fetch the current user from the backend and merge it in.
-   * Returns the fresh user or null if the session is invalid.
-   */
   const refreshProfile = async () => {
     const token = localStorage.getItem(TOKEN_KEY)
     if (!token) return null
-
     try {
       const data = await api('/api/member/me', { token })
       const fresh = {
@@ -118,40 +92,30 @@ export function AuthProvider({ children }) {
         email: data.user?.email ?? user?.email,
         phone: data.user?.phone ?? user?.phone,
         role: data.user?.role ?? user?.role,
-        portal:
-          data.user?.portal ||
-          user?.portal ||
-          portalForRole(data.user?.role ?? user?.role),
+        portal: data.user?.portal || user?.portal || portalForRole(data.user?.role ?? user?.role),
       }
       setUser(fresh)
-      if (data.chama) {
-        localStorage.setItem(CHAMA_KEY, JSON.stringify(data.chama))
-      }
       return fresh
     } catch {
       return null
     }
   }
 
-  /** Merge partial fields into the current user (used after a successful save). */
   const updateUser = (patch) => {
     setUser((prev) => {
       if (!prev) return prev
       const next = { ...prev, ...patch }
-      try {
-        localStorage.setItem(USER_KEY, JSON.stringify(next))
-      } catch {}
+      try { localStorage.setItem(USER_KEY, JSON.stringify(next)) } catch {}
       return next
     })
   }
 
   const logout = () => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(CHAMA_KEY)
-    localStorage.removeItem('member_token')
-    localStorage.removeItem('member_user')
-    localStorage.removeItem('member_chama')
+    // Clear everything auth-related, including the old chama cache key
+    // so users upgrading to this version don't keep stale data around.
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith('auth_') || k.startsWith('chama_') || k.startsWith('member_'))
+      .forEach((k) => localStorage.removeItem(k))
     setUser(null)
     notifyAuthChanged()
   }
