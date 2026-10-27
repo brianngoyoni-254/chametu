@@ -1,13 +1,20 @@
-import { useState } from 'react'
-import { Smartphone, Check, Clock, Info } from 'lucide-react'
-import {
-  getMemberSession,
-  getMemberChama,
-  getMemberFinance,
-} from '../lib/chametuStorage'
+// src/member/MemberContributions.jsx
+import { Smartphone, Check, Clock, Info, Loader2 } from 'lucide-react'
+import { useMember } from '../context/MemberContext'
 
 function fmt(n) {
-  return 'KSh ' + Math.round(n).toLocaleString('en-KE')
+  return 'KSh ' + Math.round(Number(n) || 0).toLocaleString('en-KE')
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
 }
 
 const badge = {
@@ -17,46 +24,21 @@ const badge = {
 }
 const label = { done: 'Paid', pending: 'Pending', overdue: 'Overdue' }
 
-const HISTORY = [
-  { month: 'August 2026', amount: 5000, status: 'done' },
-  { month: 'July 2026', amount: 5000, status: 'done' },
-  { month: 'June 2026', amount: 5000, status: 'done' },
-]
-
 export default function MemberContributions() {
-  const session = getMemberSession()
-  const chama = getMemberChama(session)
-  const [finance, setFinance] = useState(getMemberFinance(session))
-  const [paying, setPaying] = useState(false)
-  const [paid, setPaid] = useState(finance.contributions.status === 'done')
+  const { chama, contributions, isLoading } = useMember()
 
-  const pct = Math.min(
-    100,
-    Math.round((finance.contributions.paid / finance.contributions.expected) * 100)
-  )
-
-  function payNow() {
-    setPaying(true)
-    setTimeout(() => {
-      setFinance((f) => ({
-        ...f,
-        contributions: {
-          ...f.contributions,
-          paid: f.contributions.expected,
-          status: 'done',
-        },
-      }))
-      setPaid(true)
-      setPaying(false)
-    }, 1200)
-  }
+  const expected = Number(chama?.monthly_contribution || 0)
+  const paid = contributions.reduce((s, c) => s + Number(c.amount || 0), 0)
+  const pct = expected ? Math.min(100, Math.round((paid / expected) * 100)) : 0
+  const isPaid = expected > 0 && paid >= expected
+  const balance = Math.max(0, expected - paid)
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="font-display text-xl font-bold text-navy">Contributions</h1>
         <p className="mt-1 text-[0.86rem] text-ink-soft">
-          {chama.name} / due on the {chama.due}th each month
+          {chama?.name || 'Your chama'} / due on the {chama?.due_day || 30}th each month
         </p>
       </div>
 
@@ -74,20 +56,18 @@ export default function MemberContributions() {
               This month
             </div>
             <div className="mt-1.5 font-display font-mono text-3xl font-bold tracking-tight text-navy">
-              {fmt(finance.contributions.expected)}
+              {fmt(expected)}
             </div>
             <div className="mt-1 text-[0.78rem] text-ink-soft">
-              {paid
-                ? 'Fully settled'
-                : `${fmt(finance.contributions.paid)} paid so far`}
+              {isPaid ? 'Fully settled' : `${fmt(paid)} paid so far`}
             </div>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-[0.68rem] font-bold uppercase tracking-widest ${
-              badge[finance.contributions.status]
+              isPaid ? badge.done : badge.pending
             }`}
           >
-            {label[finance.contributions.status]}
+            {isPaid ? label.done : label.pending}
           </span>
         </div>
 
@@ -100,33 +80,29 @@ export default function MemberContributions() {
           </div>
           <div className="mt-1.5 flex justify-between text-[0.7rem] text-ink-soft">
             <span>{pct}% complete</span>
-            <span>
-              Balance{' '}
-              {fmt(
-                Math.max(
-                  0,
-                  finance.contributions.expected - finance.contributions.paid
-                )
-              )}
-            </span>
+            <span>Balance {fmt(balance)}</span>
           </div>
         </div>
 
-        {!paid ? (
+        {!isPaid && expected > 0 ? (
           <button
-            onClick={payNow}
-            disabled={paying}
-            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-forest to-emerald py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(11,122,90,0.25)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            onClick={() =>
+              // TODO: replace with real STK push endpoint when M-Pesa is wired
+              alert('M-Pesa payment coming soon. For now, contact your treasurer.')
+            }
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-forest to-emerald py-3.5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(11,122,90,0.25)] transition hover:-translate-y-0.5"
           >
             <Smartphone size={15} />
-            {paying
-              ? 'Sending STK push...'
-              : `Pay ${fmt(finance.contributions.expected)} via M-Pesa`}
+            Pay {fmt(balance)} via M-Pesa
           </button>
-        ) : (
+        ) : isPaid ? (
           <div className="mt-5 flex items-center justify-center gap-2 rounded-2xl bg-emerald/10 py-3.5 text-sm font-semibold text-forest ring-1 ring-emerald/20">
             <Check size={16} />
             Paid for this month
+          </div>
+        ) : (
+          <div className="mt-5 flex items-center justify-center rounded-2xl bg-paper py-3.5 text-sm text-ink-soft">
+            No contribution schedule configured
           </div>
         )}
       </div>
@@ -134,9 +110,8 @@ export default function MemberContributions() {
       <div className="flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-4 py-3 text-[0.8rem] text-navy ring-1 ring-emerald/10">
         <Info size={15} className="mt-0.5 flex-none text-forest" />
         <span>
-          Payments made after the due date attract a small late fee, as agreed by
-          your chama. If you have already paid and this has not updated, contact
-          your treasurer.
+          Payments made after the due date attract a small late fee, as agreed by your chama. If
+          you have already paid and this has not updated, contact your treasurer.
         </span>
       </div>
 
@@ -145,39 +120,49 @@ export default function MemberContributions() {
           <Clock size={14} className="text-ink-soft" />
           Payment history
         </h3>
-        <div className="overflow-hidden rounded-xl border border-line">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-line bg-paper/60 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-ink-soft">
-                <th className="px-4 py-2.5">Month</th>
-                <th className="px-4 py-2.5">Amount</th>
-                <th className="px-4 py-2.5 text-right">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {HISTORY.map((h) => (
-                <tr
-                  key={h.month}
-                  className="border-b border-line last:border-none transition hover:bg-forest/[0.02]"
-                >
-                  <td className="px-4 py-3 font-medium text-navy">{h.month}</td>
-                  <td className="px-4 py-3 font-mono text-navy">
-                    {h.amount.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide ${
-                        badge[h.status]
-                      }`}
-                    >
-                      {label[h.status]}
-                    </span>
-                  </td>
+
+        {isLoading && contributions.length === 0 ? (
+          <div className="py-10 text-center">
+            <Loader2 className="mx-auto animate-spin text-forest" size={22} />
+          </div>
+        ) : contributions.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-line py-10 text-center">
+            <Clock size={20} className="mx-auto text-ink-soft/60" />
+            <p className="mt-2 text-sm text-ink-soft">No payments recorded yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-line">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-paper/60 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-ink-soft">
+                  <th className="px-4 py-2.5">Date</th>
+                  <th className="px-4 py-2.5">Reference</th>
+                  <th className="px-4 py-2.5">Amount</th>
+                  <th className="px-4 py-2.5 text-right">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {contributions.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="border-b border-line last:border-none transition hover:bg-forest/[0.02]"
+                  >
+                    <td className="px-4 py-3 text-ink-soft">{fmtDate(c.created_at)}</td>
+                    <td className="px-4 py-3 text-navy">{c.reference || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-navy">
+                      {Number(c.amount || 0).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className="inline-block rounded-full bg-emerald/10 px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide text-forest">
+                        Paid
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   )

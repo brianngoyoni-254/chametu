@@ -1,12 +1,14 @@
+// src/member/MemberLayout.jsx
 import { useState, useRef, useEffect } from 'react'
 import { Outlet, Navigate, useLocation, useNavigate, Link } from 'react-router-dom'
 import {
   LogOut, Bell, Menu, CheckCheck, Trash2, X,
-  AlertTriangle, Info, CheckCircle2, ArrowRight, LayoutDashboard,
+  AlertTriangle, Info, CheckCircle2, ArrowRight, LayoutDashboard, Loader2,
 } from 'lucide-react'
 import MemberSidebar from './MemberSidebar'
-import { useMemberAuth } from '../lib/memberAuth'
-import { useMemberNotifications } from '../lib/memberNotifications'
+import { useAuth } from '../context/AuthContext'
+import { MemberProvider, useMember } from '../context/MemberContext'
+import { useNotifications } from '../lib/notifications'
 
 const TITLES = {
   '': 'Overview',
@@ -46,15 +48,41 @@ function ago(iso) {
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
 }
 
+function initials(name) {
+  return (name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
+}
+
 export default function MemberLayout() {
-  const { user, chama, logout } = useMemberAuth()
+  const { isAuthenticated } = useAuth()
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return (
+    <MemberProvider>
+      <MemberShell />
+    </MemberProvider>
+  )
+}
+
+function MemberShell() {
+  const { user, logout } = useAuth()
+  const { profile, chama, isLoading } = useMember()
   const location = useLocation()
   const navigate = useNavigate()
+
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
 
-  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useMemberNotifications(user?.id)
+  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useNotifications()
 
   useEffect(() => {
     const onClick = (e) => {
@@ -69,19 +97,18 @@ export default function MemberLayout() {
     }
   }, [])
 
-  if (!user) return <Navigate to="/login" replace />
-
   const segment = location.pathname.split('/member/')[1] || ''
   const title = TITLES[segment] || 'Overview'
-  const subtitle = SUBTITLES[segment] || `${chama?.name || 'My Chama'} / member account`
+  const subtitle =
+    SUBTITLES[segment] ||
+    `${chama?.name || 'My Chama'} / member account`
+
+  const displayName = profile?.name || user?.name || 'Member'
+  const displayRole = profile?.role || user?.role || 'Member'
 
   function handleLogout() {
     logout()
     navigate('/login')
-  }
-
-  function initials(name) {
-    return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
   }
 
   const openNotif = (n) => {
@@ -110,11 +137,13 @@ export default function MemberLayout() {
             </button>
 
             <div className="min-w-0 flex-1">
-              <h2 className="truncate font-display text-base font-bold text-navy">{title}</h2>
+              <h2 className="truncate font-display text-base font-bold text-navy">
+                {title}
+              </h2>
               <p className="truncate text-[0.72rem] text-ink-soft">{subtitle}</p>
             </div>
 
-            {user.portal === 'admin' && (
+            {displayRole && displayRole !== 'Member' && (
               <Link
                 to="/dashboard"
                 className="hidden items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-[0.72rem] font-semibold text-navy transition hover:border-forest sm:inline-flex"
@@ -142,7 +171,9 @@ export default function MemberLayout() {
                 <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
                   <div className="flex items-center justify-between border-b border-line px-4 py-3">
                     <div className="flex items-center gap-2">
-                      <h3 className="font-display text-[0.9rem] font-bold text-navy">Notifications</h3>
+                      <h3 className="font-display text-[0.9rem] font-bold text-navy">
+                        Notifications
+                      </h3>
                       {unread > 0 && (
                         <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[0.63rem] font-bold text-red-600">
                           {unread} new
@@ -173,9 +204,16 @@ export default function MemberLayout() {
                   <div className="max-h-[60vh] overflow-y-auto">
                     {items.length === 0 ? (
                       <div className="px-4 py-10 text-center">
-                        <CheckCircle2 size={26} className="mx-auto mb-2 text-emerald opacity-60" />
-                        <p className="text-[0.85rem] font-semibold text-navy">You're all caught up</p>
-                        <p className="mt-0.5 text-[0.72rem] text-ink-soft">New alerts will appear here.</p>
+                        <CheckCircle2
+                          size={26}
+                          className="mx-auto mb-2 text-emerald opacity-60"
+                        />
+                        <p className="text-[0.85rem] font-semibold text-navy">
+                          You're all caught up
+                        </p>
+                        <p className="mt-0.5 text-[0.72rem] text-ink-soft">
+                          New alerts will appear here.
+                        </p>
                       </div>
                     ) : (
                       items.map((n) => {
@@ -185,10 +223,14 @@ export default function MemberLayout() {
                             key={n.id}
                             onClick={() => openNotif(n)}
                             className={`group flex w-full items-start gap-3 border-b border-line/60 px-4 py-3 text-left transition last:border-0 ${
-                              n.read ? 'hover:bg-paper/60' : 'bg-emerald/[0.03] hover:bg-emerald/[0.06]'
+                              n.read
+                                ? 'hover:bg-paper/60'
+                                : 'bg-emerald/[0.03] hover:bg-emerald/[0.06]'
                             }`}
                           >
-                            <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${cls}`}>
+                            <span
+                              className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${cls}`}
+                            >
                               <Icon size={12} />
                             </span>
                             <div className="min-w-0 flex-1">
@@ -208,7 +250,10 @@ export default function MemberLayout() {
                               </p>
                             </div>
                             <span
-                              onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                dismiss(n.id)
+                              }}
                               className="rounded-md p-1 text-ink-soft/40 opacity-0 transition group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-600"
                               role="button"
                               aria-label="Dismiss"
@@ -223,10 +268,14 @@ export default function MemberLayout() {
 
                   <div className="border-t border-line bg-paper/50 px-4 py-2.5">
                     <button
-                      onClick={() => { setBellOpen(false); navigate('/member/profile') }}
+                      onClick={() => {
+                        setBellOpen(false)
+                        navigate('/member/profile')
+                      }}
                       className="flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[0.75rem] font-semibold text-navy transition hover:bg-white"
                     >
-                      <Bell size={12} /> Manage notifications <ArrowRight size={11} />
+                      <Bell size={12} /> Manage notifications{' '}
+                      <ArrowRight size={11} />
                     </button>
                   </div>
                 </div>
@@ -235,13 +284,15 @@ export default function MemberLayout() {
 
             <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-card py-1.5 pl-1.5 pr-3">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald font-display text-[0.7rem] font-bold text-white shadow-sm">
-                {initials(user.name)}
+                {initials(displayName)}
               </span>
               <div className="hidden min-w-0 sm:block">
                 <div className="truncate text-[0.78rem] font-semibold leading-tight text-navy">
-                  {user.name}
+                  {displayName}
                 </div>
-                <div className="text-[0.65rem] capitalize text-ink-soft">{user.role}</div>
+                <div className="text-[0.65rem] capitalize text-ink-soft">
+                  {displayRole}
+                </div>
               </div>
               <button
                 onClick={handleLogout}
@@ -256,7 +307,13 @@ export default function MemberLayout() {
 
         <div className="px-4 py-6 sm:px-6 sm:py-8">
           <div className="mx-auto max-w-[1000px]">
-            <Outlet />
+            {isLoading && !profile ? (
+              <div className="flex min-h-[400px] items-center justify-center">
+                <Loader2 size={26} className="animate-spin text-forest" />
+              </div>
+            ) : (
+              <Outlet />
+            )}
           </div>
         </div>
       </main>

@@ -62,6 +62,7 @@ def create_app(config_class=Config):
     from app.routes.support import support_bp
     from app.routes.rewards import rewards_bp
     from app.routes.ledger import ledger_bp
+    from app.routes.notifications import notif_bp
 
     app.register_blueprint(auth_bp,     url_prefix="/api/auth")
     app.register_blueprint(chama_bp,    url_prefix="/api/chama")
@@ -71,6 +72,7 @@ def create_app(config_class=Config):
     app.register_blueprint(support_bp,  url_prefix="/api/support")
     app.register_blueprint(rewards_bp,  url_prefix="/api/rewards")
     app.register_blueprint(ledger_bp,   url_prefix="/api/ledger")
+    app.register_blueprint(notif_bp,    url_prefix="/api/notifications")
 
     # ---------- request lifecycle ----------
     @app.before_request

@@ -12,7 +12,8 @@ from app.models.finance import (
     WelfareClaim, Meeting, Proposal, MemberVote, Asset, Payout, PayoutOrder,
 )
 from app.models.invite import Invite
-from app.services import member_service, contribution_service
+from app.models.contribution import MemberInvite
+from app.services import member_service, contribution_service, notification_service as notif_svc
 from app.logging_utils import log_writes
 from app.utils.decorators import require_permission
 
@@ -35,7 +36,7 @@ def _role():
 def list_roles():
     cid = _cid()
     roles = Role.query.filter_by(chama_id=cid).all()
-    
+
     # Auto-seed default roles if the chama has none
     if not roles:
         empty_perms = {
@@ -44,17 +45,17 @@ def list_roles():
             'viewReports': False, 'editRoles': False, 'requestLoans': False,
             'makePayments': False, 'raiseIssue': False, 'viewOwnData': False,
         }
-        
+
         defaults = [
             {'name': 'Chairman', 'icon': 'Shield', 'system': True, 'description': 'Chairs meetings, approves loans and oversees the chama.',
              'perms': {**empty_perms, 'manageMembers': True, 'manageContrib': True, 'recordPayments': True, 'approveLoans': True, 'manageInvestments': True, 'manageMeetings': True, 'viewReports': True, 'editRoles': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
-            
+
             {'name': 'Treasurer', 'icon': 'Wallet', 'system': True, 'description': 'Handles contributions, disbursements and financial records.',
              'perms': {**empty_perms, 'manageContrib': True, 'recordPayments': True, 'manageInvestments': True, 'viewReports': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
-            
+
             {'name': 'Secretary', 'icon': 'FileText', 'system': True, 'description': 'Records minutes, manages members and documentation.',
              'perms': {**empty_perms, 'manageMembers': True, 'manageMeetings': True, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
-            
+
             {'name': 'Member', 'icon': 'User', 'system': True, 'description': 'Can view their own data, pay, request loans and raise issues.',
              'perms': {**empty_perms, 'requestLoans': True, 'makePayments': True, 'raiseIssue': True, 'viewOwnData': True}},
         ]
@@ -76,25 +77,25 @@ def list_roles():
 def create_role():
     cid = _cid()
     data = request.get_json() or {}
-    
+
     if not data.get('name'):
         return jsonify({'message': 'Role name is required'}), 400
-        
+
     existing = Role.query.filter_by(chama_id=cid, name=data['name']).first()
     if existing:
         return jsonify({'message': 'Role name already exists'}), 400
-        
+
     role = Role(
-        chama_id=cid, 
-        name=data['name'], 
+        chama_id=cid,
+        name=data['name'],
         description=data.get('description', ''),
         icon=data.get('icon', 'UserCog'),
-        system=False, 
+        system=False,
         perms=data.get('perms', {})
     )
     db.session.add(role)
     db.session.commit()
-    
+
     return jsonify({
         'id': role.id, 'name': role.name, 'description': role.description,
         'icon': role.icon, 'system': role.system, 'perms': role.perms
@@ -109,9 +110,9 @@ def update_role(role_id):
     role = Role.query.filter_by(id=role_id, chama_id=cid).first()
     if not role:
         return jsonify({'message': 'Role not found'}), 404
-        
+
     data = request.get_json() or {}
-    
+
     # System roles cannot have their name changed, but permissions can be updated
     if 'name' in data and not role.system:
         role.name = data['name']
@@ -119,9 +120,9 @@ def update_role(role_id):
         role.description = data['description']
     if 'perms' in data:
         role.perms = data['perms']
-        
+
     db.session.commit()
-    
+
     return jsonify({
         'id': role.id, 'name': role.name, 'description': role.description,
         'icon': role.icon, 'system': role.system, 'perms': role.perms
@@ -136,10 +137,10 @@ def delete_role(role_id):
     role = Role.query.filter_by(id=role_id, chama_id=cid).first()
     if not role:
         return jsonify({'message': 'Role not found'}), 404
-        
+
     if role.system:
         return jsonify({'message': 'Cannot delete default system roles'}), 400
-        
+
     db.session.delete(role)
     db.session.commit()
     return jsonify({'message': 'Role deleted'}), 200
@@ -197,19 +198,63 @@ def get_members():
 
 @chama_bp.route('/members/<member_id>', methods=['PUT', 'PATCH'])
 @jwt_required()
-@require_permission('manageMembers') # NEW: Using dynamic permission!
+@require_permission('manageMembers')
 @log_writes(logger, 'member.update')
 def update_member(member_id):
+    cid = _cid()
+    data = request.get_json() or {}
+
+    # Capture "before" state so we can notify the member about what changed
+    before = Member.query.filter_by(id=member_id, chama_id=cid).first()
+    if not before:
+        return jsonify({'message': 'Member not found'}), 404
+    old_role = before.role
+    old_status = before.status
+    target_user_id = before.user_id
+
     try:
-        result = member_service.update_member(_cid(), member_id, request.get_json() or {})
+        result = member_service.update_member(cid, member_id, data)
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
+
+    # Build a notification summarizing what changed
+    changes = []
+    if 'role' in data and data['role'] != old_role:
+        changes.append(f'role changed to {data["role"]}')
+    if 'status' in data and data['status'] != old_status:
+        changes.append(f'account {data["status"]}')
+    if 'contributionOverride' in data:
+        val = data['contributionOverride']
+        if val in (None, ''):
+            changes.append('contribution override cleared')
+        else:
+            try:
+                changes.append(f'contribution override set to KSh {int(float(val)):,}')
+            except (TypeError, ValueError):
+                changes.append('contribution override updated')
+    if any(k in data for k in ('name', 'email', 'phone')):
+        changes.append('profile details updated')
+
+    if changes:
+        try:
+            notif_svc.notify_member(
+                chama_id=cid,
+                user_id=target_user_id,
+                type='info',
+                event='memberChanges',
+                title='Your member profile was updated',
+                body='; '.join(changes).capitalize() + '.',
+                link='/member/profile',
+            )
+        except Exception:
+            logger.exception('failed to send member-update notification')
+
     return jsonify(result), 200
 
 
 @chama_bp.route('/members/<member_id>', methods=['DELETE'])
 @jwt_required()
-@require_permission('manageMembers') # NEW: Using dynamic permission!
+@require_permission('manageMembers')
 @log_writes(logger, 'member.deactivate')
 def delete_member(member_id):
     try:
@@ -221,29 +266,73 @@ def delete_member(member_id):
 
 @chama_bp.route('/members/<member_id>/role', methods=['PATCH'])
 @jwt_required()
-@require_permission('editRoles') # NEW: Using dynamic permission!
+@require_permission('editRoles')
 @log_writes(logger, 'member.role_change')
 def change_member_role(member_id):
+    cid = _cid()
     data = request.get_json() or {}
+
+    # Capture old role for the notification
+    before = Member.query.filter_by(id=member_id, chama_id=cid).first()
+    old_role = before.role if before else None
+    target_user_id = before.user_id if before else None
+
     try:
-        result = member_service.change_role(_cid(), member_id, data.get('role'))
+        result = member_service.change_role(cid, member_id, data.get('role'))
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
+
+    if target_user_id and data.get('role') and data['role'] != old_role:
+        try:
+            notif_svc.notify_member(
+                chama_id=cid,
+                user_id=target_user_id,
+                type='info',
+                event='memberChanges',
+                title='Your role was updated',
+                body=f'You are now a {data["role"]}.',
+                link='/member/profile',
+            )
+        except Exception:
+            logger.exception('failed to send role-change notification')
+
     return jsonify(result), 200
 
 
 @chama_bp.route('/members/<member_id>/contribution-override', methods=['PATCH'])
 @jwt_required()
-@require_permission('manageContrib') # NEW: Using dynamic permission!
+@require_permission('manageContrib')
 @log_writes(logger, 'member.contribution_override')
 def set_member_override(member_id):
+    cid = _cid()
     data = request.get_json() or {}
+
     try:
         member = contribution_service.set_member_override(
-            _cid(), member_id, data.get('amount'),
+            cid, member_id, data.get('amount'),
         )
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
+
+    # Notify the member about the new contribution
+    override = member.contribution_override
+    if override is None:
+        body = 'Your custom contribution was cleared — you now pay the chama default.'
+    else:
+        body = f'Your monthly contribution is now KSh {int(round(float(override))):,}.'
+
+    try:
+        notif_svc.notify_member(
+            chama_id=cid,
+            user_id=member.user_id,
+            type='info',
+            event='memberChanges',
+            title='Your contribution amount was updated',
+            body=body,
+            link='/member/contributions',
+        )
+    except Exception:
+        logger.exception('failed to send contribution-override notification')
 
     return jsonify({
         'memberId': member.id,
@@ -260,7 +349,7 @@ def list_invites():
 
 @chama_bp.route('/invites', methods=['POST'])
 @jwt_required()
-@require_permission('manageMembers') # NEW: Using dynamic permission!
+@require_permission('manageMembers')
 @log_writes(logger, 'member.invite_create')
 def create_invite():
     data = request.get_json() or {}
@@ -281,7 +370,7 @@ def create_invite():
 
 @chama_bp.route('/invites/<invite_id>', methods=['DELETE'])
 @jwt_required()
-@require_permission('manageMembers') # NEW: Using dynamic permission!
+@require_permission('manageMembers')
 @log_writes(logger, 'member.invite_cancel')
 def cancel_invite(invite_id):
     try:
@@ -289,6 +378,54 @@ def cancel_invite(invite_id):
     except ValueError as e:
         return jsonify({'message': str(e)}), 404
     return jsonify({'message': 'Invite cancelled'}), 200
+
+
+# ---- Bulk clear invites --------------------------------------------
+@chama_bp.route('/invites', methods=['DELETE'])
+@jwt_required()
+@require_permission('manageMembers')
+@log_writes(logger, 'member.invites_clear')
+def clear_invites():
+    """Bulk-delete invites.
+
+    Body options:
+      { "ids": ["id1", "id2", ...] }   -> delete these specific invites
+      { "all": true }                  -> delete all invites for this chama
+      { "all": true, "statuses": [...] } -> delete only those statuses
+    """
+    cid = _cid()
+    data = request.get_json(silent=True) or {}
+
+    q = MemberInvite.query.filter_by(chama_id=cid)
+
+    if data.get('all'):
+        statuses = data.get('statuses')
+        if statuses:
+            q = q.filter(MemberInvite.status.in_(statuses))
+    else:
+        ids = data.get('ids') or []
+        if not ids:
+            return jsonify({'message': 'No invite ids provided'}), 400
+        q = q.filter(MemberInvite.id.in_(ids))
+
+    invites = q.all()
+    if not invites:
+        return jsonify({'deleted': 0}), 200
+
+    tokens = [i.token for i in invites if i.token]
+
+    for inv in invites:
+        db.session.delete(inv)
+
+    if tokens:
+        Invite.query.filter(Invite.token.in_(tokens)).delete(
+            synchronize_session=False
+        )
+
+    db.session.commit()
+    logger.info('invites cleared: chama=%s count=%s', cid, len(tokens))
+    return jsonify({'deleted': len(tokens)}), 200
+# -------------------------------------------------------------------------
 
 
 # ============================ CONTRIBUTIONS ============================
@@ -301,7 +438,7 @@ def list_contributions():
 
 @chama_bp.route('/contributions', methods=['POST'])
 @jwt_required()
-@require_permission('recordPayments') # NEW: Using dynamic permission!
+@require_permission('recordPayments')
 @log_writes(logger, 'contribution.record')
 def record_contribution():
     data = request.get_json() or {}
@@ -317,12 +454,29 @@ def record_contribution():
         )
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
+
+    # Notify the member that their contribution was recorded
+    try:
+        member = Member.query.get(data.get('member_id'))
+        if member and member.user_id:
+            notif_svc.notify_member(
+                chama_id=_cid(),
+                user_id=member.user_id,
+                type='success',
+                event='paymentConfirmations',
+                title='Contribution recorded',
+                body=f'KSh {int(round(float(row.amount))):,} was added to your savings.',
+                link='/member/savings',
+            )
+    except Exception:
+        logger.exception('failed to send contribution notification')
+
     return jsonify({'id': row.id, 'amount': row.amount, 'period': row.period}), 201
 
 
 @chama_bp.route('/contributions/schedule', methods=['PUT'])
 @jwt_required()
-@require_permission('manageContrib') # NEW: Using dynamic permission!
+@require_permission('manageContrib')
 @log_writes(logger, 'contribution.schedule')
 def set_contribution_schedule():
     data = request.get_json() or {}
@@ -478,6 +632,47 @@ def add_proposal():
     return jsonify({'message': 'Proposal created'}), 201
 
 
+# ---- Cast vote on a proposal -------------------------------------------
+@chama_bp.route('/proposals/<proposal_id>/vote', methods=['POST'])
+@jwt_required()
+@require_permission('raiseIssue')
+@log_writes(logger, 'proposal.vote')
+def vote_on_proposal(proposal_id):
+    uid = get_jwt_identity()
+    cid = _cid()
+    data = request.get_json() or {}
+    choice = data.get('choice')
+
+    if choice not in ('yes', 'no', 'abs'):
+        return jsonify({'message': 'choice must be yes, no or abs'}), 400
+
+    proposal = Proposal.query.filter_by(id=proposal_id, chama_id=cid).first()
+    if not proposal:
+        return jsonify({'message': 'Proposal not found'}), 404
+
+    member = Member.query.filter_by(user_id=uid, chama_id=cid).first()
+    if not member:
+        return jsonify({'message': 'You are not a member of this chama'}), 403
+
+    existing = MemberVote.query.filter_by(
+        proposal_id=proposal_id, member_id=member.id
+    ).first()
+    if existing:
+        return jsonify({'message': 'You have already voted on this proposal'}), 400
+
+    db.session.add(MemberVote(
+        proposal_id=proposal_id,
+        member_id=member.id,
+        choice=choice,
+    ))
+    db.session.commit()
+
+    logger.info('vote cast: proposal=%s member=%s choice=%s',
+                proposal_id, member.id, choice)
+    return jsonify({'message': 'Vote recorded', 'choice': choice}), 201
+# -------------------------------------------------------------------------
+
+
 @chama_bp.route('/welfare/claim', methods=['POST'])
 @jwt_required()
 @require_permission('raiseIssue')
@@ -492,22 +687,68 @@ def add_welfare_claim():
                      reason=d['reason'], status='pending')
     db.session.add(w)
     db.session.commit()
+
+    # Notify all admins of the new claim
+    try:
+        notif_svc.notify_chama_admins(
+            chama_id=_cid(),
+            type='warning',
+            event='welfareClaims',
+            title='New welfare claim',
+            body=f'{member.user.name if member.user else "A member"} requested KSh {int(round(float(w.amount))):,} for {w.reason}.',
+            link='/dashboard/welfare',
+        )
+    except Exception:
+        logger.exception('failed to send welfare-claim notification')
+
     return jsonify({'message': 'Claim submitted'}), 201
 
 
 @chama_bp.route('/welfare/<id>/review', methods=['PATCH'])
 @jwt_required()
-@require_permission('manageMembers') # Or a dedicated approveWelfare permission
+@require_permission('manageMembers')
 @log_writes(logger, 'welfare.claim_review')
 def review_welfare(id):
-    w = WelfareClaim.query.filter_by(id=id, chama_id=_cid()).first()
+    cid = _cid()
+    w = WelfareClaim.query.filter_by(id=id, chama_id=cid).first()
     if not w:
         return jsonify({'message': 'Not found'}), 404
+
     d = request.get_json() or {}
-    w.status = d['status']
+    new_status = d.get('status')
+    w.status = new_status
     w.note = d.get('note', '')
     w.reviewed_at = datetime.utcnow()
+
+    member = Member.query.get(w.member_id)
     db.session.commit()
+
+    # Notify the member of the review outcome
+    if member and member.user_id:
+        meta = {
+            'paid':     ('success', 'Welfare claim approved',
+                         f'Your claim for KSh {int(round(float(w.amount))):,} was approved and paid.'),
+            'rejected': ('warning', 'Welfare claim rejected',
+                         f'Your claim for KSh {int(round(float(w.amount))):,} was not approved.'),
+            'pending':  ('info', 'Welfare claim under review',
+                         'Your claim is back under review.'),
+        }.get(new_status)
+
+        if meta:
+            try:
+                body = meta[2] + (f' Note: {w.note}' if w.note else '')
+                notif_svc.notify_member(
+                    chama_id=cid,
+                    user_id=member.user_id,
+                    type=meta[0],
+                    event='welfareUpdates',
+                    title=meta[1],
+                    body=body,
+                    link='/member/welfare',
+                )
+            except Exception:
+                logger.exception('failed to send welfare-review notification')
+
     return jsonify({'message': 'Claim reviewed'}), 200
 
 
@@ -523,4 +764,19 @@ def record_payout():
     p = Payout(chama_id=_cid(), member_id=member.id, amount=d['amount'], date=d['date'])
     db.session.add(p)
     db.session.commit()
+
+    # Notify the receiving member
+    try:
+        notif_svc.notify_member(
+            chama_id=_cid(),
+            user_id=member.user_id,
+            type='success',
+            event='payments',
+            title='Payout received',
+            body=f'KSh {int(round(float(p.amount))):,} was paid out to you ({p.date}).',
+            link='/member/rotation',
+        )
+    except Exception:
+        logger.exception('failed to send payout notification')
+
     return jsonify({'message': 'Payout recorded'}), 201

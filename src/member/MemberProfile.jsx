@@ -1,33 +1,38 @@
-import { Mail, Phone, User as UserIcon, Calendar, Shield, Info } from 'lucide-react'
+// src/member/MemberProfile.jsx
 import {
-  getMemberSession,
-  getMemberChama,
-  getMembers,
-} from '../lib/chametuStorage'
+  Mail, Phone, User as UserIcon, Calendar, Shield, Info, Loader2,
+} from 'lucide-react'
+import { useMember } from '../context/MemberContext'
 
 function initials(name) {
-  return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
+  return (name || '?')
+    .split(' ')
+    .map((n) => n[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase()
 }
 
 export default function MemberProfile() {
-  const session = getMemberSession()
-  const chama = getMemberChama(session)
-  const record = getMembers().find((m) => m.id === session.id)
+  const { profile, chama, savings, isLoading } = useMember()
+
+  if (isLoading && !profile) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
+    )
+  }
 
   const fields = [
-    { icon: Mail, label: 'Email', value: record?.email || '-' },
-    { icon: Phone, label: 'Phone', value: record?.phone || '-' },
-    { icon: Shield, label: 'Role', value: session.role, capitalize: true },
+    { icon: Mail, label: 'Email', value: profile?.email || '—' },
+    { icon: Phone, label: 'Phone', value: profile?.phone || '—' },
+    { icon: Shield, label: 'Role', value: profile?.role || 'Member', capitalize: true },
     {
       icon: Calendar,
-      label: 'Member since',
-      value: record
-        ? new Date(record.joinedAt).toLocaleDateString('en-GB', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })
-        : '-',
+      label: 'Chama code',
+      value: chama?.code || '—',
     },
   ]
 
@@ -36,7 +41,7 @@ export default function MemberProfile() {
       <div>
         <h1 className="font-display text-xl font-bold text-navy">My Profile</h1>
         <p className="mt-1 text-[0.86rem] text-ink-soft">
-          Your details within {chama.name}
+          Your details within {chama?.name || 'the chama'}
         </p>
       </div>
 
@@ -50,15 +55,15 @@ export default function MemberProfile() {
         />
         <div className="relative flex items-center gap-4">
           <span className="grid h-16 w-16 flex-none place-items-center rounded-2xl bg-gradient-to-br from-emerald to-forest font-display text-xl font-bold text-white shadow-lg ring-2 ring-white/20">
-            {initials(session.name)}
+            {initials(profile?.name)}
           </span>
           <div className="min-w-0">
             <h2 className="truncate font-display text-xl font-bold tracking-tight">
-              {session.name}
+              {profile?.name || 'Member'}
             </h2>
             <p className="mt-0.5 flex items-center gap-1.5 text-[0.82rem] capitalize text-white/70">
               <Shield size={12} />
-              {session.role} / {chama.name}
+              {profile?.role || 'Member'} / {chama?.name || 'Chama'}
             </p>
           </div>
         </div>
@@ -95,12 +100,22 @@ export default function MemberProfile() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="text-[0.72rem] font-semibold uppercase tracking-widest text-ink-soft">
+            Current savings
+          </div>
+        </div>
+        <div className="mt-1 font-display font-mono text-2xl font-bold text-navy">
+          KSh {Math.round(savings).toLocaleString('en-KE')}
+        </div>
+      </div>
+
       <div className="flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-4 py-3 text-[0.8rem] text-navy ring-1 ring-emerald/10">
         <Info size={15} className="mt-0.5 flex-none text-forest" />
         <span>
-          Need to update your name, email or phone? Contact your chama's treasurer
-          or chairperson. Member profile edits are reviewed to keep group records
-          accurate.
+          Need to update your name, email or phone? Contact your chama's treasurer or chairperson.
+          Member profile edits are reviewed to keep group records accurate.
         </span>
       </div>
     </div>

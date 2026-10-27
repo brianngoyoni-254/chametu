@@ -1,9 +1,9 @@
+// src/member/MemberAssets.jsx
 import {
   Package, Landmark, Wrench, Car, Building2, TrendingUp,
-  ShieldCheck, Calendar,
+  ShieldCheck, Calendar, Loader2,
 } from 'lucide-react'
-import { useSharedState, SHARED_KEYS, DEFAULT_ASSETS } from '../lib/chametuShared'
-import { getChama } from '../lib/chametuStorage'
+import { useMember } from '../context/MemberContext'
 
 const TYPE_ICON = {
   Land: Landmark,
@@ -14,15 +14,15 @@ const TYPE_ICON = {
 }
 
 function fmt(n) {
-  return 'KSh ' + Number(n).toLocaleString('en-KE')
+  return 'KSh ' + Number(n || 0).toLocaleString('en-KE')
 }
 
 export default function MemberAssets() {
-  const chama = getChama()
-  const [assets] = useSharedState(SHARED_KEYS.assets, DEFAULT_ASSETS)
+  const { chama, shared, isLoading } = useMember()
+  const assets = shared?.assets || []
 
-  const totalCost = assets.reduce((s, a) => s + Number(a.price), 0)
-  const totalValue = assets.reduce((s, a) => s + Number(a.value), 0)
+  const totalCost = assets.reduce((s, a) => s + Number(a.price || 0), 0)
+  const totalValue = assets.reduce((s, a) => s + Number(a.value || 0), 0)
   const gain = totalValue - totalCost
   const gainPct = totalCost ? Math.round((gain / totalCost) * 100) : 0
 
@@ -31,7 +31,7 @@ export default function MemberAssets() {
       <div>
         <h1 className="font-display text-xl font-bold text-navy">Chama Assets</h1>
         <p className="mt-1 text-[0.86rem] text-ink-soft">
-          What {chama.name} has acquired so far
+          What {chama?.name || 'the chama'} has acquired so far
         </p>
       </div>
 
@@ -56,22 +56,28 @@ export default function MemberAssets() {
             <span>
               Acquired at <b className="text-white/90">{fmt(totalCost)}</b>
             </span>
-            <span
-              className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
-                gain >= 0
-                  ? 'bg-emerald/20 text-emerald'
-                  : 'bg-red-500/20 text-red-300'
-              }`}
-            >
-              {gain >= 0 ? '▲' : '▼'} {gain >= 0 ? '+' : '−'}
-              {gainPct}%
-            </span>
+            {totalCost > 0 && (
+              <span
+                className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.72rem] font-semibold ${
+                  gain >= 0
+                    ? 'bg-emerald/20 text-emerald'
+                    : 'bg-red-500/20 text-red-300'
+                }`}
+              >
+                {gain >= 0 ? '▲' : '▼'} {gain >= 0 ? '+' : '−'}
+                {gainPct}%
+              </span>
+            )}
           </div>
         </div>
       </div>
 
       {/* Asset cards */}
-      {assets.length === 0 ? (
+      {isLoading && assets.length === 0 ? (
+        <div className="py-10 text-center">
+          <Loader2 className="mx-auto animate-spin text-forest" size={22} />
+        </div>
+      ) : assets.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-line bg-white py-14 text-center">
           <Package size={26} className="mx-auto text-ink-soft/50" />
           <p className="mt-3 text-sm text-ink-soft">
@@ -82,7 +88,7 @@ export default function MemberAssets() {
         <div className="grid gap-3.5 sm:grid-cols-2">
           {assets.map((a) => {
             const Icon = TYPE_ICON[a.type] || Package
-            const g = Number(a.value) - Number(a.price)
+            const g = Number(a.value || 0) - Number(a.price || 0)
             const gp = Number(a.price) ? Math.round((g / Number(a.price)) * 100) : 0
             return (
               <div
@@ -125,7 +131,7 @@ export default function MemberAssets() {
                   </span>
                   <span className="flex items-center gap-1.5">
                     <ShieldCheck size={11} className="text-forest" />
-                    {a.ownership}% chama owned
+                    {a.ownership || 100}% chama owned
                   </span>
                 </div>
               </div>

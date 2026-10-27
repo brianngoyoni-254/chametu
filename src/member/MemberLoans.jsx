@@ -1,53 +1,41 @@
+// src/member/MemberLoans.jsx
 import { useEffect, useState } from 'react'
 import {
   Gauge, CheckCircle2, Info, X, Clock, TrendingUp, AlertTriangle,
   ArrowRight, Sparkles, Wallet, Smartphone, Landmark, Receipt,
-  Banknote,
+  Banknote, Loader2,
 } from 'lucide-react'
-import {
-  getMemberSession,
-  getMemberChama,
-  getMemberFinance,
-  applyMemberLoan,
-  repayMemberLoan,
-} from '../lib/chametuStorage'
-import { publishAdminNotification } from '../lib/adminNotifications'
-import { publishMemberNotification } from '../lib/memberNotifications'
+import { useMember } from '../context/MemberContext'
 
 function fmt(n) {
   return 'KSh ' + Math.round(Number(n) || 0).toLocaleString('en-KE')
 }
 
 const STATUS_META = {
-  new: {
+  pending: {
     label: 'Awaiting approval',
     cls: 'bg-gold/15 text-[#8A6417] ring-1 ring-gold/25',
     hint: 'Your treasurer is reviewing this application.',
-    icon: Clock,
   },
-  active: {
+  approved: {
+    label: 'Approved',
+    cls: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
+    hint: 'Approved — waiting for disbursement.',
+  },
+  disbursed: {
     label: 'Active',
     cls: 'bg-emerald/10 text-forest ring-1 ring-emerald/20',
-    hint: 'Your loan has been approved and disbursed.',
-    icon: CheckCircle2,
-  },
-  overdue: {
-    label: 'Overdue',
-    cls: 'bg-red-50 text-red-600 ring-1 ring-red-100',
-    hint: 'You have missed a repayment. Contact your treasurer.',
-    icon: AlertTriangle,
+    hint: 'Active loan — repay to free up your limit.',
   },
   repaid: {
     label: 'Fully repaid',
     cls: 'bg-emerald/15 text-forest ring-1 ring-emerald/30',
-    hint: 'This loan has been fully repaid. Congratulations!',
-    icon: CheckCircle2,
+    hint: 'Fully repaid.',
   },
   rejected: {
     label: 'Rejected',
     cls: 'bg-line text-ink-soft ring-1 ring-line',
     hint: 'This application was not approved.',
-    icon: X,
   },
 }
 
@@ -58,144 +46,122 @@ const PAYMENT_METHODS = [
 ]
 
 export default function MemberLoans() {
-  const session = getMemberSession()
-  const chama = getMemberChama(session)
-  const [finance, setFinance] = useState(() => getMemberFinance(session))
+  const {
+    loans,
+    activeLoans,
+    pendingLoan,
+    savings,
+    loanLimit,
+    loanUsed,
+    loanAvailable,
+    isLoading,
+    applyLoan,
+    repayLoan,
+  } = useMember()
+
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ amount: '', purpose: '' })
-  const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const [repayOpen, setRepayOpen] = useState(false)
+  const [repayTarget, setRepayTarget] = useState(null)
   const [repayAmount, setRepayAmount] = useState('')
   const [repayMethod, setRepayMethod] = useState('mpesa')
   const [repayError, setRepayError] = useState('')
+  const [repaying, setRepaying] = useState(false)
 
-  const multiplier = chama.maxLoanMultiple || 3
-  const savings = finance.savings || 0
-  const loanLimit = savings * multiplier
-  const used = finance.loanUsed || 0
-  const available = Math.max(0, loanLimit - used)
-  const usedPct = loanLimit ? Math.min(100, Math.round((used / loanLimit) * 100)) : 0
-
-  const activeLoan = finance.loan
-  const hasActiveLoan = activeLoan && (activeLoan.status === 'active' || activeLoan.status === 'overdue')
-  const hasPending = activeLoan && activeLoan.status === 'new'
-  const isRepaid = activeLoan && activeLoan.status === 'repaid'
-
-  const activeMeta = activeLoan ? STATUS_META[activeLoan.status] || STATUS_META.new : null
-  const ActiveIcon = activeMeta?.icon
+  const multiplier = 3
+  const usedPct = loanLimit
+    ? Math.min(100, Math.round((loanUsed / loanLimit) * 100))
+    : 0
 
   useEffect(() => {
-    const onStorage = () => setFinance(getMemberFinance(session))
-    window.addEventListener('chametu:storage-updated', onStorage)
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener('chametu:storage-updated', onStorage)
-      window.removeEventListener('storage', onStorage)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id])
+    if (pendingLoan) setOpen(false)
+  }, [pendingLoan])
 
-  useEffect(() => {
-    if (hasActiveLoan || hasPending || isRepaid) setSubmitted(false)
-  }, [hasActiveLoan, hasPending, isRepaid])
-
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault()
     setError('')
     const amount = Number(form.amount)
     if (!amount || amount <= 0) return setError('Enter a valid amount.')
-    if (amount > available) return setError(`The most you can borrow is ${fmt(available)}.`)
+    if (amount > loanAvailable) {
+      return setError(`The most you can borrow is ${fmt(loanAvailable)}.`)
+    }
 
-    applyMemberLoan(session, { amount, purpose: form.purpose })
-    publishAdminNotification({
-      type: 'warning',
-      event: 'loanApplications',
-      title: 'New loan application',
-      desc: `${session?.name || 'Member'} requested ${fmt(amount)}`,
-      link: '/dashboard/loans',
-    })
-    setFinance(getMemberFinance(session))
-    setSubmitted(true)
-    setOpen(false)
+    setSubmitting(true)
+    const res = await applyLoan(amount, form.purpose)
+    setSubmitting(false)
+
+    if (!res.ok) return setError(res.message)
     setForm({ amount: '', purpose: '' })
+    setOpen(false)
   }
 
-  function openRepay(amount = '') {
+  function openRepay(loan, amount = '') {
+    setRepayTarget(loan)
     setRepayAmount(String(amount || ''))
     setRepayMethod('mpesa')
     setRepayError('')
-    setRepayOpen(true)
   }
 
-  function submitRepay(e) {
+  async function submitRepay(e) {
     e.preventDefault()
+    if (!repayTarget) return
     setRepayError('')
     const amt = Number(repayAmount)
     if (!amt || amt <= 0) return setRepayError('Enter a valid amount.')
-    if (amt > Number(activeLoan.balance))
-      return setRepayError(`Maximum you can repay is ${fmt(activeLoan.balance)}.`)
+    if (amt > Number(repayTarget.balance)) {
+      return setRepayError(`Maximum you can repay is ${fmt(repayTarget.balance)}.`)
+    }
 
-    const result = repayMemberLoan(session, {
-      loanId: activeLoan.id,
-      amount: amt,
-      method: repayMethod,
-    })
-    if (!result) return setRepayError('Could not record the repayment.')
-    if (result.error === 'amount-exceeds-balance')
-      return setRepayError(`Maximum you can repay is ${fmt(result.remaining)}.`)
+    setRepaying(true)
+    const res = await repayLoan(repayTarget.id, amt)
+    setRepaying(false)
 
-    publishAdminNotification({
-      type: 'success',
-      event: 'payments',
-      title: 'Loan repayment received',
-      desc: `${session?.name || 'Member'} repaid ${fmt(amt)}`,
-      link: '/dashboard/loans',
-    })
-    publishMemberNotification({
-      memberId: session?.id,
-      type: 'success',
-      event: 'paymentConfirmations',
-      title: 'Repayment recorded',
-      desc: `We've recorded your repayment of ${fmt(amt)}.`,
-      link: '/member/loans',
-    })
-
-    setFinance(getMemberFinance(session))
-    setRepayOpen(false)
+    if (!res.ok) return setRepayError(res.message)
+    setRepayTarget(null)
     setRepayAmount('')
+  }
+
+  if (isLoading && loans.length === 0) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
+    )
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3.5">
-        <div>
-          <h1 className="font-display text-xl font-bold text-navy">My Loan</h1>
-          <p className="mt-1 text-[0.86rem] text-ink-soft">
-            Up to <b className="text-navy">{multiplier}×</b> your savings ({fmt(savings)})
-          </p>
-        </div>
+      <div>
+        <h1 className="font-display text-xl font-bold text-navy">My Loans</h1>
+        <p className="mt-1 text-[0.86rem] text-ink-soft">
+          Up to <b className="text-navy">{multiplier}×</b> your savings ({fmt(savings)})
+        </p>
       </div>
 
+      {/* Availability card */}
       <div className="relative overflow-hidden rounded-3xl border border-line bg-white p-6 shadow-sm">
         <div
           className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full opacity-40"
-          style={{ background: 'radial-gradient(circle, rgba(11,31,51,0.15), transparent 70%)' }}
+          style={{
+            background:
+              'radial-gradient(circle, rgba(11,31,51,0.15), transparent 70%)',
+          }}
         />
         <div className="relative">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1.5 text-[0.68rem] font-semibold uppercase tracking-widest text-ink-soft">
               <Gauge size={12} /> Available to borrow
             </div>
-            {used > 0 && (
+            {loanUsed > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-navy/5 px-2.5 py-1 text-[0.68rem] font-semibold text-navy">
-                <TrendingUp size={11} /> {fmt(used)} in use
+                <TrendingUp size={11} /> {fmt(loanUsed)} in use
               </span>
             )}
           </div>
           <div className="mt-2 font-display font-mono text-3xl font-bold tracking-tight text-navy">
-            {fmt(available)}
+            {fmt(loanAvailable)}
           </div>
           <div className="mt-1 text-[0.78rem] text-ink-soft">
             of your {fmt(loanLimit)} limit
@@ -208,151 +174,227 @@ export default function MemberLoans() {
             />
           </div>
           <div className="mt-2 flex justify-between text-[0.7rem] text-ink-soft">
-            <span>{fmt(used)} committed</span>
+            <span>{fmt(loanUsed)} committed</span>
             <span>{usedPct}% of limit</span>
           </div>
         </div>
       </div>
 
-      {activeLoan && activeMeta ? (
+      {/* Pending application */}
+      {pendingLoan && (
         <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
           <div className="border-b border-line px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="font-display text-sm font-semibold text-navy">Current loan</h3>
-              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide ${activeMeta.cls}`}>
-                {ActiveIcon && <ActiveIcon size={11} />}
-                {activeMeta.label}
+              <h3 className="font-display text-sm font-semibold text-navy">
+                Current application
+              </h3>
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide ${STATUS_META[pendingLoan.status].cls}`}
+              >
+                {STATUS_META[pendingLoan.status].label}
               </span>
             </div>
-            <p className="mt-1.5 text-[0.78rem] text-ink-soft">{activeMeta.hint}</p>
+            <p className="mt-1.5 text-[0.78rem] text-ink-soft">
+              {STATUS_META[pendingLoan.status].hint}
+            </p>
           </div>
-
           <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
             <div className="rounded-xl bg-paper/60 p-3.5">
-              <div className="text-[0.7rem] text-ink-soft">Original amount</div>
+              <div className="text-[0.7rem] text-ink-soft">Requested amount</div>
               <div className="mt-1 font-mono text-base font-bold text-navy">
-                {fmt(activeLoan.amount)}
+                {fmt(pendingLoan.amount)}
               </div>
             </div>
             <div className="rounded-xl bg-paper/60 p-3.5">
-              <div className="text-[0.7rem] text-ink-soft">Balance remaining</div>
-              <div className="mt-1 font-mono text-base font-bold text-navy">
-                {fmt(activeLoan.balance)}
+              <div className="text-[0.7rem] text-ink-soft">Purpose</div>
+              <div className="mt-1 truncate text-base font-semibold text-navy">
+                {pendingLoan.purpose || '—'}
               </div>
             </div>
           </div>
-
-          {activeLoan.purpose && (
-            <div className="border-t border-line px-5 py-3 text-[0.78rem]">
-              <span className="text-ink-soft">Purpose: </span>
-              <span className="text-navy font-medium">{activeLoan.purpose}</span>
-            </div>
-          )}
-
-          {hasActiveLoan && (
-            <>
-              <div className="border-t border-line px-5 py-4">
-                <div className="flex justify-between text-[0.72rem] text-ink-soft">
-                  <span>Repayment progress</span>
-                  <span className="font-semibold text-navy">
-                    {Math.round(
-                      ((activeLoan.amount - activeLoan.balance) / activeLoan.amount) * 100
-                    )}
-                    % repaid
-                  </span>
-                </div>
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-line">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-forest to-emerald transition-all"
-                    style={{
-                      width: `${Math.round(
-                        ((activeLoan.amount - activeLoan.balance) / activeLoan.amount) * 100
-                      )}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="border-t border-line bg-paper/40 px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[0.72rem] text-ink-soft">Repayment due</div>
-                    <div className="font-mono text-lg font-bold text-navy">
-                      {fmt(activeLoan.balance)}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => openRepay(activeLoan.balance)}
-                    className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-                  >
-                    <Wallet size={14} /> Repay loan
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      ) : submitted ? (
-        <div className="rounded-2xl border border-line bg-white p-6 text-center shadow-sm">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald/10 text-forest">
-            <CheckCircle2 size={22} />
-          </span>
-          <h3 className="mt-3 font-display text-base font-bold text-navy">Application submitted</h3>
-          <p className="mt-1 text-[0.84rem] text-ink-soft">
-            Awaiting treasurer approval. You'll get a notification here once it's reviewed.
-          </p>
-        </div>
-      ) : isRepaid ? (
-        <div className="rounded-2xl border border-line bg-white p-6 text-center shadow-sm">
-          <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald/10 text-forest">
-            <CheckCircle2 size={22} />
-          </span>
-          <h3 className="mt-3 font-display text-base font-bold text-navy">Loan fully repaid</h3>
-          <p className="mt-1 text-[0.84rem] text-ink-soft">
-            Nice work. Your savings and credit standing are both stronger now.
-          </p>
-          <button
-            onClick={() => setOpen(true)}
-            disabled={available <= 0}
-            className={`mt-4 inline-flex items-center gap-1.5 rounded-2xl px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
-              available > 0
-                ? 'bg-gradient-to-br from-forest to-emerald hover:-translate-y-0.5 hover:shadow-md'
-                : 'cursor-not-allowed bg-forest/40'
-            }`}
-          >
-            Apply again <ArrowRight size={14} />
-          </button>
-        </div>
-      ) : (
-        <div className="rounded-2xl border border-line bg-white p-6 text-center shadow-sm">
-          <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-navy/5 text-navy">
-            <Sparkles size={20} />
-          </span>
-          <p className="mt-3 text-[0.86rem] text-ink-soft">
-            {available > 0
-              ? `You're eligible to borrow up to ${fmt(available)}.`
-              : `You've used your full ${fmt(loanLimit)} limit.`}
-          </p>
-          <button
-            onClick={() => setOpen(true)}
-            disabled={available <= 0}
-            className={`mt-4 inline-flex items-center gap-1.5 rounded-2xl px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition ${
-              available > 0
-                ? 'bg-gradient-to-br from-forest to-emerald hover:-translate-y-0.5 hover:shadow-md'
-                : 'cursor-not-allowed bg-forest/40'
-            }`}
-          >
-            Apply for a loan <ArrowRight size={14} />
-          </button>
         </div>
       )}
 
+      {/* Active loans — each with its own repay button */}
+      {activeLoans.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-display text-sm font-semibold text-navy">
+            Active loans
+          </h3>
+          {activeLoans.map((loan) => {
+            const repaidPct = loan.amount
+              ? Math.round(((loan.amount - loan.balance) / loan.amount) * 100)
+              : 0
+            return (
+              <div
+                key={loan.id}
+                className="overflow-hidden rounded-2xl border border-line bg-white shadow-sm"
+              >
+                <div className="border-b border-line px-5 py-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest">
+                        <Wallet size={14} />
+                      </span>
+                      <div>
+                        <div className="font-display text-[0.94rem] font-semibold text-navy">
+                          {loan.purpose || 'Loan'}
+                        </div>
+                        <div className="text-[0.72rem] text-ink-soft">
+                          {loan.created_at
+                            ? new Date(loan.created_at).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[0.68rem] font-bold uppercase tracking-wide ${STATUS_META[loan.status].cls}`}
+                    >
+                      {STATUS_META[loan.status].label}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+                  <div className="rounded-xl bg-paper/60 p-3.5">
+                    <div className="text-[0.7rem] text-ink-soft">Original amount</div>
+                    <div className="mt-1 font-mono text-base font-bold text-navy">
+                      {fmt(loan.amount)}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-paper/60 p-3.5">
+                    <div className="text-[0.7rem] text-ink-soft">Balance remaining</div>
+                    <div className="mt-1 font-mono text-base font-bold text-navy">
+                      {fmt(loan.balance)}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-line px-5 py-3">
+                  <div className="flex justify-between text-[0.72rem] text-ink-soft">
+                    <span>Repayment progress</span>
+                    <span className="font-semibold text-navy">{repaidPct}% repaid</span>
+                  </div>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-line">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-forest to-emerald transition-all"
+                      style={{ width: `${repaidPct}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t border-line bg-paper/40 px-5 py-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[0.72rem] text-ink-soft">Repayment due</div>
+                      <div className="font-mono text-lg font-bold text-navy">
+                        {fmt(loan.balance)}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => openRepay(loan, loan.balance)}
+                      disabled={Number(loan.balance) <= 0}
+                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
+                    >
+                      <Wallet size={14} /> Repay loan
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Apply / info card */}
+      {!pendingLoan && (
+        <div className="rounded-2xl border border-line bg-white p-6 text-center shadow-sm">
+          {loanAvailable > 0 ? (
+            <>
+              <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-navy/5 text-navy">
+                <Sparkles size={20} />
+              </span>
+              <p className="mt-3 text-[0.86rem] text-ink-soft">
+                You can borrow up to <b className="text-navy">{fmt(loanAvailable)}</b> right now.
+              </p>
+              <button
+                onClick={() => setOpen(true)}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-2xl bg-gradient-to-br from-forest to-emerald px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                Apply for a loan <ArrowRight size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <span className="mx-auto grid h-11 w-11 place-items-center rounded-full bg-red-50 text-red-600">
+                <AlertTriangle size={20} />
+              </span>
+              <p className="mt-3 text-[0.86rem] text-ink-soft">
+                You've used your full <b className="text-navy">{fmt(loanLimit)}</b> limit.
+              </p>
+              <p className="mt-1 text-[0.78rem] text-ink-soft">
+                Repay an active loan to free up your limit.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Loan history */}
+      {loans.length > 0 && (
+        <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
+          <h3 className="mb-4 font-display text-sm font-semibold text-navy">
+            Loan history
+          </h3>
+          <div className="overflow-hidden rounded-xl border border-line">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line bg-paper/60 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-ink-soft">
+                  <th className="px-4 py-2.5">Purpose</th>
+                  <th className="px-4 py-2.5">Amount</th>
+                  <th className="px-4 py-2.5">Balance</th>
+                  <th className="px-4 py-2.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loans.map((l) => (
+                  <tr key={l.id} className="border-b border-line last:border-none">
+                    <td className="px-4 py-3 font-medium text-navy">
+                      {l.purpose || '—'}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-navy">{fmt(l.amount)}</td>
+                    <td className="px-4 py-3 font-mono text-navy">{fmt(l.balance)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <span
+                        className={`inline-block rounded-full px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-wide ${STATUS_META[l.status]?.cls || ''}`}
+                      >
+                        {l.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Apply form */}
       {open && (
         <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-display text-sm font-semibold text-navy">Loan application</h3>
+            <h3 className="font-display text-sm font-semibold text-navy">
+              Loan application
+            </h3>
             <button
-              onClick={() => { setOpen(false); setError('') }}
+              onClick={() => {
+                setOpen(false)
+                setError('')
+              }}
               className="rounded-lg p-1 text-ink-soft transition hover:bg-paper hover:text-navy"
             >
               <X size={15} />
@@ -360,11 +402,11 @@ export default function MemberLoans() {
           </div>
           <form onSubmit={submit} className="space-y-3.5">
             <label className="block text-[0.78rem] font-semibold text-navy">
-              Amount (up to {fmt(available)})
+              Amount (up to {fmt(loanAvailable)})
               <input
                 type="number"
                 min="1"
-                max={available}
+                max={loanAvailable}
                 value={form.amount}
                 onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
                 className="mt-1.5 w-full rounded-xl border border-line px-3.5 py-2.5 text-sm outline-none transition focus:border-forest focus:ring-4 focus:ring-emerald/10"
@@ -387,18 +429,20 @@ export default function MemberLoans() {
             )}
             <button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-br from-forest to-emerald py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              disabled={submitting}
+              className="w-full rounded-xl bg-gradient-to-br from-forest to-emerald py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
             >
-              Submit application
+              {submitting ? 'Submitting…' : 'Submit application'}
             </button>
           </form>
         </div>
       )}
 
-      {repayOpen && activeLoan && (
+      {/* Repay modal */}
+      {repayTarget && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center sm:p-4"
-          onClick={() => setRepayOpen(false)}
+          onClick={() => setRepayTarget(null)}
         >
           <div
             className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-2xl"
@@ -415,11 +459,12 @@ export default function MemberLoans() {
                   </h3>
                 </div>
                 <p className="mt-1 text-[0.78rem] text-ink-soft">
-                  Outstanding balance: <b className="text-navy">{fmt(activeLoan.balance)}</b>
+                  Outstanding balance:{' '}
+                  <b className="text-navy">{fmt(repayTarget.balance)}</b>
                 </p>
               </div>
               <button
-                onClick={() => setRepayOpen(false)}
+                onClick={() => setRepayTarget(null)}
                 className="rounded-lg p-1.5 text-ink-soft hover:bg-paper"
               >
                 <X size={16} />
@@ -434,14 +479,14 @@ export default function MemberLoans() {
                 <input
                   type="number"
                   min="1"
-                  max={activeLoan.balance}
+                  max={repayTarget.balance}
                   value={repayAmount}
                   onChange={(e) => setRepayAmount(e.target.value)}
                   className="w-full rounded-xl border border-line px-3.5 py-2.5 font-mono text-base font-semibold text-navy outline-none focus:border-forest"
                 />
                 <div className="mt-1.5 flex gap-1.5">
                   {[0.25, 0.5, 1].map((frac) => {
-                    const val = Math.round(activeLoan.balance * frac)
+                    const val = Math.round(repayTarget.balance * frac)
                     return (
                       <button
                         type="button"
@@ -495,16 +540,22 @@ export default function MemberLoans() {
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => setRepayOpen(false)}
+                  onClick={() => setRepayTarget(null)}
                   className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-soft hover:text-navy"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-forest-dark"
+                  disabled={repaying}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
                 >
-                  <Wallet size={13} /> Confirm repayment
+                  {repaying ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Wallet size={13} />
+                  )}
+                  {repaying ? 'Repaying…' : 'Confirm repayment'}
                 </button>
               </div>
             </form>
@@ -515,8 +566,9 @@ export default function MemberLoans() {
       <div className="flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-4 py-3 text-[0.8rem] text-navy ring-1 ring-emerald/10">
         <Info size={15} className="mt-0.5 flex-none text-forest" />
         <span>
-          Pending and rejected applications don't reduce your available balance.
-          Repayments reduce your loan balance immediately and update your limit in real time.
+          You can hold multiple loans as long as their combined balance stays within your
+          limit. Repaying reduces your used balance and instantly frees up room for a new
+          loan.
         </span>
       </div>
     </div>

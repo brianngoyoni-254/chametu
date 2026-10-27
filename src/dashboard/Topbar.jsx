@@ -1,3 +1,4 @@
+// src/dashboard/Topbar.jsx
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -6,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useChama } from '../context/ChamaContext'
-import { useAdminNotifications } from '../lib/adminNotifications'
+import { useNotifications } from '../lib/notifications'
 
 const TITLES = {
   '/dashboard':                        'Dashboard',
@@ -52,20 +53,18 @@ function ago(iso) {
 export default function Topbar({ onBurger }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  
-  // Use real contexts instead of localStorage
+
   const { user } = useAuth()
   const { chama, currentMember } = useChama()
 
   const [bellOpen, setBellOpen] = useState(false)
   const bellRef = useRef(null)
 
-  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useAdminNotifications()
+  const { items, unread, markAllRead, markRead, dismiss, clearAll } = useNotifications()
 
   const title = useMemo(() => TITLES[pathname] || 'Dashboard', [pathname])
   const chamaName = chama?.name || 'My Chama'
 
-  // Use currentMember first (which has real DB role), fallback to user
   const activeUser = currentMember || user
 
   const initials = useMemo(() => {
@@ -157,11 +156,12 @@ export default function Topbar({ onBurger }) {
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl animate-in fade-in slide-in-from-top-2 duration-150">
-            {/* ... (keep your existing bell content) ... */}
+          <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2">
-                <h3 className="font-display text-[0.9rem] font-bold text-navy">Notifications</h3>
+                <h3 className="font-display text-[0.9rem] font-bold text-navy">
+                  Notifications
+                </h3>
                 {unread > 0 && (
                   <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[0.63rem] font-bold text-red-600">
                     {unread} new
@@ -193,8 +193,12 @@ export default function Topbar({ onBurger }) {
               {items.length === 0 ? (
                 <div className="px-4 py-10 text-center">
                   <CheckCircle2 size={26} className="mx-auto mb-2 text-emerald opacity-60" />
-                  <p className="text-[0.85rem] font-semibold text-navy">You're all caught up</p>
-                  <p className="mt-0.5 text-[0.72rem] text-ink-soft">New alerts will appear here.</p>
+                  <p className="text-[0.85rem] font-semibold text-navy">
+                    You're all caught up
+                  </p>
+                  <p className="mt-0.5 text-[0.72rem] text-ink-soft">
+                    New alerts will appear here.
+                  </p>
                 </div>
               ) : (
                 items.map((n) => {
@@ -204,10 +208,14 @@ export default function Topbar({ onBurger }) {
                       key={n.id}
                       onClick={() => openNotif(n)}
                       className={`group flex w-full items-start gap-3 border-b border-line/60 px-4 py-3 text-left transition last:border-0 ${
-                        n.read ? 'hover:bg-paper/60' : 'bg-emerald/[0.03] hover:bg-emerald/[0.06]'
+                        n.read
+                          ? 'hover:bg-paper/60'
+                          : 'bg-emerald/[0.03] hover:bg-emerald/[0.06]'
                       }`}
                     >
-                      <span className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${cls}`}>
+                      <span
+                        className={`mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg ${cls}`}
+                      >
                         <Icon size={12} />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -215,13 +223,22 @@ export default function Topbar({ onBurger }) {
                           <p className="truncate text-[0.82rem] font-semibold text-navy">
                             {n.title}
                           </p>
-                          {!n.read && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald" />}
+                          {!n.read && (
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald" />
+                          )}
                         </div>
-                        <p className="mt-0.5 line-clamp-2 text-[0.73rem] text-ink-soft">{n.desc}</p>
-                        <p className="mt-0.5 text-[0.66rem] text-ink-soft/70">{ago(n.time)}</p>
+                        <p className="mt-0.5 line-clamp-2 text-[0.73rem] text-ink-soft">
+                          {n.desc}
+                        </p>
+                        <p className="mt-0.5 text-[0.66rem] text-ink-soft/70">
+                          {ago(n.time)}
+                        </p>
                       </div>
                       <span
-                        onClick={(e) => { e.stopPropagation(); dismiss(n.id) }}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          dismiss(n.id)
+                        }}
                         className="rounded-md p-1 text-ink-soft/40 opacity-0 transition group-hover:opacity-100 hover:bg-red-500/10 hover:text-red-600"
                         role="button"
                         aria-label="Dismiss"
@@ -232,6 +249,18 @@ export default function Topbar({ onBurger }) {
                   )
                 })
               )}
+            </div>
+
+            <div className="border-t border-line bg-paper/50 px-4 py-2.5">
+              <button
+                onClick={() => {
+                  setBellOpen(false)
+                  navigate('/dashboard/settings?tab=notifications')
+                }}
+                className="flex w-full items-center justify-center gap-1.5 rounded-lg py-1.5 text-[0.75rem] font-semibold text-navy transition hover:bg-white"
+              >
+                <Settings size={12} /> Notification settings <ArrowRight size={11} />
+              </button>
             </div>
           </div>
         )}

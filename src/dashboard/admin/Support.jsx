@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react'
+// src/dashboard/admin/Support.jsx
+import { useEffect, useMemo, useState } from 'react'
 import {
-  LifeBuoy, Plus, MessageSquare, Clock, CheckCircle2, X, Send, Search, Loader2,
+  LifeBuoy, Plus, MessageSquare, Clock, CheckCircle2, X, Send, Search,
+  Loader2, Lock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
+import { useAuth } from '../../context/AuthContext'
 import { api } from '../../lib/api'
 
 const STATUS_META = {
@@ -28,10 +31,17 @@ const fmtRelative = (iso) => {
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
 }
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
+const initials = (name) =>
+  (name || '??').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
 export default function Support() {
-  const { currentMember } = useChama()
-  
+  const { chama, currentMember } = useChama()
+  const { user } = useAuth()
+
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -39,64 +49,86 @@ export default function Support() {
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
 
-  const fetchTickets = async () => {
+  const refresh = async () => {
     try {
-      const data = await api('/api/support/', { token: localStorage.getItem('auth_token') })
-      setTickets(data)
+      const data = await api('/api/support/')
+      setTickets(Array.isArray(data) ? data : [])
     } catch (err) {
-      toast.error('Failed to load tickets')
+      toast.error(err.message || 'Failed to load tickets')
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { fetchTickets() }, [])
+  useEffect(() => {
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
-  const filtered = tickets.filter((t) => {
-    if (filter !== 'all' && t.status !== filter) return false
-    if (!query) return true
-    const q = query.toLowerCase()
-    return (t.id + t.subject + t.description).toLowerCase().includes(q)
-  })
+  const filtered = useMemo(() => {
+    return tickets.filter((t) => {
+      if (filter !== 'all' && t.status !== filter) return false
+      if (!query) return true
+      const q = query.toLowerCase()
+      return (t.id + t.subject + t.description).toLowerCase().includes(q)
+    })
+  }, [tickets, filter, query])
 
-  const counts = {
+  const counts = useMemo(() => ({
+    all: tickets.length,
     open: tickets.filter((t) => t.status === 'open').length,
     pending: tickets.filter((t) => t.status === 'pending').length,
     resolved: tickets.filter((t) => t.status === 'resolved').length,
     closed: tickets.filter((t) => t.status === 'closed').length,
-    total: tickets.length,
-  }
+  }), [tickets])
 
   const submit = async ({ subject, description, category, priority }) => {
     try {
       await api('/api/support/', {
         method: 'POST',
-        token: localStorage.getItem('auth_token'),
-        body: { subject, description, category, priority, requesterName: currentMember?.name || 'Admin' }
+        body: {
+          subject, description, category, priority,
+          requesterName: currentMember?.name || user?.name || 'Admin',
+        },
       })
       toast.success('Ticket created')
       setOpen(false)
-      fetchTickets()
-    } catch (err) { toast.error(err.message) }
+      await refresh()
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
-  const addReply = async (ticket, body) => {
+  const addReply = async (ticket, body, internal = false) => {
     if (!body.trim()) return
     try {
       await api(`/api/support/${ticket.id}/messages`, {
         method: 'POST',
-        token: localStorage.getItem('auth_token'),
-        body: { author: currentMember?.name || 'Admin', role: 'requester', body }
+        body: { body: body.trim(), role: 'agent', internal },
       })
-      toast.success('Reply added')
-      fetchTickets()
-      
-      // Update the local viewing state to reflect the new message immediately
-      setViewing((prev) => ({
-        ...prev,
-        messages: [...prev.messages, { id: Date.now().toString(), author: currentMember?.name || 'Admin', body, at: new Date().toISOString() }]
-      }))
-    } catch (err) { toast.error(err.message) }
+      toast.success(internal ? 'Internal note added' : 'Reply sent')
+      await refresh()
+      // Re-fetch just this ticket's latest state
+      const fresh = await api(`/api/support/${ticket.id}`)
+      setViewing(fresh)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }
+
+  const changeStatus = async (ticket, status) => {
+    try {
+      await api(`/api/support/${ticket.id}/status`, {
+        method: 'PATCH',
+        body: { status },
+      })
+      toast.success(`Marked as ${status}`)
+      await refresh()
+      const fresh = await api(`/api/support/${ticket.id}`)
+      setViewing(fresh)
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (
@@ -104,9 +136,14 @@ export default function Support() {
       <div className="flex flex-wrap items-end justify-between gap-3.5">
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Support</h1>
-          <p className="mt-1 text-sm text-ink-soft">Raise issues with Chametu and track responses.</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            {chama?.name ? `Tickets from ${chama.name}` : 'All tickets'} — every issue raised by members of this chama
+          </p>
         </div>
-        <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white">
+        <button
+          onClick={() => setOpen(true)}
+          className="flex items-center gap-1.5 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-forest-dark"
+        >
           <Plus size={15} /> New ticket
         </button>
       </div>
@@ -115,21 +152,29 @@ export default function Support() {
         <Kpi label="Open" value={counts.open} tone="bg-blue-100 text-blue-700" Icon={LifeBuoy} />
         <Kpi label="Pending" value={counts.pending} tone="bg-amber-100 text-[#8A6417]" Icon={Clock} />
         <Kpi label="Resolved" value={counts.resolved} tone="bg-emerald/15 text-forest" Icon={CheckCircle2} />
-        <Kpi label="Total" value={counts.total} tone="bg-line text-ink-soft" Icon={MessageSquare} />
+        <Kpi label="Total" value={counts.all} tone="bg-line text-ink-soft" Icon={MessageSquare} />
       </div>
 
       <div className="rounded-2xl border border-line bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
           <div className="flex flex-wrap gap-1.5">
-            {['all', 'open', 'pending', 'resolved', 'closed'].map((f) => (
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'open', label: 'Open' },
+              { key: 'pending', label: 'Pending' },
+              { key: 'resolved', label: 'Resolved' },
+              { key: 'closed', label: 'Closed' },
+            ].map((f) => (
               <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold capitalize transition ${
-                  filter === f ? 'bg-navy text-white' : 'bg-paper border border-line text-ink-soft'
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  filter === f.key
+                    ? 'bg-navy text-white'
+                    : 'bg-paper border border-line text-ink-soft hover:border-navy'
                 }`}
               >
-                {f === 'all' ? 'All' : STATUS_META[f].label}
+                {f.label}
               </button>
             ))}
           </div>
@@ -145,13 +190,13 @@ export default function Support() {
         </div>
 
         {loading ? (
-          <div className="py-12 text-center text-ink-soft">
+          <div className="py-12 text-center">
             <Loader2 className="mx-auto animate-spin text-forest" size={24} />
           </div>
         ) : filtered.length === 0 ? (
           <div className="py-12 text-center text-ink-soft">
             <LifeBuoy size={26} className="mx-auto mb-2 opacity-40" />
-            No tickets found.
+            {tickets.length === 0 ? 'No tickets yet.' : 'No tickets match your filters.'}
           </div>
         ) : (
           <div className="divide-y divide-line">
@@ -176,7 +221,9 @@ export default function Support() {
                   </div>
                   <p className="mt-1 truncate font-semibold text-navy">{t.subject}</p>
                   <p className="mt-0.5 truncate text-[0.76rem] text-ink-soft">{t.description}</p>
-                  <p className="mt-1 text-[0.7rem] text-ink-soft">Updated {fmtRelative(t.updatedAt)}</p>
+                  <p className="mt-1 text-[0.7rem] text-ink-soft">
+                    {t.requester ? `${t.requester} · ` : ''}Updated {fmtRelative(t.updatedAt)}
+                  </p>
                 </div>
               </button>
             ))}
@@ -184,12 +231,19 @@ export default function Support() {
         )}
       </div>
 
-      {open && <NewTicketModal onClose={() => setOpen(false)} onSubmit={submit} />}
+      {open && (
+        <NewTicketModal
+          onClose={() => setOpen(false)}
+          onSubmit={submit}
+          requesterName={currentMember?.name || user?.name || 'Admin'}
+        />
+      )}
       {viewing && (
         <TicketModal
           ticket={viewing}
           onClose={() => setViewing(null)}
-          onReply={(body) => addReply(viewing, body)}
+          onReply={addReply}
+          onStatus={changeStatus}
         />
       )}
     </div>
@@ -210,7 +264,7 @@ function Kpi({ label, value, tone, Icon }) {
   )
 }
 
-function NewTicketModal({ onClose, onSubmit }) {
+function NewTicketModal({ onClose, onSubmit, requesterName }) {
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('technical')
@@ -218,39 +272,64 @@ function NewTicketModal({ onClose, onSubmit }) {
 
   const submit = (e) => {
     e.preventDefault()
-    if (!subject.trim() || !description.trim()) return toast.error('Fill in subject and description')
+    if (!subject.trim() || !description.trim()) {
+      return toast.error('Fill in subject and description')
+    }
     onSubmit({ subject: subject.trim(), description: description.trim(), category, priority })
   }
 
-  const inputCls = 'w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-navy outline-none focus:border-forest transition'
+  const inputCls =
+    'w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-navy outline-none focus:border-forest transition'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h3 className="font-display font-semibold text-navy">Raise a support ticket</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper"><X size={16} /></button>
+          <div className="flex items-center gap-2">
+            <LifeBuoy className="text-forest" size={18} />
+            <h3 className="font-display font-semibold text-navy">Raise a support ticket</h3>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper">
+            <X size={16} />
+          </button>
         </div>
         <form onSubmit={submit} className="space-y-3 p-5">
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Subject" className={inputCls} />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Description…" className={inputCls} />
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-navy">Subject</span>
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Brief summary" className={inputCls} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-navy">Description</span>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Steps, error messages…" className={inputCls} />
+          </label>
           <div className="grid grid-cols-2 gap-3">
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-              <option value="technical">Technical issue</option>
-              <option value="billing">Billing & payments</option>
-              <option value="account">Account access</option>
-              <option value="feature">Feature request</option>
-            </select>
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className={inputCls}>
-              <option value="low">Low</option>
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
-            </select>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-navy">Category</span>
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
+                <option value="technical">Technical issue</option>
+                <option value="billing">Billing & payments</option>
+                <option value="account">Account access</option>
+                <option value="feature">Feature request</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-semibold text-navy">Priority</span>
+              <select value={priority} onChange={(e) => setPriority(e.target.value)} className={inputCls}>
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </label>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-ink-soft">Cancel</button>
-            <button type="submit" className="rounded-xl bg-forest px-4 py-2 text-sm text-white">Submit</button>
+            <button type="button" onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-semibold text-ink-soft hover:text-navy">
+              Cancel
+            </button>
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-xl bg-forest px-4 py-2 text-sm font-semibold text-white hover:bg-forest-dark">
+              <Send size={13} /> Submit
+            </button>
           </div>
         </form>
       </div>
@@ -258,30 +337,125 @@ function NewTicketModal({ onClose, onSubmit }) {
   )
 }
 
-function TicketModal({ ticket, onClose, onReply }) {
+function TicketModal({ ticket, onClose, onReply, onStatus }) {
   const [reply, setReply] = useState('')
+  const [isInternal, setIsInternal] = useState(false)
+
+  const submit = (e) => {
+    e.preventDefault()
+    if (!reply.trim()) return
+    onReply(ticket, reply, isInternal)
+    setReply('')
+    setIsInternal(false)
+  }
+
+  const inputCls =
+    'w-full rounded-xl border border-line px-3 py-2 text-sm text-navy outline-none focus:border-forest'
+
+  const statusOptions = ['open', 'pending', 'resolved', 'closed']
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
-          <h3 className="font-display font-semibold text-navy">{ticket.subject}</h3>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper"><X size={16} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {ticket.messages?.map((m, i) => (
-            <div key={i} className="rounded-xl border border-line p-3">
-              <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-sm text-navy">{m.author}</span>
-                <span className="text-xs text-ink-soft">{new Date(m.at).toLocaleString()}</span>
-              </div>
-              <p className="text-sm text-ink-soft">{m.body}</p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-mono text-[0.7rem] text-ink-soft">{ticket.id.slice(0, 8)}</span>
+              <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[ticket.status].cls}`}>
+                {STATUS_META[ticket.status].label}
+              </span>
+              <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${PRIORITY_META[ticket.priority]}`}>
+                {ticket.priority}
+              </span>
             </div>
+            <h3 className="mt-1 truncate font-display font-semibold text-navy">{ticket.subject}</h3>
+            {ticket.requester && (
+              <p className="mt-0.5 text-[0.76rem] text-ink-soft">Raised by {ticket.requester}</p>
+            )}
+          </div>
+          <button onClick={onClose} className="ml-3 rounded-lg p-1.5 text-ink-soft hover:bg-paper">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Status changer */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-line bg-paper/40 px-5 py-2.5">
+          <span className="text-[0.72rem] font-semibold text-ink-soft">Status:</span>
+          {statusOptions.map((s) => (
+            <button
+              key={s}
+              onClick={() => onStatus(ticket, s)}
+              disabled={ticket.status === s}
+              className={`rounded-full px-2.5 py-1 text-[0.7rem] font-bold uppercase tracking-wide transition ${
+                ticket.status === s
+                  ? STATUS_META[s].cls
+                  : 'bg-white text-ink-soft border border-line hover:border-navy'
+              }`}
+            >
+              {STATUS_META[s].label}
+            </button>
           ))}
         </div>
-        <form onSubmit={(e) => { e.preventDefault(); onReply(reply); setReply('') }} className="border-t p-3">
-          <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder="Reply…" className="w-full rounded-xl border p-2 text-sm" />
-          <div className="mt-2 flex justify-end">
-            <button type="submit" className="bg-forest text-white px-3 py-1.5 rounded-lg text-xs font-semibold">Send reply</button>
+
+        <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          {ticket.messages.map((m) => {
+            const isAgent = m.role === 'agent'
+            const internal = m.internal
+            return (
+              <div
+                key={m.id}
+                className={`rounded-xl border p-3 ${
+                  internal
+                    ? 'border-amber-500/30 bg-amber-500/5'
+                    : isAgent
+                    ? 'border-line bg-white'
+                    : 'border-line bg-paper/60'
+                }`}
+              >
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-[0.72rem]">
+                  <span className="grid h-6 w-6 place-items-center rounded bg-navy/10 text-[0.6rem] font-bold text-navy">
+                    {initials(m.author)}
+                  </span>
+                  <span className="font-semibold text-navy">{m.author}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase ${
+                    isAgent ? 'bg-forest/10 text-forest' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    {isAgent ? 'Agent' : 'Requester'}
+                  </span>
+                  {internal && (
+                    <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[0.6rem] font-bold uppercase text-[#8A6417]">
+                      <Lock size={9} /> Internal
+                    </span>
+                  )}
+                  <span className="ml-auto text-ink-soft">{fmtDate(m.at)}</span>
+                </div>
+                <p className="whitespace-pre-wrap text-[0.84rem] leading-relaxed text-navy">{m.body}</p>
+              </div>
+            )
+          })}
+        </div>
+
+        <form onSubmit={submit} className="border-t border-line p-3">
+          <textarea
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            rows={2}
+            placeholder={isInternal ? 'Internal note (only agents see this)…' : 'Reply to the requester…'}
+            className={inputCls}
+          />
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <label className="inline-flex items-center gap-1.5 text-[0.72rem] font-semibold text-ink-soft">
+              <input
+                type="checkbox"
+                checked={isInternal}
+                onChange={(e) => setIsInternal(e.target.checked)}
+                className="h-3.5 w-3.5 rounded accent-forest"
+              />
+              Internal note
+            </label>
+            <button type="submit" className="inline-flex items-center gap-1.5 rounded-xl bg-forest px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-dark">
+              <Send size={12} /> {isInternal ? 'Add internal note' : 'Send reply'}
+            </button>
           </div>
         </form>
       </div>
