@@ -1,15 +1,12 @@
+// src/member/MemberSupport.jsx
 import { useEffect, useMemo, useState } from 'react'
 import {
   LifeBuoy, Plus, MessageSquare, Clock, CheckCircle2, X, Send, Search,
+  Loader2,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  getMemberSession,
-  getMemberChama,
-} from '../lib/chametuStorage'
-
-const TICKETS_KEY = 'chametu_superadmin_tickets'
-const EVENT = 'chametu:tickets-updated'
+import { useMember } from '../context/MemberContext'
+import { api } from '../lib/api'
 
 const CATEGORIES = [
   { key: 'billing', label: 'Billing & payments' },
@@ -37,15 +34,10 @@ const PRIORITY_META = {
   urgent: 'bg-red-100 text-red-700',
 }
 
-function read(key, fb) {
-  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fb } catch { return fb }
-}
-function write(key, v) {
-  try { localStorage.setItem(key, JSON.stringify(v)) } catch {}
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: v }))
-}
-
-const fmtDate = (iso) => new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+const fmtDate = (iso) =>
+  new Date(iso).toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
+  })
 const fmtRelative = (iso) => {
   const diff = Date.now() - new Date(iso).getTime()
   const m = Math.floor(diff / 60000)
@@ -55,117 +47,88 @@ const fmtRelative = (iso) => {
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
 }
-const initials = (name) => (name || '??').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+const initials = (name) =>
+  (name || '??').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
 export default function MemberSupport() {
-  const session = getMemberSession()
-  const chama = getMemberChama(session)
+  const { profile, isLoading: isMemberLoading } = useMember()
 
-  const [tickets, setTickets] = useState(() => read(TICKETS_KEY, []))
+  const [tickets, setTickets] = useState([])
+  const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
   const [viewing, setViewing] = useState(null)
   const [filter, setFilter] = useState('all')
   const [query, setQuery] = useState('')
 
-  useEffect(() => {
-    const onChange = (e) => setTickets(e.detail)
-    const onStorage = () => setTickets(read(TICKETS_KEY, []))
-    window.addEventListener(EVENT, onChange)
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener(EVENT, onChange)
-      window.removeEventListener('storage', onStorage)
+  const refresh = async () => {
+    try {
+      const data = await api('/api/support/me')
+      setTickets(Array.isArray(data) ? data : [])
+    } catch (err) {
+      toast.error(err.message || 'Failed to load your tickets')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
+    refresh()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const myTickets = useMemo(
-    () =>
-      tickets.filter(
-        (t) =>
-          t.requester?.email === session?.email ||
-          t.requester?.name === session?.name
-      ),
-    [tickets, session?.email, session?.name]
-  )
-
   const filtered = useMemo(() => {
-    return myTickets.filter((t) => {
+    return tickets.filter((t) => {
       if (filter !== 'all' && t.status !== filter) return false
       if (!query) return true
       const q = query.toLowerCase()
       return (t.id + t.subject + t.description).toLowerCase().includes(q)
     })
-  }, [myTickets, filter, query])
+  }, [tickets, filter, query])
 
-  const counts = useMemo(
-    () => ({
-      all: myTickets.length,
-      open: myTickets.filter((t) => t.status === 'open').length,
-      pending: myTickets.filter((t) => t.status === 'pending').length,
-      resolved: myTickets.filter((t) => t.status === 'resolved').length,
-      closed: myTickets.filter((t) => t.status === 'closed').length,
-    }),
-    [myTickets]
-  )
+  const counts = useMemo(() => ({
+    all: tickets.length,
+    open: tickets.filter((t) => t.status === 'open').length,
+    pending: tickets.filter((t) => t.status === 'pending').length,
+    resolved: tickets.filter((t) => t.status === 'resolved').length,
+    closed: tickets.filter((t) => t.status === 'closed').length,
+  }), [tickets])
 
-  const submit = ({ subject, description, category, priority }) => {
-    const now = new Date().toISOString()
-    const id = `TKT-${Date.now().toString().slice(-6)}`
-    const next = {
-      id,
-      subject,
-      description,
-      requester: {
-        name: session?.name || 'Member',
-        email: session?.email || `member@${(chama.code || 'chametu').toLowerCase()}.co.ke`,
-        phone: chama.member?.phone || '—',
-        chama: chama.name,
-      },
-      category,
-      priority,
-      status: 'open',
-      assignee: null,
-      watchers: [],
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-      slaResponseDue: new Date(Date.now() + 4 * 3600_000).toISOString(),
-      slaResolveDue: new Date(Date.now() + 24 * 3600_000).toISOString(),
-      messages: [
-        {
-          id: 'm1',
-          author: session?.name || 'Member',
-          role: 'requester',
-          body: description,
-          at: now,
-        },
-      ],
+  const submit = async ({ subject, description, category, priority }) => {
+    try {
+      await api('/api/support/me', {
+        method: 'POST',
+        body: { subject, description, category, priority },
+      })
+      toast.success('Ticket submitted — the Chametu team will reply soon')
+      setOpen(false)
+      await refresh()
+    } catch (err) {
+      toast.error(err.message)
     }
-    const merged = [next, ...tickets]
-    setTickets(merged)
-    write(TICKETS_KEY, merged)
-    setOpen(false)
-    toast.success('Ticket submitted — the Chametu team will reply soon')
   }
 
-  const addReply = (ticket, body) => {
+  const addReply = async (ticket, body) => {
     if (!body.trim()) return
-    const msg = {
-      id: `m-${Date.now()}`,
-      author: session?.name || 'Member',
-      role: 'requester',
-      body: body.trim(),
-      at: new Date().toISOString(),
+    try {
+      await api(`/api/support/me/${ticket.id}/messages`, {
+        method: 'POST',
+        body: { body: body.trim() },
+      })
+      toast.success('Reply sent')
+      await refresh()
+      const freshList = await api('/api/support/me')
+      setViewing((freshList || []).find((t) => t.id === ticket.id) || null)
+    } catch (err) {
+      toast.error(err.message)
     }
-    const merged = tickets.map((t) =>
-      t.id === ticket.id
-        ? { ...t, messages: [...t.messages, msg], updatedAt: msg.at }
-        : t
+  }
+
+  if (isMemberLoading && !profile) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
     )
-    setTickets(merged)
-    write(TICKETS_KEY, merged)
-    setViewing(merged.find((t) => t.id === ticket.id))
-    toast.success('Reply added')
   }
 
   return (
@@ -174,7 +137,7 @@ export default function MemberSupport() {
         <div>
           <h1 className="font-display text-2xl font-bold text-navy">Support</h1>
           <p className="mt-1 text-sm text-ink-soft">
-            Reach the Chametu team directly. Every ticket goes to chametu support team.
+            Reach the Chametu team directly. Every ticket goes to the Chametu support team.
           </p>
         </div>
         <button
@@ -226,15 +189,19 @@ export default function MemberSupport() {
           </div>
         </div>
 
-        <div className="divide-y divide-line">
-          {filtered.length === 0 ? (
-            <div className="px-5 py-14 text-center">
-              <LifeBuoy size={28} className="mx-auto mb-2 text-ink-soft/40" />
-              <p className="text-sm font-semibold text-navy">No tickets yet</p>
-              <p className="mt-0.5 text-xs text-ink-soft">Click “New ticket” to raise your first issue.</p>
-            </div>
-          ) : (
-            filtered.map((t) => (
+        {loading ? (
+          <div className="py-12 text-center">
+            <Loader2 className="mx-auto animate-spin text-forest" size={24} />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="px-5 py-14 text-center">
+            <LifeBuoy size={28} className="mx-auto mb-2 text-ink-soft/40" />
+            <p className="text-sm font-semibold text-navy">No tickets yet</p>
+            <p className="mt-0.5 text-xs text-ink-soft">Click "New ticket" to raise your first issue.</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-line">
+            {filtered.map((t) => (
               <button
                 key={t.id}
                 onClick={() => setViewing(t)}
@@ -245,7 +212,7 @@ export default function MemberSupport() {
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[0.7rem] text-ink-soft">{t.id}</span>
+                    <span className="font-mono text-[0.7rem] text-ink-soft">{t.id.slice(0, 8)}</span>
                     <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[t.status].cls}`}>
                       {STATUS_META[t.status].label}
                     </span>
@@ -258,9 +225,9 @@ export default function MemberSupport() {
                   <p className="mt-1 text-[0.7rem] text-ink-soft">Updated {fmtRelative(t.updatedAt)}</p>
                 </div>
               </button>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {open && <NewTicketModal onClose={() => setOpen(false)} onSubmit={submit} />}
@@ -297,21 +264,18 @@ function NewTicketModal({ onClose, onSubmit }) {
 
   const submit = (e) => {
     e.preventDefault()
-    if (!subject.trim() || !description.trim()) return toast.error('Fill in subject and description')
+    if (!subject.trim() || !description.trim()) {
+      return toast.error('Fill in subject and description')
+    }
     onSubmit({ subject: subject.trim(), description: description.trim(), category, priority })
   }
 
-  const inputCls = 'w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-navy outline-none focus:border-forest transition'
+  const inputCls =
+    'w-full rounded-xl border border-line px-3.5 py-2.5 text-sm text-navy outline-none focus:border-forest transition'
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <div className="flex items-center gap-2">
             <LifeBuoy className="text-forest" size={18} />
@@ -324,22 +288,11 @@ function NewTicketModal({ onClose, onSubmit }) {
         <form onSubmit={submit} className="space-y-3 p-5">
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-navy">Subject</span>
-            <input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Brief summary"
-              className={inputCls}
-            />
+            <input value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Brief summary" className={inputCls} />
           </label>
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-navy">Description</span>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              placeholder="Steps, error messages…"
-              className={inputCls}
-            />
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="Steps, error messages…" className={inputCls} />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -375,27 +328,24 @@ function NewTicketModal({ onClose, onSubmit }) {
 
 function TicketModal({ ticket, onClose, onReply }) {
   const [reply, setReply] = useState('')
+
   const submit = (e) => {
     e.preventDefault()
     if (!reply.trim()) return
     onReply(reply)
     setReply('')
   }
-  const inputCls = 'w-full rounded-xl border border-line px-3 py-2 text-sm text-navy outline-none focus:border-forest'
+
+  const inputCls =
+    'w-full rounded-xl border border-line px-3 py-2 text-sm text-navy outline-none focus:border-forest'
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center"
-      onClick={onClose}
-    >
-      <div
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[0.7rem] text-ink-soft">{ticket.id}</span>
+              <span className="font-mono text-[0.7rem] text-ink-soft">{ticket.id.slice(0, 8)}</span>
               <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[ticket.status].cls}`}>
                 {STATUS_META[ticket.status].label}
               </span>
@@ -413,24 +363,16 @@ function TicketModal({ ticket, onClose, onReply }) {
         <div className="flex-1 space-y-2 overflow-y-auto p-4">
           {ticket.messages.map((m) => {
             const isAgent = m.role === 'agent'
-            const internal = m.internal
             return (
-              <div
-                key={m.id}
-                className={`rounded-xl border p-3 ${
-                  internal
-                    ? 'border-amber-500/30 bg-amber-500/5'
-                    : isAgent
-                      ? 'border-line bg-white'
-                      : 'border-line bg-paper/60'
-                }`}
-              >
+              <div key={m.id} className={`rounded-xl border p-3 ${isAgent ? 'border-line bg-white' : 'border-line bg-paper/60'}`}>
                 <div className="mb-1 flex flex-wrap items-center gap-2 text-[0.72rem]">
                   <span className="grid h-6 w-6 place-items-center rounded bg-navy/10 text-[0.6rem] font-bold text-navy">
                     {initials(m.author)}
                   </span>
                   <span className="font-semibold text-navy">{m.author}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase ${isAgent ? 'bg-forest/10 text-forest' : 'bg-blue-100 text-blue-700'}`}>
+                  <span className={`rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase ${
+                    isAgent ? 'bg-forest/10 text-forest' : 'bg-blue-100 text-blue-700'
+                  }`}>
                     {isAgent ? 'Chametu' : 'You'}
                   </span>
                   <span className="ml-auto text-ink-soft">{fmtDate(m.at)}</span>
@@ -442,13 +384,7 @@ function TicketModal({ ticket, onClose, onReply }) {
         </div>
 
         <form onSubmit={submit} className="border-t border-line p-3">
-          <textarea
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            rows={2}
-            placeholder="Add a reply…"
-            className={inputCls}
-          />
+          <textarea value={reply} onChange={(e) => setReply(e.target.value)} rows={2} placeholder="Add a reply…" className={inputCls} />
           <div className="mt-2 flex justify-end">
             <button type="submit" className="inline-flex items-center gap-1.5 rounded-xl bg-forest px-3 py-1.5 text-xs font-semibold text-white hover:bg-forest-dark">
               <Send size={12} /> Send reply

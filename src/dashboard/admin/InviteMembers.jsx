@@ -1,11 +1,24 @@
-import { useEffect, useState } from 'react'
+// src/dashboard/admin/InviteMembers.jsx
+import { useEffect, useMemo, useState } from 'react'
 import {
-  Copy, Check, Send, Mail, Phone, MessageCircle, ExternalLink,
-  Loader2, Trash2, RefreshCw,
+  Copy,
+  Check,
+  Send,
+  Mail,
+  Phone,
+  MessageCircle,
+  ExternalLink,
+  Loader2,
+  Trash2,
+  RefreshCw,
+  Square,
+  CheckSquare,
+  AlertTriangle,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
+import { api } from '../../lib/api'
 
 const badge = {
   pending: 'bg-[#FBF1E0] text-[#8A6417]',
@@ -13,23 +26,115 @@ const badge = {
   expired: 'bg-line text-ink-soft',
   cancelled: 'bg-red-50 text-red-600',
 }
-const badgeLabel = { pending: 'PENDING', joined: 'JOINED', expired: 'EXPIRED', cancelled: 'CANCELLED' }
 
-function ConfirmModal({ open, title, body, confirmLabel, onClose, onConfirm, loading }) {
+const badgeLabel = {
+  pending: 'PENDING',
+  joined: 'JOINED',
+  expired: 'EXPIRED',
+  cancelled: 'CANCELLED',
+}
+
+/* ------------------------------------------------------------------ */
+/* Confirmation modal                                                 */
+/* ------------------------------------------------------------------ */
+function ConfirmModal({
+  open,
+  title,
+  description,
+  invites = [],
+  confirmLabel = 'Clear',
+  loading = false,
+  onClose,
+  onConfirm,
+}) {
   if (!open) return null
+
+  const previewList = invites.slice(0, 5)
+  const moreCount = invites.length - previewList.length
+
   return (
-    <div className="fixed inset-0 z-[100] bg-black/40 grid place-items-center p-4" onClick={onClose}>
-      <div className="bg-white border border-line rounded-2xl w-full max-w-sm overflow-hidden shadow-xl" onClick={(e) => e.stopPropagation()}>
-        <div className="px-5 py-4">
-          <h3 className="font-display font-semibold text-navy text-[1.05rem]">{title}</h3>
-          <p className="mt-1.5 text-[0.86rem] text-ink-soft">{body}</p>
+    <div
+      className="fixed inset-0 z-[100] grid place-items-center bg-black/50 p-4 backdrop-blur-sm"
+      onClick={loading ? undefined : onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+    >
+      <div
+        className="w-full max-w-md overflow-hidden rounded-3xl border border-line bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start gap-3.5 px-6 pt-6">
+          <span className="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-red-50 text-red-600 ring-1 ring-red-100">
+            <AlertTriangle size={20} strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3
+              id="confirm-title"
+              className="font-display text-[1.08rem] font-bold text-navy"
+            >
+              {title}
+            </h3>
+            <p className="mt-1 text-[0.85rem] leading-relaxed text-ink-soft">
+              {description}
+            </p>
+          </div>
         </div>
-        <div className="flex justify-end gap-2 px-5 py-3.5 border-t border-line bg-paper/40">
-          <button onClick={onClose} disabled={loading} className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold disabled:opacity-50">
-            Keep it
+
+        {invites.length > 0 && (
+          <div className="mx-6 mt-4 max-h-[180px] overflow-y-auto rounded-2xl border border-line bg-paper/50">
+            {previewList.map((inv) => (
+              <div
+                key={inv.id}
+                className="flex items-center gap-2 border-b border-line px-3.5 py-2.5 text-[0.82rem] last:border-b-0"
+              >
+                {inv.contact.includes('@') ? (
+                  <Mail size={13} className="shrink-0 text-ink-soft" />
+                ) : (
+                  <Phone size={13} className="shrink-0 text-ink-soft" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-navy">
+                  {inv.contact}
+                </span>
+                <span className="shrink-0 text-[0.7rem] font-semibold uppercase tracking-wide text-ink-soft">
+                  {inv.status}
+                </span>
+              </div>
+            ))}
+            {moreCount > 0 && (
+              <div className="px-3.5 py-2 text-center text-[0.78rem] font-medium text-ink-soft">
+                + {moreCount} more
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="mt-5 flex justify-end gap-2 border-t border-line bg-paper/40 px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={loading}
+            className="rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy transition hover:border-navy disabled:opacity-50"
+          >
+            Cancel
           </button>
-          <button onClick={onConfirm} disabled={loading} className="px-4 py-2.5 rounded-xl text-white text-[0.86rem] font-semibold bg-red-600 hover:bg-red-700 transition disabled:opacity-50">
-            {loading ? 'Processing...' : confirmLabel}
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-[0.86rem] font-semibold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Clearing…
+              </>
+            ) : (
+              <>
+                <Trash2 size={14} />
+                {confirmLabel}
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -37,28 +142,55 @@ function ConfirmModal({ open, title, body, confirmLabel, onClose, onConfirm, loa
   )
 }
 
+/* ------------------------------------------------------------------ */
+/* Page                                                               */
+/* ------------------------------------------------------------------ */
 export default function InviteMembers() {
   const navigate = useNavigate()
-  const { chama, roles, invites, inviteMember, cancelInvite, refetchInvites } = useChama()
+  const { chama, roles, invites, inviteMember, refetchInvites } = useChama()
 
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [actionTarget, setActionTarget] = useState(null)
-  const [isProcessing, setIsProcessing] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
 
-  const roleNames = roles?.length > 0
-    ? roles.map((r) => r.name)
-    : ['Member', 'Secretary', 'Treasurer', 'Chairman']
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [modal, setModal] = useState(null)
+  const [isClearing, setIsClearing] = useState(false)
+
+  const roleNames =
+    roles?.length > 0
+      ? roles.map((r) => r.name)
+      : ['Member', 'Secretary', 'Treasurer', 'Chairman']
 
   const [form, setForm] = useState({ contact: '', role: roleNames[0] })
 
-  // Keep role default in sync once roles finish loading
   useEffect(() => {
     if (roleNames.length > 0) {
-      setForm((f) => (roleNames.includes(f.role) ? f : { ...f, role: roleNames[0] }))
+      setForm((f) =>
+        roleNames.includes(f.role) ? f : { ...f, role: roleNames[0] },
+      )
     }
-  }, [roles]) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roles])
+
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const valid = new Set(invites.map((i) => i.id))
+      const next = new Set([...prev].filter((id) => valid.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [invites])
+
+  const allIds = useMemo(() => invites.map((i) => i.id), [invites])
+  const allSelected = invites.length > 0 && selectedIds.size === invites.length
+  const someSelected = selectedIds.size > 0 && !allSelected
+
+  const selectedInvites = useMemo(
+    () => invites.filter((i) => selectedIds.has(i.id)),
+    [invites, selectedIds],
+  )
+
+  /* -------------------------- actions -------------------------- */
 
   async function sendInvite(e) {
     e.preventDefault()
@@ -95,54 +227,173 @@ export default function InviteMembers() {
   function shareWhatsapp(invite) {
     const link = `${window.location.origin}/join/${chama?.code}/${invite.token}`
     const text = `You're invited to join ${chama?.name} on Chametu: ${link}`
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank', 'noopener')
+    window.open(
+      `https://wa.me/?text=${encodeURIComponent(text)}`,
+      '_blank',
+      'noopener',
+    )
   }
 
   function previewInvite(invite) {
     navigate(`/join/${chama?.code}/${invite.token}`)
   }
 
-  async function executeAction() {
-    if (!actionTarget) return
-    setIsProcessing(true)
-    const res = await cancelInvite(actionTarget.id)
-    setIsProcessing(false)
-    if (res.ok) {
-      toast.success('Invite deleted successfully')
-      setActionTarget(null)
-    } else {
-      toast.error(res.message)
+  /* -------------------------- selection -------------------------- */
+
+  function toggleOne(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelectedIds((prev) =>
+      prev.size === invites.length ? new Set() : new Set(allIds),
+    )
+  }
+
+  /* -------------------------- clearing -------------------------- */
+
+  function askClearOne(invite) {
+    setModal({ mode: 'single', invites: [invite] })
+  }
+
+  function askClearSelected() {
+    if (selectedIds.size === 0) return
+    setModal({ mode: 'selected', invites: selectedInvites })
+  }
+
+  function askClearAll() {
+    if (invites.length === 0) return
+    setModal({ mode: 'all', invites: invites })
+  }
+
+  async function confirmClear() {
+    if (!modal) return
+    setIsClearing(true)
+    try {
+      const ids = modal.invites.map((i) => i.id)
+
+      // Bulk delete in one transaction via the backend route added below.
+      // Falls back to per-id DELETEs if the endpoint isn't available.
+      let failed = 0
+      try {
+        await api('/api/chama/invites', {
+          method: 'DELETE',
+          body: { ids },
+        })
+      } catch {
+        const results = await Promise.allSettled(
+          ids.map((id) =>
+            api(`/api/chama/invites/${id}`, { method: 'DELETE' }),
+          ),
+        )
+        failed = results.filter((r) => r.status === 'rejected').length
+      }
+
+      await refetchInvites()
+      setSelectedIds(new Set())
+
+      if (failed > 0) {
+        toast.warning(
+          `Cleared ${ids.length - failed} invite(s). ${failed} failed.`,
+        )
+      } else {
+        toast.success(
+          `Cleared ${ids.length} invite${ids.length > 1 ? 's' : ''}.`,
+        )
+      }
+      setModal(null)
+    } catch (err) {
+      toast.error(err.message || 'Could not clear invites.')
+    } finally {
+      setIsClearing(false)
     }
   }
 
+  const modalCopy = {
+    single: {
+      title: 'Clear this invite?',
+      description:
+        'The invite link will stop working immediately. This cannot be undone.',
+      confirmLabel: 'Clear invite',
+    },
+    selected: {
+      title: `Clear ${selectedIds.size} selected invite${
+        selectedIds.size > 1 ? 's' : ''
+      }?`,
+      description:
+        'These invite links will stop working. This cannot be undone.',
+      confirmLabel: `Clear ${selectedIds.size}`,
+    },
+    all: {
+      title: `Clear all ${invites.length} invites?`,
+      description:
+        'Every invite in this chama will be permanently removed — including ones already used to join. This cannot be undone.',
+      confirmLabel: 'Clear all',
+    },
+  }[modal?.mode] || {}
+
+  /* -------------------------- render -------------------------- */
+
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-3">
+      {/* Header */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-bold text-navy">Invite Members</h1>
-          <p className="mt-1 text-sm text-ink-soft">Add people to {chama?.name || 'your chama'}</p>
+          <h1 className="font-display text-2xl font-bold text-navy">
+            Invite Members
+          </h1>
+          <p className="mt-1 text-sm text-ink-soft">
+            Add people to {chama?.name || 'your chama'}
+          </p>
         </div>
-        <button
-          onClick={refresh}
-          disabled={refreshing}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-navy hover:border-forest disabled:opacity-50"
-        >
-          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={refresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-navy hover:border-forest disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+
+          {invites.length > 0 && (
+            <button
+              onClick={askClearAll}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+            >
+              <Trash2 size={13} />
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
+      {/* Invite form */}
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
-        <h3 className="font-display text-sm font-semibold text-navy">Invite by email or phone</h3>
+        <h3 className="font-display text-sm font-semibold text-navy">
+          Invite by email or phone
+        </h3>
         <p className="mt-1 text-sm text-ink-soft">
-          Enter an email to automatically send an invite via Brevo. For phone numbers, copy the link and share it manually.
+          Enter an email to automatically send an invite via Brevo. For phone
+          numbers, copy the link and share it manually.
         </p>
-        <form onSubmit={sendInvite} className="mt-4 flex flex-wrap items-end gap-3">
+        <form
+          onSubmit={sendInvite}
+          className="mt-4 flex flex-wrap items-end gap-3"
+        >
           <label className="min-w-55 flex-1 text-xs font-semibold text-ink">
             Email or phone number
             <input
               value={form.contact}
-              onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, contact: e.target.value }))
+              }
               placeholder="jane@email.com or 07XX XXX XXX"
               className="mt-1.5 w-full rounded-xl border border-line px-3 py-2.5 text-sm outline-none focus:border-forest focus:ring-4 focus:ring-emerald/10"
             />
@@ -151,10 +402,14 @@ export default function InviteMembers() {
             Role
             <select
               value={form.role}
-              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, role: e.target.value }))
+              }
               className="mt-1.5 block rounded-xl border border-line px-3 py-2.5 text-sm outline-none focus:border-forest"
             >
-              {roleNames.map((r) => <option key={r}>{r}</option>)}
+              {roleNames.map((r) => (
+                <option key={r}>{r}</option>
+              ))}
             </select>
           </label>
           <button
@@ -162,84 +417,195 @@ export default function InviteMembers() {
             disabled={busy}
             className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-forest to-emerald px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 disabled:opacity-50"
           >
-            {busy ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+            {busy ? (
+              <Loader2 size={15} className="animate-spin" />
+            ) : (
+              <Send size={15} />
+            )}
             {busy ? 'Generating...' : 'Generate invite'}
           </button>
         </form>
       </div>
 
+      {/* List */}
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
-        <h3 className="mb-3.5 font-display text-sm font-semibold text-navy">
-          Recent Invites <span className="ml-1 text-ink-soft font-normal">({invites.length})</span>
-        </h3>
+        <div className="mb-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            {invites.length > 0 && (
+              <button
+                type="button"
+                onClick={toggleAll}
+                aria-pressed={allSelected}
+                className="grid h-6 w-6 place-items-center rounded-md text-ink-soft transition hover:bg-paper hover:text-forest"
+                title={allSelected ? 'Deselect all' : 'Select all'}
+              >
+                {allSelected ? (
+                  <CheckSquare
+                    size={18}
+                    strokeWidth={2}
+                    className="text-forest"
+                  />
+                ) : someSelected ? (
+                  <span className="grid h-[18px] w-[18px] place-items-center rounded-[5px] border-2 border-forest bg-white">
+                    <span className="h-[2px] w-2 rounded-full bg-forest" />
+                  </span>
+                ) : (
+                  <Square size={18} strokeWidth={2} />
+                )}
+              </button>
+            )}
+            <h3 className="font-display text-sm font-semibold text-navy">
+              Recent Invites{' '}
+              <span className="ml-1 font-normal text-ink-soft">
+                ({invites.length})
+              </span>
+            </h3>
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-[0.78rem] font-medium text-ink-soft">
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="text-[0.78rem] font-semibold text-ink-soft hover:text-navy"
+              >
+                Clear
+              </button>
+              <button
+                onClick={askClearSelected}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-red-700"
+              >
+                <Trash2 size={12} />
+                Clear selected
+              </button>
+            </div>
+          )}
+        </div>
 
         {invites.length === 0 ? (
-          <p className="text-sm text-ink-soft">No invites sent yet — generate one above.</p>
+          <p className="text-sm text-ink-soft">
+            No invites sent yet — generate one above.
+          </p>
         ) : (
           <div className="space-y-2.5">
-            {invites.map((inv) => (
-              <div key={inv.id} className="rounded-xl border border-line p-3.5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="flex items-center gap-1.5 text-sm text-navy">
-                    {inv.contact.includes('@')
-                      ? <Mail size={13} className="text-ink-soft" />
-                      : <Phone size={13} className="text-ink-soft" />}
-                    {inv.contact}
-                    <span className="text-ink-soft">· {inv.role}</span>
-                  </span>
-                  <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${badge[inv.status] || badge.expired}`}>
-                    {badgeLabel[inv.status] || 'EXPIRED'}
-                  </span>
-                </div>
-
-                {inv.status === 'pending' && (
-                  <>
-                    <div className="mt-2 truncate rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs text-ink">
-                      {window.location.origin}/join/{chama?.code}/{inv.token}
+            {invites.map((inv) => {
+              const isSelected = selectedIds.has(inv.id)
+              return (
+                <div
+                  key={inv.id}
+                  className={`rounded-xl border p-3.5 transition ${
+                    isSelected
+                      ? 'border-forest bg-forest/[0.04] ring-1 ring-forest/20'
+                      : 'border-line hover:border-forest/40'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => toggleOne(inv.id)}
+                        aria-pressed={isSelected}
+                        className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-ink-soft transition hover:text-forest"
+                        title={isSelected ? 'Deselect' : 'Select'}
+                      >
+                        {isSelected ? (
+                          <CheckSquare
+                            size={17}
+                            strokeWidth={2.2}
+                            className="text-forest"
+                          />
+                        ) : (
+                          <Square size={17} strokeWidth={2} />
+                        )}
+                      </button>
+                      <span className="flex min-w-0 items-center gap-1.5 text-sm text-navy">
+                        {inv.contact.includes('@') ? (
+                          <Mail size={13} className="shrink-0 text-ink-soft" />
+                        ) : (
+                          <Phone size={13} className="shrink-0 text-ink-soft" />
+                        )}
+                        <span className="truncate">{inv.contact}</span>
+                        <span className="shrink-0 text-ink-soft">
+                          · {inv.role}
+                        </span>
+                      </span>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <button onClick={() => copy(inv)} className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-navy transition hover:border-forest">
-                        {copiedId === inv.id ? <Check size={13} /> : <Copy size={13} />}
-                        {copiedId === inv.id ? 'Copied' : 'Copy link'}
-                      </button>
-                      <button onClick={() => previewInvite(inv)} className="flex items-center gap-1.5 rounded-md border border-forest bg-forest/[0.05] px-3 py-1.5 text-xs font-semibold text-forest transition hover:bg-forest/10">
-                        <ExternalLink size={13} /> Preview as invitee
-                      </button>
-                      <button onClick={() => shareWhatsapp(inv)} className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-emerald transition hover:border-emerald">
-                        <MessageCircle size={13} /> WhatsApp
-                      </button>
-                      <button onClick={() => setActionTarget(inv)} className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700 hover:underline">
-                        Cancel
-                      </button>
-                    </div>
-                  </>
-                )}
-
-                {inv.status !== 'pending' && inv.status !== 'joined' && (
-                  <div className="mt-2 flex justify-end">
-                    <button onClick={() => setActionTarget(inv)} className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100">
-                      <Trash2 size={13} /> Delete invite
-                    </button>
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${
+                        badge[inv.status] || badge.expired
+                      }`}
+                    >
+                      {badgeLabel[inv.status] || 'EXPIRED'}
+                    </span>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {inv.status === 'pending' && (
+                    <>
+                      <div className="mt-2 truncate rounded-lg border border-line bg-paper px-3 py-2 font-mono text-xs text-ink">
+                        {window.location.origin}/join/{chama?.code}/{inv.token}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <button
+                          onClick={() => copy(inv)}
+                          className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-navy transition hover:border-forest"
+                        >
+                          {copiedId === inv.id ? (
+                            <Check size={13} />
+                          ) : (
+                            <Copy size={13} />
+                          )}
+                          {copiedId === inv.id ? 'Copied' : 'Copy link'}
+                        </button>
+                        <button
+                          onClick={() => previewInvite(inv)}
+                          className="flex items-center gap-1.5 rounded-md border border-forest bg-forest/[0.05] px-3 py-1.5 text-xs font-semibold text-forest transition hover:bg-forest/10"
+                        >
+                          <ExternalLink size={13} /> Preview as invitee
+                        </button>
+                        <button
+                          onClick={() => shareWhatsapp(inv)}
+                          className="flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-xs font-semibold text-emerald transition hover:border-emerald"
+                        >
+                          <MessageCircle size={13} /> WhatsApp
+                        </button>
+                        <button
+                          onClick={() => askClearOne(inv)}
+                          className="ml-auto text-xs font-semibold text-red-600 hover:text-red-700 hover:underline"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  {inv.status !== 'pending' && (
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        onClick={() => askClearOne(inv)}
+                        className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                      >
+                        <Trash2 size={13} /> Clear invite
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
 
       <ConfirmModal
-        open={!!actionTarget}
-        title={actionTarget?.status === 'pending' ? 'Cancel this invite?' : 'Delete this invite?'}
-        body={
-          actionTarget?.status === 'pending'
-            ? `Are you sure you want to cancel the invite for ${actionTarget?.contact}? They will no longer be able to use this link to join.`
-            : `Are you sure you want to permanently delete the expired invite for ${actionTarget?.contact}?`
-        }
-        confirmLabel={actionTarget?.status === 'pending' ? 'Cancel Invite' : 'Delete permanently'}
-        loading={isProcessing}
-        onClose={() => setActionTarget(null)}
-        onConfirm={executeAction}
+        open={!!modal}
+        title={modalCopy.title}
+        description={modalCopy.description}
+        invites={modal?.invites || []}
+        confirmLabel={modalCopy.confirmLabel}
+        loading={isClearing}
+        onClose={() => setModal(null)}
+        onConfirm={confirmClear}
       />
     </div>
   )

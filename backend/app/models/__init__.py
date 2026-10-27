@@ -15,3 +15,6 @@ from .ledger import (
     SavingsLedger, Payment, WelfareContribution, AuditLogEntry,
 )
 from .contribution import Contribution, MemberInvite
+from .notification import (
+    Notification, NotificationPreference, NotificationReadReceipt,
+)

@@ -1,22 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+// src/member/MemberWelfare.jsx
+import { useMemo, useState } from 'react'
 import {
   Heart, Info, X, Clock, CheckCircle2, XCircle, Wallet,
-  TrendingUp, MessageSquare, Users, ArrowDownRight, ArrowUpRight,
-  Search, ShieldCheck, ListChecks,
+  MessageSquare, Search, ShieldCheck, ListChecks, Loader2,
 } from 'lucide-react'
-import {
-  getMemberSession,
-  getMembers,
-  applyMemberWelfare,
-} from '../lib/chametuStorage'
-import { publishAdminNotification } from '../lib/adminNotifications'
-import {
-  getAllClaims,
-  getWelfareSummary,
-  getPublicPayouts,
-  filterClaims,
-  WELFARE_MONTHLY_FEE,
-} from '../lib/welfareShared'
+import { useMember } from '../context/MemberContext'
 
 function fmt(n) {
   return 'KSh ' + Number(n || 0).toLocaleString('en-KE')
@@ -58,89 +46,109 @@ const STATUS_META = {
     label: 'Rejected',
     cls: 'bg-red-50 text-red-600 ring-1 ring-red-100',
     icon: XCircle,
-    hint: 'Your claim was not approved. See note below.',
+    hint: 'Your claim was not approved.',
   },
 }
 
 export default function MemberWelfare() {
-  const session = getMemberSession()
-  const [members, setMembers] = useState(() => getMembers())
-  const [claims, setClaims] = useState(() => getAllClaims())
+  const { welfareClaims, shared, profile, isLoading, submitWelfareClaim } = useMember()
+
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ reason: '', amount: '' })
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [tab, setTab] = useState('all')
   const [ledgerQuery, setLedgerQuery] = useState('')
 
-  useEffect(() => {
-    const refresh = () => {
-      setMembers(getMembers())
-      setClaims(getAllClaims())
-    }
-    window.addEventListener('chametu:storage-updated', refresh)
-    window.addEventListener('storage', refresh)
-    return () => {
-      window.removeEventListener('chametu:storage-updated', refresh)
-      window.removeEventListener('storage', refresh)
-    }
-  }, [])
+  // Public payouts = approved claims across the whole chama.
+  // We only see the claims the backend already filtered to us, so for the
+  // public ledger we use shared.welfare (returns all claims for the chama).
+  const allWelfareClaims = shared?.welfare || welfareClaims
 
-  const summary = useMemo(() => getWelfareSummary(members), [members, claims])
-  const payouts = useMemo(() => getPublicPayouts(), [claims])
-
-  const myClaims = useMemo(
-    () =>
-      claims.filter(
-        (c) =>
-          c.memberId === session?.id ||
-          c.member === session?.name
-      ),
-    [claims, session?.id, session?.name]
-  )
+  const myClaims = useMemo(() => {
+    const myName = profile?.name
+    const myId = profile?.id
+    return allWelfareClaims.filter(
+      (c) => c.memberId === myId || c.member === myName
+    )
+  }, [allWelfareClaims, profile])
 
   const myCounts = useMemo(() => ({
     all: myClaims.length,
     pending: myClaims.filter((c) => c.status === 'pending').length,
     paid: myClaims.filter((c) => c.status === 'paid').length,
     rejected: myClaims.filter((c) => c.status === 'rejected').length,
-    totalReceived: myClaims.filter((c) => c.status === 'paid').reduce((s, c) => s + Number(c.amount || 0), 0),
+    totalReceived: myClaims
+      .filter((c) => c.status === 'paid')
+      .reduce((s, c) => s + Number(c.amount || 0), 0),
   }), [myClaims])
 
   const filteredClaims = useMemo(
-    () => filterClaims(myClaims, tab, ''),
+    () => myClaims.filter((c) => tab === 'all' || c.status === tab),
     [myClaims, tab]
   )
 
+  const publicPayouts = useMemo(
+    () =>
+      allWelfareClaims
+        .filter((c) => c.status === 'paid')
+        .sort(
+          (a, b) =>
+            new Date(b.reviewedAt || b.submittedAt || 0).getTime() -
+            new Date(a.reviewedAt || a.submittedAt || 0).getTime()
+        ),
+    [allWelfareClaims]
+  )
+
   const filteredPayouts = useMemo(() => {
-    if (!ledgerQuery.trim()) return payouts
+    if (!ledgerQuery.trim()) return publicPayouts
     const q = ledgerQuery.trim().toLowerCase()
-    return payouts.filter(
+    return publicPayouts.filter(
       (p) =>
         (p.member || '').toLowerCase().includes(q) ||
         (p.reason || '').toLowerCase().includes(q)
     )
-  }, [payouts, ledgerQuery])
+  }, [publicPayouts, ledgerQuery])
 
-  function submit(e) {
+  // Chama-wide summary
+  const summary = useMemo(() => {
+    const collected = 0 // backend doesn't expose chama-level collection yet
+    const paid = publicPayouts.reduce((s, c) => s + Number(c.amount || 0), 0)
+    const pending = allWelfareClaims
+      .filter((c) => c.status === 'pending')
+      .reduce((s, c) => s + Number(c.amount || 0), 0)
+    return {
+      balance: Math.max(0, collected - paid),
+      collected,
+      paid,
+      pending,
+      approvedClaims: publicPayouts.length,
+      pendingClaims: allWelfareClaims.filter((c) => c.status === 'pending').length,
+    }
+  }, [allWelfareClaims, publicPayouts])
+
+  async function submit(e) {
     e.preventDefault()
     setError('')
     const amount = Number(form.amount)
     if (!form.reason.trim()) return setError('Tell us the reason for your claim.')
     if (!amount || amount <= 0) return setError('Enter a valid amount.')
 
-    applyMemberWelfare(session, { reason: form.reason.trim(), amount })
+    setSubmitting(true)
+    const res = await submitWelfareClaim(amount, form.reason.trim())
+    setSubmitting(false)
 
-    publishAdminNotification({
-      type: 'warning',
-      event: 'welfareClaims',
-      title: 'New welfare claim',
-      desc: `${session?.name || 'Member'} requested ${fmt(amount)}`,
-      link: '/dashboard/welfare',
-    })
-
-    setClaims(getAllClaims())
+    if (!res.ok) return setError(res.message)
     setForm({ reason: '', amount: '' })
     setOpen(false)
+  }
+
+  if (isLoading && myClaims.length === 0) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
+    )
   }
 
   return (
@@ -150,8 +158,7 @@ export default function MemberWelfare() {
         <div>
           <h1 className="font-display text-xl font-bold text-navy">Welfare</h1>
           <p className="mt-1 text-[0.86rem] text-ink-soft">
-            Community support fund · {summary.memberCount} contributing members ·{' '}
-            {fmt(WELFARE_MONTHLY_FEE)}/member/month
+            Community support fund
           </p>
         </div>
         <button
@@ -162,68 +169,15 @@ export default function MemberWelfare() {
         </button>
       </div>
 
-      {/* Fund health KPIs */}
+      {/* Fund KPIs */}
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-        <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-soft">Fund balance</span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald/10 text-forest">
-              <Wallet size={13} />
-            </span>
-          </div>
-          <div className="mt-2 font-display font-mono text-lg font-bold text-navy">
-            {fmt(summary.balance)}
-          </div>
-          <div className="mt-0.5 text-[0.7rem] text-emerald font-semibold">
-            {fmt(summary.collected)} collected
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-soft">Paid out</span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-navy/5 text-navy">
-              <ArrowUpRight size={13} />
-            </span>
-          </div>
-          <div className="mt-2 font-display font-mono text-lg font-bold text-navy">
-            {fmt(summary.paid)}
-          </div>
-          <div className="mt-0.5 text-[0.7rem] text-ink-soft">
-            {summary.approvedClaims} claim{summary.approvedClaims === 1 ? '' : 's'} approved
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-soft">Awaiting review</span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-gold/15 text-[#8A6417]">
-              <Clock size={13} />
-            </span>
-          </div>
-          <div className="mt-2 font-display text-lg font-bold text-navy">
-            {summary.pendingClaims}
-          </div>
-          <div className="mt-0.5 text-[0.7rem] text-[#8A6417] font-semibold">
-            {fmt(summary.pending)} pending
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-ink-soft">Community</span>
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald/10 text-forest">
-              <Users size={13} />
-            </span>
-          </div>
-          <div className="mt-2 font-display text-lg font-bold text-navy">
-            {summary.memberCount}
-          </div>
-          <div className="mt-0.5 text-[0.7rem] text-ink-soft">active members</div>
-        </div>
+        <Kpi icon={Wallet} label="Fund balance" value={fmt(summary.balance)} tone="emerald" />
+        <Kpi icon={Heart} label="Paid out" value={fmt(summary.paid)} tone="navy" />
+        <Kpi icon={Clock} label="Awaiting review" value={String(summary.pendingClaims)} tone="gold" />
+        <Kpi icon={ShieldCheck} label="Approved claims" value={String(summary.approvedClaims)} tone="forest" />
       </div>
 
-      {/* Public payout ledger */}
+      {/* Public ledger */}
       <div className="rounded-2xl border border-line bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
           <div>
@@ -250,7 +204,7 @@ export default function MemberWelfare() {
           <div className="px-5 py-12 text-center">
             <ShieldCheck size={26} className="mx-auto text-ink-soft/40" />
             <p className="mt-2 text-[0.86rem] text-ink-soft">
-              {payouts.length === 0
+              {publicPayouts.length === 0
                 ? 'No payouts have been made from the fund yet.'
                 : 'No payouts match your search.'}
             </p>
@@ -331,9 +285,10 @@ export default function MemberWelfare() {
             )}
             <button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-br from-forest to-emerald py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              disabled={submitting}
+              className="w-full rounded-xl bg-gradient-to-br from-forest to-emerald py-2.5 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50"
             >
-              Submit claim
+              {submitting ? 'Submitting…' : 'Submit claim'}
             </button>
           </form>
         </div>
@@ -410,10 +365,10 @@ export default function MemberWelfare() {
 
                   <p className="mt-2 text-[0.76rem] text-ink-soft">{meta.hint}</p>
 
-                  {c.reviewNote && (
+                  {c.note && (
                     <div className="mt-3 flex items-start gap-1.5 rounded-lg bg-paper/70 px-2.5 py-2 text-[0.72rem] text-navy">
                       <MessageSquare size={11} className="mt-0.5 shrink-0 text-ink-soft" />
-                      <span>{c.reviewNote}</span>
+                      <span>{c.note}</span>
                     </div>
                   )}
 
@@ -435,6 +390,29 @@ export default function MemberWelfare() {
           The welfare fund is transparent by design — every approved payout is visible to all
           members. You'll get a notification here once your own claim is reviewed.
         </span>
+      </div>
+    </div>
+  )
+}
+
+function Kpi({ icon: Icon, label, value, tone }) {
+  const toneClass = {
+    emerald: 'bg-emerald/10 text-forest',
+    navy: 'bg-navy/5 text-navy',
+    gold: 'bg-gold/15 text-[#8A6417]',
+    forest: 'bg-emerald/10 text-forest',
+  }[tone]
+
+  return (
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-ink-soft">{label}</span>
+        <span className={`grid h-7 w-7 place-items-center rounded-lg ${toneClass}`}>
+          <Icon size={13} />
+        </span>
+      </div>
+      <div className="mt-2 font-display font-mono text-lg font-bold text-navy">
+        {value}
       </div>
     </div>
   )

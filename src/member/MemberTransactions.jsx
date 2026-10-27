@@ -1,9 +1,28 @@
-import { ArrowRightLeft, Info } from 'lucide-react'
-import { getMemberSession, getMemberTransactions } from '../lib/chametuStorage'
+// src/member/MemberTransactions.jsx
+import { ArrowRightLeft, Info, Loader2 } from 'lucide-react'
+import { useMember } from '../context/MemberContext'
+
+function fmtDate(iso) {
+  if (!iso) return '—'
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric',
+    })
+  } catch {
+    return '—'
+  }
+}
+
+const TYPE_LABEL = {
+  contribution: 'Contribution',
+  loan_disbursement: 'Loan disbursed',
+  loan_repayment: 'Loan repayment',
+  credit: 'Money in',
+  debit: 'Money out',
+}
 
 export default function MemberTransactions() {
-  const session = getMemberSession()
-  const tx = getMemberTransactions(session)
+  const { transactions, isLoading } = useMember()
 
   return (
     <div className="space-y-5">
@@ -15,7 +34,11 @@ export default function MemberTransactions() {
       </div>
 
       <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
-        {tx.length === 0 ? (
+        {isLoading && transactions.length === 0 ? (
+          <div className="py-10 text-center">
+            <Loader2 className="mx-auto animate-spin text-forest" size={22} />
+          </div>
+        ) : transactions.length === 0 ? (
           <div className="rounded-xl border border-dashed border-line py-10 text-center">
             <ArrowRightLeft size={22} className="mx-auto text-ink-soft/50" />
             <p className="mt-2 text-[0.86rem] text-ink-soft">
@@ -28,28 +51,36 @@ export default function MemberTransactions() {
               <thead>
                 <tr className="border-b border-line bg-paper/60 text-left text-[0.7rem] font-semibold uppercase tracking-wider text-ink-soft">
                   <th className="px-4 py-2.5">Date</th>
-                  <th className="px-4 py-2.5">Description</th>
+                  <th className="px-4 py-2.5">Type</th>
+                  <th className="px-4 py-2.5">Reference</th>
                   <th className="px-4 py-2.5 text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
-                {tx.map((t, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-line last:border-none transition hover:bg-forest/[0.02]"
-                  >
-                    <td className="px-4 py-3 text-ink-soft">{t.date}</td>
-                    <td className="px-4 py-3 font-medium text-navy">{t.desc}</td>
-                    <td
-                      className={`px-4 py-3 text-right font-mono font-semibold ${
-                        t.amount > 0 ? 'text-emerald' : 'text-red-600'
-                      }`}
+                {transactions.map((t) => {
+                  const isDebit =
+                    t.type === 'debit' || t.type === 'loan_disbursement'
+                  return (
+                    <tr
+                      key={t.id}
+                      className="border-b border-line last:border-none transition hover:bg-forest/[0.02]"
                     >
-                      {t.amount > 0 ? '+' : ''}
-                      {t.amount.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                      <td className="px-4 py-3 text-ink-soft">{fmtDate(t.createdAt)}</td>
+                      <td className="px-4 py-3 font-medium text-navy">
+                        {TYPE_LABEL[t.type] || t.type}
+                      </td>
+                      <td className="px-4 py-3 text-ink-soft">{t.reference || '—'}</td>
+                      <td
+                        className={`px-4 py-3 text-right font-mono font-semibold ${
+                          isDebit ? 'text-red-600' : 'text-emerald'
+                        }`}
+                      >
+                        {isDebit ? '−' : '+'}
+                        {Number(t.amount || 0).toLocaleString()}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

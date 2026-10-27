@@ -1,46 +1,30 @@
+// src/member/MemberOverview.jsx
 import { Link } from 'react-router-dom'
 import {
   PiggyBank, Percent, ArrowRightLeft, Gauge, ArrowRight,
   CalendarDays, Sparkles, TrendingUp, CheckCircle2, Clock,
   Package, RefreshCw, Vote, Wallet, Users, ArrowUpRight,
-  CircleDollarSign, Landmark, Bell, UserRound,
+  CircleDollarSign, Landmark, Bell, UserRound, Loader2, AlertCircle,
 } from 'lucide-react'
-import {
-  getMemberSession,
-  getMemberChama,
-  getMemberFinance,
-  getMemberTransactions,
-} from '../lib/chametuStorage'
-import { getOverviewData } from '../dashboard/admin/data/adminData'
-import {
-  useSharedState,
-  SHARED_KEYS,
-  DEFAULT_MEETINGS,
-  DEFAULT_ASSETS,
-  DEFAULT_PROPOSALS,
-} from '../lib/chametuShared'
+import { useMember } from '../context/MemberContext'
 
 function fmt(n) {
-  return 'KSh ' + Math.round(n || 0).toLocaleString('en-KE')
+  return 'KSh ' + Math.round(Number(n) || 0).toLocaleString('en-KE')
 }
 
 function fmtCompact(n) {
-  const abs = Math.abs(n || 0)
+  const abs = Math.abs(Number(n) || 0)
   if (abs >= 1_000_000) {
-    const v = (n / 1_000_000).toFixed(1).replace(/\.0$/, '')
-    return v + 'M'
+    return (Number(n) / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M'
   }
-  if (abs >= 1_000) return Math.round(n / 1_000) + 'K'
-  return String(n || 0)
+  if (abs >= 1_000) return Math.round(Number(n) / 1_000) + 'K'
+  return String(Math.round(Number(n) || 0))
 }
 
 function fmtDate(d) {
   if (!d) return ''
   try {
-    return new Date(d).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
+    return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   } catch {
     return d
   }
@@ -55,62 +39,85 @@ function daysUntil(d) {
   return Math.round((target - now) / (1000 * 60 * 60 * 24))
 }
 
-function initials(name) {
-  return (name || '')
-    .split(' ')
-    .filter(Boolean)
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
-}
-
-const AVATAR_GRADIENTS = [
-  'from-forest to-emerald',
-  'from-gold to-[#E8A21F]',
-  'from-navy to-[#0A2A3E]',
-  'from-emerald to-[#0A7A5A]',
-  'from-[#0B7A5A] to-[#10B981]',
-  'from-[#0A3D46] to-[#0B7A5A]',
-]
-
 export default function MemberOverview() {
-  const session = getMemberSession()
-  const chama = getMemberChama(session)
-  const finance = getMemberFinance(session)
-  const tx = getMemberTransactions(session).slice(0, 5)
-  const d = getOverviewData()
-  const [meetings] = useSharedState(SHARED_KEYS.meetings, DEFAULT_MEETINGS)
-  const [assets] = useSharedState(SHARED_KEYS.assets, DEFAULT_ASSETS)
-  const [proposals] = useSharedState(SHARED_KEYS.proposals, DEFAULT_PROPOSALS)
+  const {
+    profile,
+    chama,
+    savings,
+    loans,
+    contributions,
+    savingsHistory,
+    transactions,
+    shared,
+    isLoading,
+    error,
+    activeLoans,
+    pendingLoan,
+    loanUsed,
+    loanAvailable,
+    loanLimit,
+    refetch,
+  } = useMember()
 
-  const chamaName = chama.name
-  const firstName = (session?.name || 'there').split(' ')[0]
+  if (isLoading && !profile) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
+    )
+  }
 
-  const loanLimit = finance.savings * (chama.maxLoanMultiple || 3)
-  const loanUsed = finance.loan ? finance.loan.amount : 0
-  const loanAvailable = Math.max(0, loanLimit - loanUsed)
+  if (error) {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center">
+        <AlertCircle size={22} className="mx-auto text-red-600" />
+        <p className="mt-2 text-sm font-semibold text-red-700">{error}</p>
+        <button
+          onClick={refetch}
+          className="mt-3 rounded-xl bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
 
-  const contribPct = Math.min(
-    100,
-    Math.round(
-      (finance.contributions.paid / finance.contributions.expected) * 100
-    ) || 0
-  )
-  const isContributionDone = finance.contributions.status === 'done'
+  const firstName = (profile?.name || 'there').split(' ')[0]
+  const chamaName = chama?.name || 'your chama'
 
-  const nextMeeting = meetings.filter((m) => !m.locked)[0]
-  const daysToNext = nextMeeting ? daysUntil(nextMeeting.date) : null
-  const openProposals = proposals.length
-  const assetCount = assets.length
+  const assets = shared?.assets || []
+  const meetings = shared?.meetings || []
+  const proposals = shared?.proposals || []
+  const payout = shared?.payout
+
   const assetValue = assets.reduce((s, a) => s + Number(a.value || 0), 0)
+  const openProposals = proposals.length
 
-  const allMembers = d.members || []
-  const visibleMembers = allMembers.slice(0, 8)
-  const extraCount = Math.max(0, allMembers.length - visibleMembers.length)
+  const nextMeeting = meetings
+    .filter((m) => !m.locked)
+    .slice()
+    .sort((a, b) => new Date(a.date) - new Date(b.date))[0]
+  const daysToNext = nextMeeting ? daysUntil(nextMeeting.date) : null
+
+  const currentPeriodContrib = contributions[0]
+  const contribPaid = Number(currentPeriodContrib?.amount || 0)
+  const contribExpected = Number(chama?.monthly_contribution || 0)
+  const contribPct = contribExpected
+    ? Math.min(100, Math.round((contribPaid / contribExpected) * 100))
+    : 0
+  const isContributionDone = contribExpected > 0 && contribPaid >= contribExpected
+
+  const recentTx = transactions.slice(0, 5)
+
+  const activeLoansList = activeLoans || []
+  const totalLoanBalance = activeLoansList.reduce(
+    (s, l) => s + Number(l.balance || 0),
+    0
+  )
 
   return (
     <div className="space-y-6">
+      {/* Hero */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy via-[#0A2A3E] to-[#0A3D46] p-6 text-white shadow-lg sm:p-7">
         <div
           className="pointer-events-none absolute inset-0 opacity-70"
@@ -124,14 +131,14 @@ export default function MemberOverview() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex items-center gap-1.5 text-[0.66rem] font-bold uppercase tracking-[0.18em] text-emerald/85">
               <Sparkles size={11} />
-              Chama dashboard
+              Member dashboard
             </div>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/[0.08] px-3 py-1.5 text-[0.68rem] font-semibold capitalize text-white/90 backdrop-blur">
               <span className="relative flex h-1.5 w-1.5">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald opacity-70" />
                 <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald" />
               </span>
-              {session?.role || 'Member'}
+              {profile?.role || 'Member'}
             </span>
           </div>
 
@@ -146,37 +153,35 @@ export default function MemberOverview() {
           <div className="mt-6 grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-white/[0.06] p-3 backdrop-blur sm:grid-cols-4 sm:gap-3 sm:p-4">
             <HeroStat
               icon={Wallet}
-              label="Group balance"
-              value={fmtCompact(d.groupBalance)}
+              label="Your savings"
+              value={fmtCompact(savings)}
             />
             <HeroStat
               icon={Percent}
               label="Collected"
-              value={fmtCompact(d.collected)}
-              sub={`${d.contribPct}%`}
+              value={fmtCompact(contribPaid)}
+              sub={`${contribPct}%`}
               border
             />
             <HeroStat
               icon={ArrowRightLeft}
               label="Loans out"
-              value={fmtCompact(d.outstanding)}
-              sub={`${d.liveLoans?.length || 0} active`}
+              value={fmtCompact(totalLoanBalance)}
+              sub={`${activeLoansList.length} active`}
               border
             />
             <HeroStat
               icon={TrendingUp}
-              label="Investments"
-              value={fmtCompact(d.portfolioValue)}
-              sub={
-                d.gain >= 0
-                  ? `+${fmtCompact(d.gain)}`
-                  : `-${fmtCompact(Math.abs(d.gain))}`
-              }
+              label="Chama assets"
+              value={fmtCompact(assetValue)}
+              sub={`${assets.length} item${assets.length === 1 ? '' : 's'}`}
+              border
             />
           </div>
         </div>
       </div>
 
+      {/* Your account */}
       <section>
         <div className="mb-3.5 flex items-end justify-between gap-3">
           <div>
@@ -194,7 +199,7 @@ export default function MemberOverview() {
             to="/member/savings"
             icon={PiggyBank}
             label="My savings"
-            value={fmt(finance.savings)}
+            value={fmt(savings)}
             sub="Grows with every contribution"
             accent="from-emerald/15 to-emerald/5 text-forest"
           />
@@ -214,9 +219,7 @@ export default function MemberOverview() {
             sub={
               isContributionDone
                 ? 'Well done'
-                : `${fmt(finance.contributions.paid)} of ${fmt(
-                    finance.contributions.expected
-                  )}`
+                : `${fmt(contribPaid)} of ${fmt(contribExpected)}`
             }
             accent="from-gold/20 to-gold/5 text-[#8A6417]"
             success={isContributionDone}
@@ -224,6 +227,7 @@ export default function MemberOverview() {
         </div>
       </section>
 
+      {/* Chama at a glance */}
       <section>
         <div className="mb-3.5 flex items-end justify-between gap-3">
           <div>
@@ -231,7 +235,7 @@ export default function MemberOverview() {
               Chama at a glance
             </h2>
             <p className="mt-0.5 text-[0.78rem] text-ink-soft">
-              Where the group stands financially
+              What the group owns and owes
             </p>
           </div>
         </div>
@@ -240,175 +244,54 @@ export default function MemberOverview() {
           <SnapshotCard
             icon={CircleDollarSign}
             tone="forest"
-            label="Group balance"
-            value={fmt(d.groupBalance)}
-            footer={`${fmt(d.moneyIn)} in recently`}
-            footerTone="text-emerald"
+            label="Your savings"
+            value={fmt(savings)}
+            footer={`${savingsHistory.length} ledger entries`}
+            footerTone="text-ink-soft"
           />
           <SnapshotCard
             icon={Landmark}
             tone="gold"
-            label="Contributions this month"
-            value={fmt(d.collected)}
-            footer={`${d.contribPct}% of ${fmt(d.expected)}`}
-            footerTone={d.contribPct >= 90 ? 'text-emerald' : 'text-[#8A6417]'}
-            progress={d.contribPct}
+            label="Monthly contribution"
+            value={fmt(contribExpected)}
+            footer={
+              isContributionDone ? 'Paid this month' : `${contribPct}% paid`
+            }
+            footerTone={isContributionDone ? 'text-emerald' : 'text-[#8A6417]'}
+            progress={contribPct}
           />
           <SnapshotCard
             icon={ArrowRightLeft}
             tone="navy"
-            label="Outstanding loans"
-            value={fmt(d.outstanding)}
+            label="Your loan balance"
+            value={fmt(totalLoanBalance)}
             footer={
-              d.overdueAmount > 0
-                ? `${fmt(d.overdueAmount)} overdue`
-                : 'All on track'
+              activeLoansList.length > 0
+                ? `${activeLoansList.length} active loan${activeLoansList.length === 1 ? '' : 's'}`
+                : pendingLoan
+                ? 'Application pending'
+                : 'No active loan'
             }
-            footerTone={d.overdueAmount > 0 ? 'text-red-600' : 'text-emerald'}
+            footerTone={
+              totalLoanBalance > 0
+                ? 'text-[#8A6417]'
+                : pendingLoan
+                ? 'text-[#8A6417]'
+                : 'text-ink-soft'
+            }
           />
           <SnapshotCard
             icon={TrendingUp}
             tone="emerald"
-            label="Investments"
-            value={fmt(d.portfolioValue)}
-            footer={
-              d.gain >= 0
-                ? `+${fmt(d.gain)} gain`
-                : `-${fmt(Math.abs(d.gain))} loss`
-            }
-            footerTone={d.gain >= 0 ? 'text-emerald' : 'text-red-600'}
+            label="Chama assets"
+            value={fmt(assetValue)}
+            footer={`${assets.length} item${assets.length === 1 ? '' : 's'}`}
+            footerTone="text-emerald"
           />
         </div>
       </section>
 
-      <section>
-        <div className="mb-3.5 flex items-end justify-between gap-3">
-          <div>
-            <h2 className="font-display text-[1.02rem] font-bold text-navy">
-              Your chama community
-            </h2>
-            <p className="mt-0.5 text-[0.78rem] text-ink-soft">
-              Everyone working towards the same goals
-            </p>
-          </div>
-        </div>
-
-        <div className="overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
-          <div className="grid gap-0 md:grid-cols-[220px_1fr]">
-            <div className="relative overflow-hidden bg-gradient-to-br from-forest to-emerald p-6 text-white">
-              <div
-                className="pointer-events-none absolute inset-0 opacity-50"
-                style={{
-                  background:
-                    'radial-gradient(300px 200px at 100% 100%, rgba(255,255,255,0.2), transparent)',
-                }}
-              />
-              <div className="relative">
-                <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/20 backdrop-blur">
-                  <Users size={18} />
-                </span>
-                <div className="mt-5 font-display text-[3.2rem] font-bold leading-none tracking-tight">
-                  {d.memberCounts.total}
-                </div>
-                <div className="mt-1.5 text-[0.82rem] font-semibold text-white/90">
-                  {d.memberCounts.total === 1 ? 'Member' : 'Members'} in {chamaName}
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[0.66rem] font-semibold backdrop-blur">
-                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
-                    {d.memberCounts.active} active
-                  </span>
-                  {d.memberCounts.invited > 0 && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[0.66rem] font-semibold backdrop-blur">
-                      <span className="h-1.5 w-1.5 rounded-full bg-gold" />
-                      {d.memberCounts.invited} invited
-                    </span>
-                  )}
-                  {d.memberCounts.arrears > 0 && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[0.66rem] font-semibold backdrop-blur">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-300" />
-                      {d.memberCounts.arrears} in arrears
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-[0.68rem] font-bold uppercase tracking-[0.14em] text-ink-soft">
-                  <UserRound size={12} />
-                  Members
-                </div>
-                <span className="text-[0.72rem] text-ink-soft">
-                  {d.memberCounts.active} of {d.memberCounts.total} active
-                </span>
-              </div>
-
-              {allMembers.length === 0 ? (
-                <div className="mt-4 rounded-xl border border-dashed border-line py-6 text-center">
-                  <Users size={20} className="mx-auto text-ink-soft/60" />
-                  <p className="mt-2 text-[0.82rem] text-ink-soft">
-                    No other members have joined yet.
-                  </p>
-                </div>
-              ) : (
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {visibleMembers.map((m, i) => (
-                      <span
-                        key={m.id || i}
-                        title={`${m.name} / ${m.role}`}
-                        className={`grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br ${
-                          AVATAR_GRADIENTS[i % AVATAR_GRADIENTS.length]
-                        } font-display text-[0.7rem] font-bold text-white ring-2 ring-card`}
-                      >
-                        {initials(m.name)}
-                      </span>
-                    ))}
-                  </div>
-                  {extraCount > 0 && (
-                    <span className="grid h-10 w-10 place-items-center rounded-full bg-paper font-display text-[0.7rem] font-bold text-ink-soft ring-2 ring-card">
-                      +{extraCount}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="my-5 h-px bg-line" />
-
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <MiniStat
-                  icon={PiggyBank}
-                  label="Member savings"
-                  value={fmt(d.memberSavings)}
-                />
-                <MiniStat
-                  icon={Percent}
-                  label="Group contribution"
-                  value={`${d.contribPct}%`}
-                  tone={d.contribPct >= 90 ? 'good' : 'warn'}
-                />
-                <MiniStat
-                  icon={CheckCircle2}
-                  label="Active rate"
-                  value={
-                    d.memberCounts.total
-                      ? `${Math.round(
-                          (d.memberCounts.active / d.memberCounts.total) * 100
-                        )}%`
-                      : '0%'
-                  }
-                  tone="good"
-                  className="hidden sm:flex"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
+      {/* Happening in the chama */}
       <section>
         <div className="mb-3.5 flex items-end justify-between gap-3">
           <div>
@@ -427,7 +310,7 @@ export default function MemberOverview() {
             icon={Package}
             gradient="from-forest to-emerald"
             label="Assets"
-            title={`${assetCount} item${assetCount === 1 ? '' : 's'}`}
+            title={`${assets.length} item${assets.length === 1 ? '' : 's'}`}
             sub={`Valued at ${fmt(assetValue)}`}
           />
           <UpdateCard
@@ -442,10 +325,10 @@ export default function MemberOverview() {
                     daysToNext === 0
                       ? 'Today'
                       : daysToNext === 1
-                        ? 'Tomorrow'
-                        : daysToNext > 0
-                          ? `In ${daysToNext} days`
-                          : `${Math.abs(daysToNext)} days ago`
+                      ? 'Tomorrow'
+                      : daysToNext > 0
+                      ? `In ${daysToNext} days`
+                      : `${Math.abs(daysToNext)} days ago`
                   }`
                 : 'Stay tuned for updates'
             }
@@ -455,8 +338,16 @@ export default function MemberOverview() {
             icon={RefreshCw}
             gradient="from-navy to-[#0A2A3E]"
             label="Rotation"
-            title="See who is next"
-            sub="Check the payout order"
+            title={
+              payout?.order?.length
+                ? `${payout.order.length} members`
+                : 'See who is next'
+            }
+            sub={
+              payout?.order?.length
+                ? 'Check your position'
+                : 'Check the payout order'
+            }
           />
           <UpdateCard
             to="/member/voting"
@@ -470,8 +361,9 @@ export default function MemberOverview() {
         </div>
       </section>
 
+      {/* Recent activity + next steps */}
       <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-        <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
+        <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h3 className="font-display text-sm font-bold text-navy">
@@ -489,7 +381,7 @@ export default function MemberOverview() {
             </Link>
           </div>
 
-          {tx.length === 0 ? (
+          {recentTx.length === 0 ? (
             <div className="rounded-xl border border-dashed border-line py-10 text-center">
               <Clock size={20} className="mx-auto text-ink-soft/60" />
               <p className="mt-2 text-sm text-ink-soft">
@@ -498,54 +390,62 @@ export default function MemberOverview() {
             </div>
           ) : (
             <div className="space-y-2">
-              {tx.map((t, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between rounded-xl border border-line/70 px-3.5 py-2.5 transition hover:border-forest/40 hover:bg-forest/[0.02]"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
+              {recentTx.map((t, i) => {
+                const isDebit =
+                  t.type === 'debit' || t.type === 'loan_disbursement'
+                return (
+                  <div
+                    key={t.id || i}
+                    className="flex items-center justify-between rounded-xl border border-line/70 px-3.5 py-2.5 transition hover:border-forest/40 hover:bg-forest/[0.02]"
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={`grid h-8 w-8 flex-none place-items-center rounded-lg ${
+                          isDebit
+                            ? 'bg-red-500/15 text-red-600'
+                            : 'bg-emerald/10 text-forest'
+                        }`}
+                      >
+                        <ArrowRightLeft size={13} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-[0.84rem] font-medium text-navy">
+                          {t.reference || t.type}
+                        </div>
+                        <div className="text-[0.7rem] text-ink-soft">
+                          {t.createdAt
+                            ? new Date(t.createdAt).toLocaleDateString()
+                            : '—'}
+                        </div>
+                      </div>
+                    </div>
                     <span
-                      className={`grid h-8 w-8 flex-none place-items-center rounded-lg ${
-                        t.amount > 0
-                          ? 'bg-emerald/10 text-forest'
-                          : 'bg-red-500/15 text-red-600'
+                      className={`ml-2 flex-none font-mono text-[0.82rem] font-semibold ${
+                        isDebit ? 'text-red-600' : 'text-emerald'
                       }`}
                     >
-                      <ArrowRightLeft size={13} />
+                      {isDebit ? '−' : '+'}
+                      {Number(t.amount || 0).toLocaleString()}
                     </span>
-                    <div className="min-w-0">
-                      <div className="truncate text-[0.84rem] font-medium text-navy">
-                        {t.desc}
-                      </div>
-                      <div className="text-[0.7rem] text-ink-soft">{t.date}</div>
-                    </div>
                   </div>
-                  <span
-                    className={`ml-2 flex-none font-mono text-[0.82rem] font-semibold ${
-                      t.amount > 0 ? 'text-emerald' : 'text-red-600'
-                    }`}
-                  >
-                    {t.amount > 0 ? '+' : ''}
-                    {t.amount.toLocaleString()}
-                  </span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
 
         <div className="flex flex-col gap-4">
-          <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
+          <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
             <div className="flex items-center gap-1.5 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-soft">
               <Bell size={12} className="text-gold" />
               Next contribution
             </div>
             <div className="mt-2">
               <div className="font-display text-lg font-bold text-navy">
-                Due on the {chama.due || 30}th
+                Due on the {chama?.due_day || 30}th
               </div>
               <p className="mt-0.5 text-[0.78rem] text-ink-soft">
-                {fmt(chama.amount || 5000)} / {chama.grace || 3} day grace period
+                {fmt(contribExpected)} / month
               </p>
             </div>
 
@@ -565,12 +465,14 @@ export default function MemberOverview() {
             )}
           </div>
 
-          {finance.loan && (
-            <div className="rounded-2xl border border-line bg-card p-5 shadow-sm">
+          {(activeLoansList.length > 0 || pendingLoan) && (
+            <div className="rounded-2xl border border-line bg-white p-5 shadow-sm">
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="flex items-center gap-1.5 font-display text-sm font-bold text-navy">
                   <TrendingUp size={14} className="text-forest" />
-                  Your active loan
+                  {pendingLoan && activeLoansList.length === 0
+                    ? 'Pending loan'
+                    : 'Active loans'}
                 </h3>
                 <Link
                   to="/member/loans"
@@ -579,38 +481,41 @@ export default function MemberOverview() {
                   View <ArrowRight size={11} />
                 </Link>
               </div>
-              <div className="font-mono text-xl font-bold text-navy">
-                {fmt(finance.loan.balance)}
-              </div>
-              <div className="text-[0.72rem] text-ink-soft">
-                remaining of {fmt(finance.loan.amount)}
-              </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-line">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-forest to-emerald"
-                  style={{
-                    width: `${Math.round(
-                      ((finance.loan.amount - finance.loan.balance) /
-                        finance.loan.amount) *
-                        100
-                    )}%`,
-                  }}
-                />
-              </div>
-              <div className="mt-1.5 text-[0.7rem] text-ink-soft">
-                {Math.round(
-                  ((finance.loan.amount - finance.loan.balance) /
-                    finance.loan.amount) *
-                    100
-                )}
-                % repaid
-              </div>
+
+              {pendingLoan ? (
+                <>
+                  <div className="font-mono text-xl font-bold text-navy">
+                    {fmt(pendingLoan.amount)}
+                  </div>
+                  <div className="text-[0.72rem] text-ink-soft">
+                    {pendingLoan.status === 'approved'
+                      ? 'Approved — awaiting disbursement'
+                      : 'Awaiting treasurer approval'}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="font-mono text-xl font-bold text-navy">
+                    {fmt(totalLoanBalance)}
+                  </div>
+                  <div className="text-[0.72rem] text-ink-soft">
+                    across {activeLoansList.length} active loan
+                    {activeLoansList.length === 1 ? '' : 's'}
+                  </div>
+                  <Link
+                    to="/member/loans"
+                    className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-forest/10 py-2 text-[0.78rem] font-semibold text-forest hover:bg-forest/20"
+                  >
+                    Repay now <ArrowRight size={12} />
+                  </Link>
+                </>
+              )}
             </div>
           )}
 
           <Link
             to="/member/meetings"
-            className="group rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+            className="group rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
           >
             <div className="flex items-center gap-3">
               <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald text-white shadow-sm">
@@ -621,8 +526,8 @@ export default function MemberOverview() {
                   Chama community
                 </div>
                 <div className="text-[0.72rem] text-ink-soft">
-                  {d.memberCounts.total} member
-                  {d.memberCounts.total === 1 ? '' : 's'} total
+                  {meetings.length} meeting{meetings.length === 1 ? '' : 's'} ·{' '}
+                  {assets.length} asset{assets.length === 1 ? '' : 's'}
                 </div>
               </div>
               <ArrowRight
@@ -636,6 +541,8 @@ export default function MemberOverview() {
     </div>
   )
 }
+
+/* ---------- primitives ---------- */
 
 function HeroStat({ icon: Icon, label, value, sub, border }) {
   return (
@@ -664,7 +571,7 @@ function PersonalCard({ to, icon: Icon, label, value, sub, accent, success }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-2xl border border-line bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+      className="group relative overflow-hidden rounded-2xl border border-line bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
     >
       <div className="flex items-start justify-between">
         <span className="text-[0.72rem] font-semibold text-ink-soft">
@@ -712,7 +619,7 @@ function SnapshotCard({
   }[tone]
 
   return (
-    <div className="rounded-2xl border border-line bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-md">
+    <div className="rounded-2xl border border-line bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-forest/30 hover:shadow-md">
       <div className="flex items-start justify-between">
         <span className="text-[0.72rem] font-semibold text-ink-soft">
           {label}
@@ -751,7 +658,7 @@ function UpdateCard({ to, icon: Icon, gradient, label, title, sub, badge }) {
   return (
     <Link
       to={to}
-      className="group relative overflow-hidden rounded-2xl border border-line bg-card p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
+      className="group relative overflow-hidden rounded-2xl border border-line bg-white p-4.5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-forest/40 hover:shadow-md"
     >
       {badge && (
         <span className="absolute right-3.5 top-3.5 rounded-full bg-red-500 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider text-white shadow-sm">
@@ -775,32 +682,5 @@ function UpdateCard({ to, icon: Icon, gradient, label, title, sub, badge }) {
         className="absolute bottom-4 right-4 text-ink-soft opacity-0 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-forest group-hover:opacity-100"
       />
     </Link>
-  )
-}
-
-function MiniStat({ icon: Icon, label, value, tone, className = '' }) {
-  const toneClass =
-    tone === 'good'
-      ? 'text-emerald'
-      : tone === 'warn'
-        ? 'text-[#8A6417]'
-        : 'text-navy'
-
-  return (
-    <div className={`flex items-start gap-2.5 ${className}`}>
-      <span className="mt-0.5 grid h-7 w-7 flex-none place-items-center rounded-lg bg-paper text-ink-soft">
-        <Icon size={13} />
-      </span>
-      <div className="min-w-0">
-        <div className="text-[0.66rem] font-semibold uppercase tracking-wider text-ink-soft">
-          {label}
-        </div>
-        <div
-          className={`mt-0.5 truncate font-display font-mono text-[0.94rem] font-bold ${toneClass}`}
-        >
-          {value}
-        </div>
-      </div>
-    </div>
   )
 }

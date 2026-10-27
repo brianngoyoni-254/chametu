@@ -1,35 +1,38 @@
-import { Check, X, Minus, Vote, Clock, CheckCircle2, Info } from 'lucide-react'
-import { useSharedState, SHARED_KEYS, DEFAULT_PROPOSALS } from '../lib/chametuShared'
-import { getMemberSession } from '../lib/chametuStorage'
+// src/member/MemberVoting.jsx
+import { useState } from 'react'
+import {
+  Check, X, Minus, Vote, Clock, CheckCircle2, Info, Loader2,
+} from 'lucide-react'
+import { useMember } from '../context/MemberContext'
 
 export default function MemberVoting() {
-  const session = getMemberSession()
-  const [proposals, setProposals] = useSharedState(SHARED_KEYS.proposals, DEFAULT_PROPOSALS)
-  const memberId = session?.id || session?.email || session?.name || 'anon'
+  const { shared, profile, isLoading, castVote } = useMember()
+  const proposals = shared?.proposals || []
+  const myId = profile?.id
 
-  function castVote(id, choice) {
-    setProposals((ps) =>
-      ps.map((p) => {
-        if (p.id !== id) return p
-        const prev = p.votes?.[memberId]
-        if (prev) return p // already voted
-
-        const votes = { ...(p.votes || {}), [memberId]: choice }
-        const counts = { yes: 0, no: 0, abs: 0 }
-        Object.values(votes).forEach((v) => {
-          if (v === 'yes') counts.yes++
-          else if (v === 'no') counts.no++
-          else if (v === 'abs') counts.abs++
-        })
-        return { ...p, ...counts, votes }
-      })
-    )
-  }
+  const [votingId, setVotingId] = useState(null)
+  const [error, setError] = useState('')
 
   const totalVotes = proposals.reduce(
     (s, p) => s + Object.keys(p.votes || {}).length,
     0
   )
+
+  async function handleVote(proposalId, choice) {
+    setError('')
+    setVotingId(proposalId)
+    const res = await castVote(proposalId, choice)
+    setVotingId(null)
+    if (!res.ok) setError(res.message)
+  }
+
+  if (isLoading && proposals.length === 0) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader2 size={26} className="animate-spin text-forest" />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -42,6 +45,12 @@ export default function MemberVoting() {
           {totalVotes !== 1 ? 's' : ''} cast
         </p>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[0.82rem] font-medium text-red-700">
+          {error}
+        </div>
+      )}
 
       {proposals.length === 0 && (
         <div className="rounded-2xl border border-dashed border-line bg-white py-14 text-center">
@@ -58,8 +67,9 @@ export default function MemberVoting() {
           const yesPct = Math.round(((p.yes || 0) / total) * 100)
           const noPct = Math.round(((p.no || 0) / total) * 100)
           const absPct = Math.max(0, 100 - yesPct - noPct)
-          const myVote = p.votes?.[memberId]
+          const myVote = myId ? p.votes?.[myId] : null
           const voteCount = Object.keys(p.votes || {}).length
+          const isBusy = votingId === p.id
 
           return (
             <div
@@ -103,28 +113,27 @@ export default function MemberVoting() {
                 <span className="text-gold">Abs {absPct}%</span>
               </div>
 
-              {/* Vote actions */}
               <div className="mt-4 grid grid-cols-3 gap-2">
                 <VoteBtn
                   active={myVote === 'yes'}
-                  disabled={!!myVote}
-                  onClick={() => castVote(p.id, 'yes')}
+                  disabled={!!myVote || isBusy}
+                  onClick={() => handleVote(p.id, 'yes')}
                   tone="yes"
                   icon={Check}
                   label="Yes"
                 />
                 <VoteBtn
                   active={myVote === 'no'}
-                  disabled={!!myVote}
-                  onClick={() => castVote(p.id, 'no')}
+                  disabled={!!myVote || isBusy}
+                  onClick={() => handleVote(p.id, 'no')}
                   tone="no"
                   icon={X}
                   label="No"
                 />
                 <VoteBtn
                   active={myVote === 'abs'}
-                  disabled={!!myVote}
-                  onClick={() => castVote(p.id, 'abs')}
+                  disabled={!!myVote || isBusy}
+                  onClick={() => handleVote(p.id, 'abs')}
                   tone="abs"
                   icon={Minus}
                   label="Abstain"
