@@ -24,6 +24,7 @@ import InviteMembers from '../dashboard/admin/InviteMembers'
 import MyChama from '../dashboard/admin/MyChama'
 import Support from '../dashboard/admin/Support'
 import Settings from '../dashboard/admin/Settings'
+import Upgrade from '../dashboard/admin/Upgrade' // <-- Added Import
 
 import Payments from '../dashboard/admin/Payments'
 import Transactions from '../dashboard/admin/Transactions'
@@ -106,6 +107,9 @@ export default function AppRoutes() {
           <Route path="/dashboard/chama" element={<MyChama />} />
           <Route path="/dashboard/support" element={<Support />} />
           <Route path="/dashboard/settings" element={<Settings />} />
+          
+          {/* <-- ADDED UPGRADE ROUTE HERE --> */}
+          <Route path="/dashboard/upgrade" element={<Upgrade />} />
 
           <Route path="/dashboard/payments" element={<Payments />} />
           <Route path="/dashboard/transactions" element={<Transactions />} />

@@ -59,6 +59,11 @@ def accept_invite():
     if not email or not name or len(password) < 6 or not chama_code:
         return jsonify({"message": "Name, email, password and chama code are required"}), 400
 
+    # Blocked chama check
+    chama = Chama.query.filter_by(code=chama_code).first()
+    if chama and chama.is_blocked:
+        return jsonify({"message": "This chama account is suspended. Please contact the chairman or support."}), 403
+
     try:
         result = member_service.accept_member_invite(
             email=email,
@@ -106,20 +111,20 @@ def register():
     name = (data.get("name") or "").strip()
     email = (data.get("email") or "").lower().strip()
     password = data.get("password") or ""
-    phone = (data.get("phone") or "").strip() or None
+    phone = (data.get("phone") or "").strip()
     chama_name = (data.get("chama_name") or "").strip() or f"{name}'s Chama"
     tier = data.get("tier") or "Starter"
     monthly = float(data.get("amount") or 1000)
 
-    if not name or not email or len(password) < 8:
-        logger.warning('register validation failed: name=%r email=%r', name, email)
-        return jsonify({"message": "Name, email and password (min 8 chars) are required"}), 400
+    if not name or not email or not phone or len(password) < 8:
+        logger.warning('register validation failed: name=%r email=%r phone=%r', name, email, phone)
+        return jsonify({"message": "Name, email, phone, and password (min 8 chars) are required"}), 400
 
     if User.query.filter_by(email=email).first():
         logger.warning('register duplicate email: %s', email)
         return jsonify({"message": "An account with that email already exists"}), 409
 
-    if phone and User.query.filter_by(phone=phone).first():
+    if User.query.filter_by(phone=phone).first():
         logger.warning('register duplicate phone: %s', phone)
         return jsonify({"message": "That phone number is already in use"}), 409
 
@@ -216,6 +221,15 @@ def login():
             email, member.chama_id,
         )
         return jsonify({"message": "Chama not found"}), 404
+
+    # Blocked chama check
+    if chama.is_blocked:
+        logger.warning('login blocked: chama %s is suspended (user=%s, role=%s)',
+                       chama.code, email, member.role)
+        return jsonify({
+            "message": "Your chama account has been suspended. Please contact support to restore access.",
+            "blocked": True,
+        }), 403
 
     portal = _portal_for(member.role)
 

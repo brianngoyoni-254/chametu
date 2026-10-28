@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt
 
 from app import db
 from app.models.chama import Chama, ChamaSettings
+from app.models.settings import PlatformSettings
 
 settings_bp = Blueprint('settings', __name__)
 logger = logging.getLogger(__name__)
@@ -108,3 +109,12 @@ def update_settings():
 
     logger.info('chama settings updated for %s', chama.code)
     return jsonify({'message': 'Settings updated'}), 200
+
+
+@settings_bp.route('/public-prices', methods=['GET'])
+def get_public_prices():
+    """Public endpoint for the frontend to fetch dynamic tier prices."""
+    settings = PlatformSettings.query.first()
+    if not settings or not settings.prices:
+        return jsonify({'Starter': 500, 'Growth': 1000, 'Business': 2000, 'Gold': 3000}), 200
+    return jsonify(settings.prices), 200

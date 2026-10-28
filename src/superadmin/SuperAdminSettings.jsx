@@ -7,9 +7,10 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNotifications, DEFAULT_PREFS } from './useNotifications'
+import { api } from '../lib/api'
 
 const DEFAULT_SETTINGS = {
-  prices: { Starter: 1500, Growth: 3000, Business: 5000, Gold: 10000 },
+  prices: { Starter: 500, Growth: 1000, Business: 2000, Gold: 3000 },
   paybill: '400200',
   accountRef: 'CHAMETU',
   gracePeriod: 7,
@@ -29,7 +30,6 @@ const TABS = [
 ]
 
 const TIER_META = { Starter: 'bg-gray-400', Growth: 'bg-emerald', Business: 'bg-blue-500', Gold: 'bg-gold' }
-
 const inputCls = 'w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-navy outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 dark:border-white/10 dark:bg-white/5 dark:text-white'
 
 function Toggle({ checked, onChange, label, description }) {
@@ -58,10 +58,26 @@ export default function SuperAdminSettings() {
   const [tab, setTab] = useState(initialTab)
   const [settings, setSettings] = useState(DEFAULT_SETTINGS)
   const [dirty, setDirty] = useState(false)
+  const [loading, setLoading] = useState(true)
 
   const { prefs, savePrefs } = useNotifications()
   const [localPrefs, setLocalPrefs] = useState(prefs)
   const [prefsDirty, setPrefsDirty] = useState(false)
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const token = localStorage.getItem('superadmin_token')
+        const data = await api('/api/superadmin/settings', { token })
+        setSettings(data)
+      } catch (err) {
+        toast.error('Failed to load settings')
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchSettings()
+  }, [])
 
   useEffect(() => {
     if (params.get('tab') && TABS.some((t) => t.key === params.get('tab'))) {
@@ -82,14 +98,25 @@ export default function SuperAdminSettings() {
     setPrefsDirty(true)
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     for (const [tier, price] of Object.entries(settings.prices)) {
       if (!(price > 0)) return toast.error(`Invalid price for ${tier}`)
     }
     if (!(settings.gracePeriod >= 0)) return toast.error('Grace period must be ≥ 0')
     if (!(settings.autoBlockDays > 0)) return toast.error('Auto-block days must be > 0')
-    setDirty(false)
-    toast.success('Settings saved', { description: 'Platform configuration updated.' })
+    
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      await api('/api/superadmin/settings', {
+        method: 'PUT',
+        token,
+        body: settings
+      })
+      setDirty(false)
+      toast.success('Settings saved', { description: 'Platform configuration updated.' })
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   const handleSavePrefs = () => {
@@ -99,9 +126,9 @@ export default function SuperAdminSettings() {
   }
 
   const handleResetAll = () => {
-    setSettings(DEFAULT_SETTINGS); setDirty(false)
+    setSettings(DEFAULT_SETTINGS); setDirty(true)
     setLocalPrefs(DEFAULT_PREFS); savePrefs(DEFAULT_PREFS); setPrefsDirty(false)
-    toast.info('Settings reset to defaults')
+    toast.info('Settings reset to defaults (click Save to persist)')
   }
 
   const Field = ({ label, icon: Icon, hint, children }) => (
@@ -113,6 +140,10 @@ export default function SuperAdminSettings() {
       {hint && <span className="mt-1 block text-[0.66rem] text-ink-soft sm:text-[0.68rem]">{hint}</span>}
     </label>
   )
+
+  if (loading) {
+    return <div className="p-8 text-center text-ink-soft">Loading settings...</div>
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-4 sm:space-y-6">

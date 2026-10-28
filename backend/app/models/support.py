@@ -17,6 +17,12 @@ class Ticket(db.Model):
     priority = db.Column(db.String(20), default='normal')      # low|normal|high|urgent
     status = db.Column(db.String(20), default='open')          # open|pending|resolved|closed
 
+    # Fields for SuperAdmin dashboard
+    assignee = db.Column(db.String(100), nullable=True)
+    tags = db.Column(db.JSON, default=list)
+    sla_response_due = db.Column(db.DateTime, nullable=True)
+    sla_resolve_due = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     resolved_at = db.Column(db.DateTime, nullable=True)

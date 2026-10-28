@@ -9,12 +9,22 @@ from flask_jwt_extended import JWTManager, get_jwt, get_jwt_identity, verify_jwt
 from flask_cors import CORS
 from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
+from sqlalchemy import MetaData  # <-- NEW IMPORT
 
 from app.config import Config
 from app.logging_config import configure_logging
 from app.logging_utils import attach_request_id, set_context
 
-db = SQLAlchemy()
+# Add naming convention to permanently fix SQLite constraint naming issues
+convention = {
+    "ix": "ix_%(column_0_label)s",
+    "uq": "uq_%(table_name)s_%(column_0_name)s",
+    "ck": "ck_%(table_name)s_%(constraint_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s"
+}
+
+db = SQLAlchemy(metadata=MetaData(naming_convention=convention))  # <-- UPDATED
 jwt = JWTManager()
 migrate = Migrate()
 
@@ -63,7 +73,9 @@ def create_app(config_class=Config):
     from app.routes.rewards import rewards_bp
     from app.routes.ledger import ledger_bp
     from app.routes.notifications import notif_bp
+    from app.routes.superadmin import superadmin_bp
 
+    app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(auth_bp,     url_prefix="/api/auth")
     app.register_blueprint(chama_bp,    url_prefix="/api/chama")
     app.register_blueprint(finance_bp,  url_prefix="/api/finance")

@@ -12,6 +12,10 @@ class Chama(db.Model):
     type = db.Column(db.String(50), default='Investment')
     base_tier = db.Column(db.String(20), default='Starter')
 
+    # ---------- Blocking ----------
+    is_blocked = db.Column(db.Boolean, default=False, nullable=False)
+    blocked_at = db.Column(db.DateTime, nullable=True)
+
     # ---------- contribution schedule ----------
     monthly_contribution = db.Column(db.Float, default=0.0)
     contribution_frequency = db.Column(
