@@ -7,7 +7,8 @@ export default function SuperAdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   return (
-    <div className="flex min-h-screen bg-[#F7F9FB] dark:bg-paper">
+    // FIXED: Changed dark:bg-paper to dark:bg-[#071625] so the background is dark in dark mode
+    <div className="flex min-h-screen bg-[#F7F9FB] dark:bg-[#071625]">
       <SuperAdminSidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">

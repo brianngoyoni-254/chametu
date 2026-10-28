@@ -31,7 +31,6 @@ export default function SuperAdminPayments() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [modal, setModal] = useState(null)
   
-  // Updated state to handle payment methods
   const [stkForm, setStkForm] = useState({ chama_id: '', phone: '', amount: '', method: 'stk' })
   const [stkLoading, setStkLoading] = useState(false)
   const [generatedLink, setGeneratedLink] = useState(null)
@@ -157,10 +156,10 @@ export default function SuperAdminPayments() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <button onClick={fetchData} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={fetchData} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
-          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white">
             <Download size={15} /> Export
           </button>
           <button onClick={() => setModal('mpesa')} className="flex items-center justify-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white dark:bg-emerald dark:text-[#06331F]">
@@ -188,7 +187,7 @@ export default function SuperAdminPayments() {
           const val = totals.byChannel[key]
           const pct = totals.total ? (val / totals.total) * 100 : 0
           return (
-            <div key={key} className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+            <div key={key} className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm sm:p-5">
               <div className="flex items-center justify-between">
                 <span className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.82rem]">Via {cfg.label}</span>
                 <span className={`grid h-8 w-8 place-items-center rounded-lg ${cfg.bg} ${cfg.color}`}><Icon size={15} /></span>
@@ -206,21 +205,21 @@ export default function SuperAdminPayments() {
       </div>
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3">
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 sm:px-4 sm:py-3">
           <CheckCircle2 size={16} className="text-emerald" />
           <div className="flex-1 min-w-0"><p className="text-[0.68rem] text-ink-soft">Settled</p><p className="truncate text-[0.82rem] font-bold text-navy dark:text-white">{txns.filter((t) => t.status === 'paid').length} transactions</p></div>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 sm:px-4 sm:py-3">
           <Clock size={16} className="text-amber-500" />
           <div className="flex-1 min-w-0"><p className="text-[0.68rem] text-ink-soft">Pending PIN</p><p className="truncate text-[0.82rem] font-bold text-navy dark:text-white">{totals.pending} STK prompts</p></div>
         </div>
-        <div className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 dark:border-white/10 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 sm:px-4 sm:py-3">
           <XCircle size={16} className="text-red-500" />
           <div className="flex-1 min-w-0"><p className="text-[0.68rem] text-ink-soft">Unmatched</p><p className="truncate text-[0.82rem] font-bold text-navy dark:text-white">{summary.unmatchedPayments} need matching</p></div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-card shadow-sm dark:border-white/10">
+      <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-line p-3 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:p-4">
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {[
@@ -230,7 +229,7 @@ export default function SuperAdminPayments() {
               { key: 'cash', label: 'Cash', Icon: Banknote },
             ].map((f) => (
               <button key={f.key} onClick={() => setChannelFilter(f.key)}
-                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.75rem] font-semibold ${channelFilter === f.key ? 'bg-navy text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-card text-navy dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>
+                className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[0.75rem] font-semibold ${channelFilter === f.key ? 'bg-navy text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-white text-navy dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>
                 {f.Icon && <f.Icon size={11} />} {f.label}
               </button>
             ))}
@@ -238,7 +237,7 @@ export default function SuperAdminPayments() {
           <div className="relative w-full sm:max-w-[260px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search ref, chama or payer…"
-              className="w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white" />
+              className="w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 py-2 pl-9 pr-3 text-sm text-navy dark:text-white outline-none focus:border-forest" />
           </div>
         </div>
 
@@ -298,7 +297,7 @@ export default function SuperAdminPayments() {
 
       {modal === 'mpesa' && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center sm:p-4" onClick={closeModal}>
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-card shadow-2xl dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-[#071625] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-line px-4 py-3 dark:border-white/10">
               <h3 className="font-display text-base font-bold text-navy dark:text-white">Request Payment</h3>
               <button onClick={closeModal} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper dark:hover:bg-white/10"><X size={18} /></button>
@@ -332,7 +331,7 @@ export default function SuperAdminPayments() {
                   <select 
                     value={stkForm.chama_id} 
                     onChange={(e) => setStkForm({ ...stkForm, chama_id: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 text-sm text-navy dark:text-white outline-none focus:border-forest"
                     required
                   >
                     <option value="">Choose a chama...</option>
@@ -347,7 +346,7 @@ export default function SuperAdminPayments() {
                   <select 
                     value={stkForm.method} 
                     onChange={(e) => setStkForm({ ...stkForm, method: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 text-sm text-navy dark:text-white outline-none focus:border-forest"
                   >
                     <option value="stk">M-Pesa STK Push (Direct to phone)</option>
                     <option value="card">Card Payment (Generate Link)</option>
@@ -363,7 +362,7 @@ export default function SuperAdminPayments() {
                       value={stkForm.phone} 
                       onChange={(e) => setStkForm({ ...stkForm, phone: e.target.value })}
                       placeholder="e.g. 0712345678"
-                      className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      className="mt-1.5 w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 text-sm text-navy dark:text-white outline-none focus:border-forest"
                     />
                   </label>
                 )}
@@ -375,7 +374,7 @@ export default function SuperAdminPayments() {
                     value={stkForm.amount} 
                     onChange={(e) => setStkForm({ ...stkForm, amount: e.target.value })}
                     placeholder="e.g. 1500"
-                    className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    className="mt-1.5 w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 text-sm text-navy dark:text-white outline-none focus:border-forest"
                     required
                   />
                 </label>

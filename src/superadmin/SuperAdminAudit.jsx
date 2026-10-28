@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ShieldCheck, Search, Download, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '../lib/api' // <-- Import real API
+import { api } from '../lib/api'
 
 const TONE_MAP = {
   green: 'bg-emerald/15 text-emerald-700 dark:text-emerald-400',
@@ -60,21 +60,21 @@ export default function SuperAdminAudit() {
           <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">Live actions from the admin dashboard · {logs.length} entries</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button onClick={fetchLogs} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={fetchLogs} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
-          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white">
             <Download size={15} /> Export
           </button>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-card shadow-sm dark:border-white/10">
+      <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <div className="flex flex-col gap-2 border-b border-line p-3 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3 sm:p-4">
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {[{ key: 'all', label: 'All' }, { key: 'green', label: 'Positive' }, { key: 'amber', label: 'Warnings' }, { key: 'red', label: 'Critical' }, { key: 'blue', label: 'Config' }, { key: 'gray', label: 'Other' }].map((f) => (
               <button key={f.key} onClick={() => setToneFilter(f.key)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-[0.75rem] font-semibold ${toneFilter === f.key ? 'bg-navy text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-card text-navy dark:border-white/10 dark:bg-white/5 dark:text-white'}`}>
+                className={`shrink-0 rounded-full px-3 py-1.5 text-[0.75rem] font-semibold ${toneFilter === f.key ? 'bg-navy text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-white dark:border-white/10 dark:bg-white/5 text-navy dark:text-white'}`}>
                 {f.label}
               </button>
             ))}
@@ -82,7 +82,7 @@ export default function SuperAdminAudit() {
           <div className="relative w-full sm:max-w-xs">
             <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search actor, action, target…"
-              className="w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white" />
+              className="w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 py-2 pl-9 pr-3 text-sm text-navy dark:text-white outline-none focus:border-forest" />
           </div>
         </div>
 

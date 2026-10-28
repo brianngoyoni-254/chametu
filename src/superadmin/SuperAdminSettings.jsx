@@ -30,7 +30,9 @@ const TABS = [
 ]
 
 const TIER_META = { Starter: 'bg-gray-400', Growth: 'bg-emerald', Business: 'bg-blue-500', Gold: 'bg-gold' }
-const inputCls = 'w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-navy outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 dark:border-white/10 dark:bg-white/5 dark:text-white'
+
+// FIXED: Ensure inputs are readable in both light and dark modes
+const inputCls = 'w-full rounded-xl border border-line bg-white px-3 py-2.5 text-sm text-navy outline-none transition focus:border-forest focus:ring-4 focus:ring-forest/10 dark:border-white/10 dark:bg-white/5 dark:text-white'
 
 function Toggle({ checked, onChange, label, description }) {
   return (
@@ -153,7 +155,7 @@ export default function SuperAdminSettings() {
           <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">Configuration for pricing, payments, enforcement & notifications</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button onClick={handleResetAll} className="flex items-center justify-center rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
+          <button onClick={handleResetAll} className="flex items-center justify-center rounded-xl border border-line bg-white px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
             Reset all
           </button>
           {tab === 'notifications' ? (
@@ -180,7 +182,7 @@ export default function SuperAdminSettings() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-[240px_1fr]">
-        <nav className="-mx-1 flex gap-1.5 overflow-x-auto rounded-2xl border border-line bg-card p-1.5 shadow-sm dark:border-white/10 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible">
+        <nav className="-mx-1 flex gap-1.5 overflow-x-auto rounded-2xl border border-line bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-white/5 lg:mx-0 lg:flex-col lg:gap-1 lg:overflow-visible">
           {TABS.map((t) => {
             const Icon = t.icon
             const active = tab === t.key
@@ -198,7 +200,7 @@ export default function SuperAdminSettings() {
 
         <div className="space-y-4 sm:space-y-5">
           {tab === 'general' && (
-            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
               <div className="mb-3 flex items-center gap-2 sm:mb-4">
                 <Globe size={15} className="text-forest dark:text-emerald" />
                 <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Workspace</h2>
@@ -221,7 +223,7 @@ export default function SuperAdminSettings() {
           )}
 
           {tab === 'pricing' && (
-            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
               <div className="mb-3 flex items-center gap-2 sm:mb-4">
                 <Percent size={15} className="text-forest dark:text-emerald" />
                 <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Tier pricing</h2>
@@ -242,7 +244,7 @@ export default function SuperAdminSettings() {
           )}
 
           {tab === 'payments' && (
-            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
               <div className="mb-3 flex items-center gap-2 sm:mb-4">
                 <Smartphone size={15} className="text-forest dark:text-emerald" />
                 <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">M-Pesa collection</h2>
@@ -262,7 +264,7 @@ export default function SuperAdminSettings() {
           )}
 
           {tab === 'enforcement' && (
-            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
               <div className="mb-3 flex items-center gap-2 sm:mb-4">
                 <ShieldAlert size={15} className="text-forest dark:text-emerald" />
                 <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Enforcement rules</h2>
@@ -280,7 +282,7 @@ export default function SuperAdminSettings() {
 
           {tab === 'notifications' && (
             <div className="space-y-4 sm:space-y-5">
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2 sm:mb-4">
                   <Bell size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Events to notify me about</h2>
@@ -294,7 +296,7 @@ export default function SuperAdminSettings() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2 sm:mb-4">
                   <CreditCard size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Payment channels</h2>
@@ -306,7 +308,7 @@ export default function SuperAdminSettings() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2 sm:mb-4">
                   <MessageSquare size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Delivery</h2>
@@ -318,7 +320,7 @@ export default function SuperAdminSettings() {
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2 sm:mb-4">
                   <BellOff size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Quiet hours</h2>
@@ -336,7 +338,7 @@ export default function SuperAdminSettings() {
 
           {tab === 'security' && (
             <div className="space-y-4 sm:space-y-5">
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2 sm:mb-4">
                   <ShieldCheck size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Access & security</h2>
@@ -347,7 +349,7 @@ export default function SuperAdminSettings() {
                   <Toggle checked={false} onChange={() => toast.info('Managed on the backend')} label="IP allow-list" description="Restrict access to trusted IPs" />
                 </div>
               </div>
-              <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+              <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
                 <div className="mb-3 flex items-center gap-2">
                   <Lock size={15} className="text-forest dark:text-emerald" />
                   <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Recent security events</h2>

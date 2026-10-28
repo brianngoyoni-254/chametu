@@ -83,7 +83,7 @@ export default function SuperAdminChamas() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={fetchChamas} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={fetchChamas} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3.5 py-2.5 text-sm font-semibold text-navy dark:text-white shadow-sm hover:bg-paper dark:hover:bg-white/10">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
           <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl bg-[#0B1F33] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0B1F33]/90 dark:bg-emerald dark:text-[#06331F]">
@@ -92,14 +92,14 @@ export default function SuperAdminChamas() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-card shadow-sm dark:border-white/10">
+      <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-line p-3 dark:border-white/10 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 sm:p-4">
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {TABS.map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[0.78rem] font-semibold transition sm:px-4 sm:text-[0.82rem] ${activeTab === tab ? 'bg-[#0B1F33] text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-card text-navy hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white'}`}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[0.78rem] font-semibold transition sm:px-4 sm:text-[0.82rem] ${activeTab === tab ? 'bg-[#0B1F33] text-white dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-white text-navy hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white'}`}
               >
                 {tab}
               </button>
@@ -111,7 +111,7 @@ export default function SuperAdminChamas() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search chama, town, chair…"
-              className="w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-sm text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+              className="w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 py-2 pl-9 pr-3 text-sm text-navy dark:text-white outline-none focus:border-forest"
             />
           </div>
         </div>
@@ -204,7 +204,7 @@ export default function SuperAdminChamas() {
 
       {selected && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setSelected(null)}>
-          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-card shadow-2xl dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-[#071625] shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between border-b border-line px-4 py-3 dark:border-white/10 sm:px-5 sm:py-4">
               <div className="flex items-center gap-2"><Building2 className="text-forest dark:text-emerald" size={18} /><h3 className="font-display text-base font-bold text-navy dark:text-white sm:text-lg">Chama details</h3></div>
               <button onClick={() => setSelected(null)} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper dark:hover:bg-white/10"><X size={18} /></button>
@@ -239,7 +239,7 @@ export default function SuperAdminChamas() {
               </div>
             </div>
             <div className="flex justify-end border-t border-line bg-paper/50 px-4 py-3 dark:border-white/10 dark:bg-white/5 sm:px-5 sm:py-4">
-              <button onClick={() => setSelected(null)} className="rounded-xl border border-line bg-card px-4 py-2 text-sm font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white">Close</button>
+              <button onClick={() => setSelected(null)} className="rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-navy dark:text-white">Close</button>
             </div>
           </div>
         </div>

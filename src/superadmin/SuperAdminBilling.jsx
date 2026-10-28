@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 
 export default function SuperAdminBilling() {
   const [invoices, setInvoices] = useState([])
+  const [platformSettings, setPlatformSettings] = useState({ prices: { Starter: 500, Growth: 1000, Business: 2000, Gold: 3000 } })
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(null)
 
@@ -12,8 +13,12 @@ export default function SuperAdminBilling() {
     setLoading(true)
     try {
       const token = localStorage.getItem('superadmin_token')
-      const data = await api('/api/superadmin/billing', { token })
-      setInvoices(data)
+      const [billingData, settingsData] = await Promise.all([
+        api('/api/superadmin/billing', { token }),
+        api('/api/superadmin/settings', { token })
+      ])
+      setInvoices(billingData)
+      setPlatformSettings(settingsData)
     } catch (err) {
       toast.error('Failed to load billing data')
     } finally {
@@ -154,10 +159,10 @@ export default function SuperAdminBilling() {
           <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">Tier payments and enforcement (live from admin data)</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <button onClick={fetchBilling} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={fetchBilling} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white shadow-sm">
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
-          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
+          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white shadow-sm">
             <Download size={15} /> Export CSV
           </button>
           <button onClick={handleBulkBlock} className={`flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white ${eligible > 0 ? 'bg-red-500 hover:bg-red-600' : 'cursor-not-allowed bg-red-400/50'}`}>
@@ -167,24 +172,26 @@ export default function SuperAdminBilling() {
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+        <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Collected this month</div>
           <div className="mt-1.5 font-display text-xl font-bold text-navy dark:text-white sm:mt-2 sm:text-2xl">KSh 1,500</div>
           <div className="mt-1 text-[0.72rem] font-semibold text-forest dark:text-emerald-400 sm:text-[0.78rem]">Starter tier · 0 active</div>
         </div>
-        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+        <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Outstanding</div>
           <div className="mt-1.5 font-display text-xl font-bold text-navy dark:text-white sm:mt-2 sm:text-2xl">KSh {invoices.reduce((s, i) => s + i.amount, 0).toLocaleString()}</div>
           <div className="mt-1 text-[0.72rem] font-semibold text-red-600 dark:text-red-400 sm:text-[0.78rem]">{invoices.length} chama(s) owe tier fees</div>
         </div>
-        <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+        <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm sm:p-5">
           <div className="text-[0.78rem] font-medium text-ink-soft sm:text-[0.85rem]">Tier prices</div>
-          <div className="mt-1.5 font-mono text-base font-bold text-navy dark:text-white sm:mt-2 sm:text-lg">S:500 · G:1k · B:2k · Au:3k</div>
+          <div className="mt-1.5 font-mono text-base font-bold text-navy dark:text-white sm:mt-2 sm:text-lg">
+            S:{platformSettings.prices.Starter / 1000}k · G:{platformSettings.prices.Growth / 1000}k · B:{platformSettings.prices.Business / 1000}k · Au:{platformSettings.prices.Gold / 1000}k
+          </div>
           <div className="mt-1 text-[0.72rem] text-ink-soft sm:text-[0.78rem]">per month</div>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-card shadow-sm dark:border-white/10">
+      <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <div className="border-b border-line p-4 dark:border-white/10 sm:p-5"><h2 className="font-display text-base font-bold text-navy dark:text-white sm:text-[1.05rem]">Unpaid tier invoices</h2></div>
 
         <ul className="divide-y divide-line md:hidden dark:divide-white/5">
@@ -208,7 +215,7 @@ export default function SuperAdminBilling() {
                 <button 
                   onClick={() => handleReminder(inv.id, inv.name)} 
                   disabled={actionLoading === `${inv.id}-remind`}
-                  className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy dark:text-white disabled:opacity-50"
                 >
                   {actionLoading === `${inv.id}-remind` ? <Loader2 size={11} className="animate-spin" /> : <Bell size={11} />} Remind
                 </button>
@@ -275,7 +282,7 @@ export default function SuperAdminBilling() {
                       <button 
                         onClick={() => handleReminder(inv.id, inv.name)} 
                         disabled={actionLoading === `${inv.id}-remind`}
-                        className="flex items-center gap-1 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.72rem] font-semibold text-navy dark:border-white/10 dark:bg-white/5 dark:text-white disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2.5 py-1.5 text-[0.72rem] font-semibold text-navy dark:text-white disabled:opacity-50"
                       >
                         {actionLoading === `${inv.id}-remind` ? <Loader2 size={11} className="animate-spin" /> : <Bell size={11} />} Remind
                       </button>
