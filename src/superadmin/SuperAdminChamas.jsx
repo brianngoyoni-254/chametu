@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Download, X, Building2, MapPin, User, Users, CreditCard, RefreshCw } from 'lucide-react'
+import { Search, Download, X, Building2, MapPin, User, Users, CreditCard, RefreshCw, Phone } from 'lucide-react'
 import { toast } from 'sonner'
-import { readChamaSummary } from '../lib/superadminBridge'
+import { api } from '../lib/api'
 
 const TABS = ['All', 'Active', 'Overdue', 'Deactivated', 'Blocked']
 
@@ -27,18 +27,27 @@ const tierBadge = (tier) => {
 const progressColor = (r) => (r >= 80 ? 'bg-emerald' : r >= 50 ? 'bg-gold' : 'bg-red-500')
 
 export default function SuperAdminChamas() {
-  const [chamas, setChamas] = useState(() => [readChamaSummary()])
+  const [chamas, setChamas] = useState([])
+  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
 
-  const refresh = () => setChamas([readChamaSummary()])
+  const fetchChamas = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      const data = await api('/api/superadmin/chamas', { token })
+      setChamas(data)
+    } catch (err) {
+      toast.error('Failed to load chamas')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    refresh()
-    const onStorage = () => refresh()
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    fetchChamas()
   }, [])
 
   const filtered = useMemo(() => chamas.filter((c) => {
@@ -53,8 +62,8 @@ export default function SuperAdminChamas() {
   }), [chamas, activeTab, search])
 
   const handleExport = () => {
-    const headers = ['Chama Name', 'Location', 'Chairperson', 'Tier', 'Members', 'Collection %', 'Days overdue', 'Status', 'Savings']
-    const rows = filtered.map((c) => [c.name, c.loc, c.chair, c.tier, c.m, c.col, c.od, statusLabel(c), c.sav])
+    const headers = ['Chama Name', 'Location', 'Chairperson', 'Phone', 'Tier', 'Members', 'Collection %', 'Days overdue', 'Status']
+    const rows = filtered.map((c) => [c.name, c.loc, c.chair, c.chair_phone, c.tier, c.m, c.col, c.od, statusLabel(c)])
     const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
     const csv = [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' }))
@@ -70,12 +79,12 @@ export default function SuperAdminChamas() {
         <div className="min-w-0">
           <h1 className="font-display text-xl font-bold text-navy dark:text-white sm:text-2xl">All chamas</h1>
           <p className="mt-1 text-[0.8rem] text-ink-soft sm:text-sm">
-            {chamas.length} live · updates from the admin dashboard flow here in real time
+            {chamas.length} live · updates from the admin dashboard flow here
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={refresh} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white">
-            <RefreshCw size={14} /> Refresh
+          <button onClick={fetchChamas} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm font-semibold text-navy shadow-sm hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
           </button>
           <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl bg-[#0B1F33] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#0B1F33]/90 dark:bg-emerald dark:text-[#06331F]">
             <Download size={15} /> Export CSV
@@ -117,7 +126,7 @@ export default function SuperAdminChamas() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-[0.9rem] font-bold text-navy dark:text-white">{c.name}</p>
-                    <p className="truncate text-[0.72rem] text-ink-soft">{c.loc} · {c.chair}</p>
+                    <p className="truncate text-[0.72rem] text-ink-soft">{c.loc} · {c.chair} {c.chair_phone !== '—' ? `(${c.chair_phone})` : ''}</p>
                   </div>
                   <span className={`shrink-0 rounded-md px-2 py-1 text-[0.66rem] font-bold ${statusBadge(label)}`}>{label}</span>
                 </div>
@@ -162,7 +171,7 @@ export default function SuperAdminChamas() {
                   <tr key={c.id} className="transition hover:bg-paper/40 dark:hover:bg-white/[0.02]">
                     <td className="px-4 py-3 lg:px-5 lg:py-4">
                       <div className="font-semibold text-navy dark:text-white">{c.name}</div>
-                      <div className="text-[0.72rem] text-ink-soft">{c.loc} · Chair: {c.chair}</div>
+                      <div className="text-[0.72rem] text-ink-soft">{c.loc} · Chair: {c.chair} {c.chair_phone !== '—' ? `(${c.chair_phone})` : ''}</div>
                     </td>
                     <td className="px-4 py-3 lg:px-5 lg:py-4"><span className={`inline-flex rounded-md px-2.5 py-1 text-[0.68rem] font-bold ${tierBadge(c.tier)}`}>{c.tier}</span></td>
                     <td className="px-4 py-3 font-mono text-navy dark:text-white lg:px-5 lg:py-4">{c.m}</td>
@@ -208,11 +217,12 @@ export default function SuperAdminChamas() {
               <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
                 {[
                   { icon: MapPin, label: 'Location', val: selected.loc },
-                  { icon: User, label: 'Chairperson', val: selected.chair },
-                  { icon: Users, label: 'Members', val: `${selected.memberCounts?.active ?? selected.m} active · ${selected.memberCounts?.invited ?? 0} invited` },
                   { icon: CreditCard, label: 'Tier', val: selected.tier },
+                  { icon: User, label: 'Chairperson', val: selected.chair },
+                  { icon: Phone, label: 'Phone Number', val: selected.chair_phone },
+                  { icon: Users, label: 'Members', val: `${selected.active} active · ${selected.m} total`, fullWidth: true },
                 ].map((x) => (
-                  <div key={x.label} className="rounded-xl border border-line p-2.5 dark:border-white/10 sm:p-3">
+                  <div key={x.label} className={`rounded-xl border border-line p-2.5 dark:border-white/10 sm:p-3 ${x.fullWidth ? 'col-span-2' : ''}`}>
                     <div className="flex items-center gap-1.5 text-[0.62rem] font-semibold uppercase tracking-wider text-ink-soft sm:text-[0.68rem]"><x.icon size={11} /> {x.label}</div>
                     <div className="mt-0.5 text-[0.8rem] font-medium text-navy dark:text-white sm:mt-1 sm:text-sm">{x.val}</div>
                   </div>

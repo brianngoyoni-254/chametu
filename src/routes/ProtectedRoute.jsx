@@ -14,6 +14,7 @@ export default function ProtectedRoute() {
   }
 
   if (!isAuthenticated) {
+    // Save the intended destination (e.g., /dashboard/upgrade) before redirecting to login
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 

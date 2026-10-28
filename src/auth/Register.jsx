@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
-import { TIERS, ORDER } from '../lib/tiers'
+import { ORDER } from '../lib/tiers'
 import { toast } from 'sonner'
 import logo from '../assets/logos.png'
 
@@ -29,7 +29,7 @@ const isValidPhone = (v) => /^0[17]\d{8}$/.test(v.replace(/\s/g, ''))
 
 export default function Register() {
   const { register } = useAuth()
-  const { setBaseTier, startTrial } = useTier()
+  const { setBaseTier, startTrial, tiers } = useTier()
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
@@ -65,7 +65,7 @@ export default function Register() {
     if (!isValidEmail(email)) return setError('Enter a valid email address.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
-    if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number.')
+    if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number (e.g., 0712345678).')
 
     setBusy(true)
     try {
@@ -99,7 +99,7 @@ export default function Register() {
     }
   }
 
-  const selectedPlan = TIERS[selectedTier]
+  const selectedPlan = tiers[selectedTier]
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-paper lg:grid-cols-[minmax(340px,5fr)_7fr]">
@@ -243,13 +243,14 @@ export default function Register() {
                   placeholder="e.g. Umoja Investment Chama"
                 />
               </Field>
-              <Field label="M-Pesa phone">
+              <Field label="M-Pesa phone (required)">
                 <IconInput
                   inputMode="tel"
                   icon={<Phone size={18} strokeWidth={1.8} />}
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="0712345678"
+                  required
                 />
               </Field>
             </div>
@@ -268,7 +269,7 @@ export default function Register() {
                 <PlanCard
                   key={tierName}
                   tierName={tierName}
-                  tier={TIERS[tierName]}
+                  tier={tiers[tierName]}
                   meta={PLAN_META[tierName]}
                   selected={selectedTier === tierName}
                   onSelect={() => setSelectedTier(tierName)}

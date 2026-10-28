@@ -46,6 +46,8 @@ export default function Login() {
   const { login: memberLogin } = useMemberAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  
+  // Extract the redirect path if they were kicked here by ProtectedRoute
   const from = location.state?.from?.pathname
 
   const [activeRole, setActiveRole] = useState('Chairman')
@@ -77,7 +79,8 @@ export default function Login() {
         try {
           const member = await memberLogin(email, password)
           toast.success(`Welcome back, ${member.user.name.split(' ')[0]}`)
-          navigate('/member', { replace: true })
+          // Redirect to 'from' if it exists, otherwise default to /member
+          navigate(from || '/member', { replace: true })
         } catch (memberErr) {
           setError(memberErr.message || 'Invalid member credentials.')
         }
@@ -85,6 +88,7 @@ export default function Login() {
         try {
           const session = await adminLogin({ email, password })
           toast.success(`Welcome back, ${session.name.split(' ')[0]}`)
+          // Redirect to 'from' if it exists, otherwise default to /dashboard
           navigate(from || '/dashboard', { replace: true })
         } catch (adminErr) {
           setError(adminErr.message || 'Invalid admin credentials.')

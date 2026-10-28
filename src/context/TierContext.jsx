@@ -2,11 +2,12 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from 'react'
-import { current, ORDER, TRIAL_DAYS, DAY } from '../lib/tiers'
+import { current, ORDER, TRIAL_DAYS, DAY, TIERS } from '../lib/tiers'
 import {
   fetchState, setBaseTier as apiSetBaseTier,
   startTrial as apiStartTrial, upgradeTier as apiUpgradeTier,
 } from '../lib/catalog'
+import { api } from '../lib/api'
 
 const TierContext = createContext(null)
 
@@ -15,6 +16,26 @@ export function TierProvider({ children }) {
   const [tier, setTier] = useState(ORDER[0])
   const [trialExpiresAt, setTrialExpiresAt] = useState(null)
   const [hydrated, setHydrated] = useState(false)
+  
+  // State for dynamic tiers
+  const [dynamicTiers, setDynamicTiers] = useState(TIERS)
+
+  // Fetch dynamic prices on mount
+  useEffect(() => {
+    api('/api/settings/public-prices')
+      .then((prices) => {
+        const merged = { ...TIERS }
+        Object.keys(prices).forEach((key) => {
+          if (merged[key]) {
+            merged[key] = { ...merged[key], price: prices[key] }
+          }
+        })
+        setDynamicTiers(merged)
+      })
+      .catch((err) => {
+        console.error('Failed to fetch dynamic prices:', err)
+      })
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -88,9 +109,10 @@ export function TierProvider({ children }) {
       tier, baseTier, trialExpiresAt, isTrial, canEarn: true,
       config: current(tier), baseConfig: current(baseTier),
       order: ORDER, setBaseTier, startTrial, upgrade, refresh, hydrated,
+      tiers: dynamicTiers,
     }),
     [tier, baseTier, trialExpiresAt, isTrial,
-     setBaseTier, startTrial, upgrade, refresh, hydrated],
+     setBaseTier, startTrial, upgrade, refresh, hydrated, dynamicTiers],
   )
 
   return <TierContext.Provider value={value}>{children}</TierContext.Provider>

@@ -13,7 +13,9 @@ from app.models.finance import (
 )
 from app.models.invite import Invite
 from app.models.contribution import MemberInvite
+from app.models.settings import PlatformSettings
 from app.services import member_service, contribution_service, notification_service as notif_svc
+from app.services.intasend import send_stk_push
 from app.logging_utils import log_writes
 from app.utils.decorators import require_permission
 
@@ -780,3 +782,45 @@ def record_payout():
         logger.exception('failed to send payout notification')
 
     return jsonify({'message': 'Payout recorded'}), 201
+
+
+# ============================ BILLING ============================
+@chama_bp.route('/billing/upgrade', methods=['POST'])
+@jwt_required()
+@log_writes(logger, 'chama.billing_upgrade')
+def upgrade_subscription():
+    if _role() != 'Chairman':
+        return jsonify({'message': 'Only the Chairman can upgrade the plan'}), 403
+        
+    data = request.get_json() or {}
+    tier = data.get('tier')
+    phone = data.get('phone')
+    
+    if not tier or not phone:
+        return jsonify({'message': 'Tier and phone number are required'}), 400
+        
+    # Fetch dynamic prices from DB
+    settings = PlatformSettings.query.first()
+    tier_prices = settings.prices if settings and settings.prices else {'Starter': 500, 'Growth': 1000, 'Business': 2000, 'Gold': 3000}
+    
+    amount = tier_prices.get(tier)
+    
+    if not amount:
+        return jsonify({'message': 'Invalid tier selected'}), 400
+
+    chama = Chama.query.get(_cid())
+    if not chama:
+        return jsonify({'message': 'Chama not found'}), 404
+
+    # Trigger IntaSend STK Push
+    result = send_stk_push(
+        phone_number=phone,
+        amount=amount,
+        api_ref=f"CHAMETU-SUB-{chama.id[:8]}",
+        name=chama.name
+    )
+
+    if result['status'] == 'success':
+        return jsonify({"message": f"STK Push sent to {phone}. Please enter your M-Pesa PIN."}), 200
+    else:
+        return jsonify({"message": result.get('message', 'Payment initiation failed')}), 400

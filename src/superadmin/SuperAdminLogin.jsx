@@ -8,13 +8,7 @@ import {
 import { toast } from 'sonner'
 import ThemeToggle from '../components/ThemeToggle'
 import logo from '../assets/logos.png'
-
-// --- HARDCODED DEVELOPER CREDENTIALS ---
-// In a real app, this is checked on a secure backend.
-const DEV_ACCOUNTS = [
-  { email: 'danny@chametu.co.ke', password: 'admin123', name: 'Danny (Lead Dev)' },
-  { email: 'brian@chametu.co.ke', password: 'admin123', name: 'Brian (Dev 2)' },
-]
+import { api } from '../lib/api' // <-- Import API
 
 export default function SuperAdminLogin() {
   const navigate = useNavigate()
@@ -35,23 +29,25 @@ export default function SuperAdminLogin() {
 
     setBusy(true)
 
-    // Simulate network request
-    setTimeout(() => {
-      const account = DEV_ACCOUNTS.find(
-        (acc) => acc.email.toLowerCase() === email.toLowerCase() && acc.password === password
-      )
+    try {
+      // REAL API CALL to Flask backend
+      const data = await api('/api/superadmin/login', {
+        method: 'POST',
+        body: { email, password }
+      })
 
-      if (account) {
-        // Save the developer session
-        localStorage.setItem('superadmin_session', JSON.stringify({ email: account.email, name: account.name }))
-        toast.success(`Welcome back, ${account.name}`)
-        navigate('/superadmin')
-      } else {
-        setError('Access Denied. Invalid developer credentials.')
-        toast.error('Authentication failed')
-        setBusy(false)
-      }
-    }, 600)
+      // Save the real JWT token
+      localStorage.setItem('superadmin_token', data.token)
+      localStorage.setItem('superadmin_user', JSON.stringify(data.user))
+      
+      toast.success(`Welcome back, ${data.user.name}`)
+      navigate('/superadmin')
+    } catch (err) {
+      setError(err.message || 'Access Denied. Invalid developer credentials.')
+      toast.error('Authentication failed')
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -74,29 +70,19 @@ export default function SuperAdminLogin() {
           }}
         />
 
-        {/* Brand */}
         <Link to="/" className="relative flex items-center gap-3 text-white no-underline">
           <div className="relative">
             <div className="absolute inset-0 rounded-2xl bg-emerald/50 blur-xl" />
             <div className="relative grid h-11 w-11 place-items-center rounded-2xl bg-white/[0.08] ring-1 ring-white/15 backdrop-blur">
-              <img
-                src={logo}
-                alt="Chametu"
-                className="h-7 w-7 rounded-lg object-contain"
-              />
+              <img src={logo} alt="Chametu" className="h-7 w-7 rounded-lg object-contain" />
             </div>
           </div>
           <div>
-            <div className="font-display text-lg font-bold leading-none tracking-tight">
-              Chametu
-            </div>
-            <div className="mt-1 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-gold">
-              Super Admin Portal
-            </div>
+            <div className="font-display text-lg font-bold leading-none tracking-tight">Chametu</div>
+            <div className="mt-1 text-[0.6rem] font-semibold uppercase tracking-[0.22em] text-gold">Super Admin Portal</div>
           </div>
         </Link>
 
-        {/* Headline */}
         <div className="relative mt-16 max-w-[520px]">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.05] px-3.5 py-1.5 text-[0.68rem] font-semibold uppercase tracking-widest text-white/70 backdrop-blur">
             <Zap size={11} className="text-gold" />
@@ -115,80 +101,46 @@ export default function SuperAdminLogin() {
           </p>
         </div>
 
-        {/* Feature cards */}
         <div className="relative mt-10 grid max-w-[520px] gap-3">
           {[
-            {
-              icon: LayoutDashboard,
-              title: 'Global Overview',
-              sub: 'Real-time MRR, active chamas and platform health',
-            },
-            {
-              icon: CreditCard,
-              title: 'Billing & Enforcement',
-              sub: 'Manage tier invoices and bulk-block overdue chamas',
-            },
-            {
-              icon: ShieldAlert,
-              title: 'Audit & Compliance',
-              sub: 'Every admin action is logged and traceable',
-            },
+            { icon: LayoutDashboard, title: 'Global Overview', sub: 'Real-time MRR, active chamas and platform health' },
+            { icon: CreditCard, title: 'Billing & Enforcement', sub: 'Manage tier invoices and bulk-block overdue chamas' },
+            { icon: ShieldAlert, title: 'Audit & Compliance', sub: 'Every admin action is logged and traceable' },
           ].map((f) => (
-            <div
-              key={f.title}
-              className="group flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3.5 backdrop-blur transition hover:border-white/20 hover:bg-white/[0.07]"
-            >
+            <div key={f.title} className="group flex items-center gap-3.5 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3.5 backdrop-blur transition hover:border-white/20 hover:bg-white/[0.07]">
               <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-emerald/15 text-emerald ring-1 ring-emerald/20 transition group-hover:bg-emerald/20">
                 <f.icon size={16} strokeWidth={2} />
               </span>
               <div className="min-w-0">
-                <div className="text-[0.88rem] font-semibold text-white/95">
-                  {f.title}
-                </div>
-                <div className="mt-0.5 text-[0.76rem] leading-snug text-white/55">
-                  {f.sub}
-                </div>
+                <div className="text-[0.88rem] font-semibold text-white/95">{f.title}</div>
+                <div className="mt-0.5 text-[0.76rem] leading-snug text-white/55">{f.sub}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Footer strip */}
         <div className="relative mt-auto flex items-center gap-3 pt-12 text-[0.72rem] text-white/40">
           <Fingerprint size={14} />
           <span>Developer access only. All attempts are logged.</span>
         </div>
       </aside>
 
-      {/* ================= RIGHT: Login form ================= */}
       <main className="flex min-h-screen items-start justify-center px-4 py-6 sm:px-8 sm:py-10 lg:items-center">
         <div className="w-full max-w-[440px]">
           
-          {/* Top bar: back to homepage + theme toggle */}
           <div className="mb-5 flex items-center justify-between border-b border-line pb-4 sm:mb-6">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-[0.78rem] font-semibold text-navy no-underline transition hover:border-forest hover:bg-forest/[0.04] sm:text-[0.82rem]"
-            >
+            <Link to="/" className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-card px-3 py-2 text-[0.78rem] font-semibold text-navy no-underline transition hover:border-forest hover:bg-forest/[0.04] sm:text-[0.82rem]">
               <ArrowLeft size={14} strokeWidth={2.4} aria-hidden="true" />
               Back home
             </Link>
             <ThemeToggle />
           </div>
 
-          {/* Mobile brand */}
           <Link to="/" className="mb-6 flex items-center gap-2 no-underline lg:hidden">
-            <img
-              src={logo}
-              alt="Chametu"
-              className="h-7 w-7 rounded-lg object-contain sm:h-8 sm:w-8"
-            />
-            <span className="font-display text-[0.98rem] font-bold text-navy sm:text-[1.05rem]">
-              Chametu
-            </span>
+            <img src={logo} alt="Chametu" className="h-7 w-7 rounded-lg object-contain sm:h-8 sm:w-8" />
+            <span className="font-display text-[0.98rem] font-bold text-navy sm:text-[1.05rem]">Chametu</span>
           </Link>
 
-          {/* Header */}
           <div>
             <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-[0.14em] bg-navy/10 text-navy dark:bg-white/10 dark:text-white sm:gap-2 sm:px-3 sm:py-1.5 sm:text-[0.65rem]">
               <ShieldCheck size={11} strokeWidth={2.4} />
@@ -203,22 +155,15 @@ export default function SuperAdminLogin() {
             </p>
           </div>
 
-          {/* Hint strip */}
           <div className="mt-5 flex items-start gap-2 rounded-xl bg-emerald/[0.05] px-3 py-2 text-[0.68rem] leading-relaxed text-navy ring-1 ring-emerald/10 sm:px-3.5 sm:py-2.5 sm:text-[0.74rem]">
             <ShieldCheck size={12} className="mt-0.5 flex-none text-forest" />
             <span>Use your assigned developer credentials. Unauthorized access is prohibited.</span>
           </div>
 
-          {/* ============ FORM ============ */}
           <form onSubmit={submit} className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
-            
             <Field label="Developer Email">
               <div className="group flex items-center gap-2.5 rounded-2xl border-[1.5px] border-line bg-card px-3.5 transition focus-within:border-forest focus-within:ring-4 focus-within:ring-forest/10 sm:gap-3 sm:px-4">
-                <Mail
-                  size={16}
-                  strokeWidth={1.9}
-                  className="shrink-0 text-ink-soft transition group-focus-within:text-forest"
-                />
+                <Mail size={16} strokeWidth={1.9} className="shrink-0 text-ink-soft transition group-focus-within:text-forest" />
                 <input
                   type="email"
                   value={email}
@@ -232,11 +177,7 @@ export default function SuperAdminLogin() {
 
             <Field label="Password">
               <div className="group flex items-center gap-2.5 rounded-2xl border-[1.5px] border-line bg-card px-3.5 transition focus-within:border-forest focus-within:ring-4 focus-within:ring-forest/10 sm:gap-3 sm:px-4">
-                <KeyRound
-                  size={16}
-                  strokeWidth={1.9}
-                  className="shrink-0 text-ink-soft transition group-focus-within:text-forest"
-                />
+                <KeyRound size={16} strokeWidth={1.9} className="shrink-0 text-ink-soft transition group-focus-within:text-forest" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -279,10 +220,7 @@ export default function SuperAdminLogin() {
             </button>
 
             {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-2xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-[0.78rem] leading-relaxed text-red-700 sm:px-4 sm:py-3 sm:text-[0.84rem]"
-              >
+              <div role="alert" className="flex items-start gap-2 rounded-2xl border border-red-100 bg-red-50 px-3.5 py-2.5 text-[0.78rem] leading-relaxed text-red-700 sm:px-4 sm:py-3 sm:text-[0.84rem]">
                 <span className="mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full bg-red-500 text-white">
                   <X size={10} strokeWidth={3} />
                 </span>
@@ -301,9 +239,6 @@ export default function SuperAdminLogin() {
   )
 }
 
-/* ============================================================
-   Field Component
-   ============================================================ */
 function Field({ label, action, children }) {
   return (
     <div>
