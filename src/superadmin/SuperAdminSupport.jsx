@@ -107,7 +107,6 @@ export default function SuperAdminSupport() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 sm:space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-bold text-navy dark:text-white sm:text-2xl">Support tickets</h1>
@@ -116,7 +115,7 @@ export default function SuperAdminSupport() {
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-semibold text-navy shadow-sm transition hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white dark:hover:bg-white/10">
+          <button onClick={handleExport} className="flex items-center justify-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2.5 text-sm font-semibold text-navy dark:text-white shadow-sm transition hover:bg-paper dark:hover:bg-white/10">
             <Download size={15} /> Export
           </button>
           <button onClick={() => setNewModalOpen(true)} className="flex items-center justify-center gap-2 rounded-xl bg-forest px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-forest-dark dark:bg-emerald dark:text-[#06331F]">
@@ -125,7 +124,6 @@ export default function SuperAdminSupport() {
         </div>
       </div>
 
-      {/* KPI strip */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <KpiCard label="Open" value={stats.open} tone="blue" Icon={Inbox} />
         <KpiCard label="Pending" value={stats.pending} tone="amber" Icon={Clock} />
@@ -133,23 +131,20 @@ export default function SuperAdminSupport() {
         <KpiCard label="SLA breached" value={stats.slaBreached} tone="red" Icon={AlertTriangle} />
       </div>
 
-      {/* List panel */}
-      <div className="rounded-2xl border border-line bg-card shadow-sm dark:border-white/10">
+      <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-line p-3 dark:border-white/10 sm:p-4">
-          {/* Status pills */}
           <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
             {[{ key: 'all', label: 'All' }, ...Object.entries(TICKET_STATUSES).map(([k, v]) => ({ key: k, label: v.label }))].map((f) => (
               <button
                 key={f.key}
                 onClick={() => setStatusFilter(f.key)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[0.75rem] font-semibold transition sm:text-[0.78rem] ${statusFilter === f.key ? 'bg-navy text-white shadow-sm dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-card text-navy/70 hover:border-forest/40 hover:text-navy dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:text-white'}`}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-[0.75rem] font-semibold transition sm:text-[0.78rem] ${statusFilter === f.key ? 'bg-navy text-white shadow-sm dark:bg-emerald dark:text-[#06331F]' : 'border border-line bg-white text-navy/70 hover:border-forest/40 hover:text-navy dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:text-white'}`}
               >
                 {f.label}
               </button>
             ))}
           </div>
 
-          {/* Search + selects */}
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
@@ -157,19 +152,19 @@ export default function SuperAdminSupport() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search by ID, subject, requester, tag…"
-                className="w-full rounded-xl border border-line bg-card py-2 pl-9 pr-3 text-sm text-navy outline-none focus:border-forest focus:ring-4 focus:ring-forest/10 dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 py-2 pl-9 pr-3 text-sm text-navy dark:text-white outline-none focus:border-forest focus:ring-4 focus:ring-forest/10"
               />
             </div>
             <div className="grid grid-cols-3 gap-1.5 sm:flex sm:gap-2">
-              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="rounded-lg border border-line bg-card px-2 py-2 text-[0.75rem] text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white sm:px-2.5 sm:text-[0.78rem]">
+              <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2 py-2 text-[0.75rem] text-navy dark:text-white outline-none focus:border-forest sm:px-2.5 sm:text-[0.78rem]">
                 <option value="all">Priority</option>
                 {Object.entries(TICKET_PRIORITIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded-lg border border-line bg-card px-2 py-2 text-[0.75rem] text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white sm:px-2.5 sm:text-[0.78rem]">
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2 py-2 text-[0.75rem] text-navy dark:text-white outline-none focus:border-forest sm:px-2.5 sm:text-[0.78rem]">
                 <option value="all">Category</option>
                 {Object.entries(TICKET_CATEGORIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
-              <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="rounded-lg border border-line bg-card px-2 py-2 text-[0.75rem] text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white sm:px-2.5 sm:text-[0.78rem]">
+              <select value={assigneeFilter} onChange={(e) => setAssigneeFilter(e.target.value)} className="rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2 py-2 text-[0.75rem] text-navy dark:text-white outline-none focus:border-forest sm:px-2.5 sm:text-[0.78rem]">
                 <option value="all">Assignee</option>
                 <option value="unassigned">Unassigned</option>
                 {AGENTS.map((a) => <option key={a} value={a}>{a}</option>)}
@@ -177,7 +172,6 @@ export default function SuperAdminSupport() {
             </div>
           </div>
 
-          {/* Bulk bar */}
           {selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-xl border border-forest/30 bg-forest/[0.04] px-3 py-2 dark:border-emerald/30 dark:bg-emerald/5">
               <span className="inline-flex items-center gap-1 rounded-md bg-forest/10 px-2 py-0.5 text-[0.72rem] font-bold text-forest dark:text-emerald">
@@ -186,10 +180,10 @@ export default function SuperAdminSupport() {
               <button onClick={() => handleBulkStatus('resolved')} className="flex items-center gap-1 rounded-lg bg-forest px-2.5 py-1 text-[0.72rem] font-semibold text-white hover:bg-forest-dark dark:bg-emerald dark:text-[#06331F]">
                 <CheckCircle2 size={11} /> Resolve
               </button>
-              <button onClick={() => handleBulkStatus('closed')} className="rounded-lg border border-line bg-card px-2.5 py-1 text-[0.72rem] font-semibold text-navy hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white">
+              <button onClick={() => handleBulkStatus('closed')} className="rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2.5 py-1 text-[0.72rem] font-semibold text-navy dark:text-white hover:bg-paper dark:hover:bg-white/10">
                 Close
               </button>
-              <select onChange={(e) => handleBulkAssign(e.target.value)} className="rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] text-navy outline-none dark:border-white/10 dark:bg-white/5 dark:text-white">
+              <select onChange={(e) => handleBulkAssign(e.target.value)} className="rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2 py-1 text-[0.72rem] text-navy dark:text-white outline-none">
                 <option value="">Assign to…</option>
                 {AGENTS.map((a) => <option key={a} value={a}>{a}</option>)}
               </select>
@@ -198,7 +192,6 @@ export default function SuperAdminSupport() {
           )}
         </div>
 
-        {/* Desktop table */}
         <div className="hidden md:block">
           <table className="w-full text-left text-sm">
             <thead className="border-b border-line bg-paper/40 text-[0.68rem] uppercase tracking-wider text-ink-soft dark:border-white/10 dark:bg-white/5">
@@ -281,7 +274,6 @@ export default function SuperAdminSupport() {
           </table>
         </div>
 
-        {/* Mobile cards */}
         <ul className="divide-y divide-line md:hidden dark:divide-white/5">
           {filtered.length === 0 ? (
             <li className="px-4 py-12 text-center">
@@ -345,7 +337,7 @@ function KpiCard({ label, value, tone, Icon }) {
   }
   const t = tones[tone] || tones.blue
   return (
-    <div className="rounded-2xl border border-line bg-card p-3.5 shadow-sm dark:border-white/10 sm:p-4">
+    <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-3.5 shadow-sm sm:p-4">
       <div className="flex items-center justify-between">
         <span className="text-[0.72rem] font-medium text-ink-soft sm:text-[0.78rem]">{label}</span>
         <span className={`grid h-7 w-7 place-items-center rounded-lg ${t.bg} ${t.text}`}>
@@ -389,12 +381,12 @@ function NewTicketModal({ onClose, onCreate }) {
     setTagInput('')
   }
 
-  const inputCls = 'w-full rounded-xl border border-line bg-card px-3 py-2.5 text-sm text-navy outline-none focus:border-forest focus:ring-4 focus:ring-forest/10 dark:border-white/10 dark:bg-white/5 dark:text-white'
+  const inputCls = 'w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2.5 text-sm text-navy dark:text-white outline-none focus:border-forest focus:ring-4 focus:ring-forest/10'
   const labelCls = 'mb-1.5 flex items-center gap-1.5 text-[0.74rem] font-semibold text-navy dark:text-white'
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-3 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-white/10" onClick={(e) => e.stopPropagation()}>
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-[#071625] shadow-2xl animate-in fade-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-4 py-3 dark:border-white/10 sm:px-5 sm:py-4">
           <div className="flex items-center gap-2">
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-forest/10 text-forest dark:text-emerald">
@@ -469,7 +461,7 @@ function NewTicketModal({ onClose, onCreate }) {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag() } }}
                 placeholder="Add tag and press Enter…"
-                className="min-w-[140px] flex-1 rounded-lg border border-line bg-card px-2 py-1 text-[0.72rem] text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white"
+                className="min-w-[140px] flex-1 rounded-lg border border-line bg-white dark:border-white/10 dark:bg-white/5 px-2 py-1 text-[0.72rem] text-navy dark:text-white outline-none focus:border-forest"
               />
             </div>
           </div>
@@ -503,21 +495,20 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
     toast.success(isInternal ? 'Internal note added' : 'Reply sent to requester')
   }
 
-  const inputCls = 'w-full rounded-xl border border-line bg-card px-3 py-2 text-[0.82rem] text-navy outline-none focus:border-forest dark:border-white/10 dark:bg-white/5 dark:text-white'
+  const inputCls = 'w-full rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2 text-[0.82rem] text-navy dark:text-white outline-none focus:border-forest'
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-4 sm:space-y-5">
       <div className="flex items-center justify-between gap-3">
-        <button onClick={onBack} className="flex items-center gap-2 rounded-xl border border-line bg-card px-3 py-2 text-[0.8rem] font-semibold text-navy shadow-sm hover:bg-paper dark:border-white/10 dark:bg-white/5 dark:text-white">
+        <button onClick={onBack} className="flex items-center gap-2 rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-3 py-2 text-[0.8rem] font-semibold text-navy dark:text-white shadow-sm hover:bg-paper dark:hover:bg-white/10">
           <ArrowLeft size={14} /> Back to tickets
         </button>
         <button onClick={onRemove} className="rounded-lg p-2 text-red-600 hover:bg-red-500/10 dark:text-red-400" aria-label="Delete ticket"><Trash2 size={16} /></button>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        {/* Conversation */}
         <div className="space-y-3">
-          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10 sm:p-5">
+          <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className={`inline-flex rounded-md px-2 py-0.5 text-[0.68rem] font-bold ${st.cls}`}>{st.label}</span>
               <span className={`inline-flex rounded-md px-2 py-0.5 text-[0.68rem] font-bold ${pr.cls}`}>{pr.label}</span>
@@ -543,7 +534,7 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
             {ticket.messages.map((m) => {
               const isAgent = m.role === 'agent'
               return (
-                <div key={m.id} className={`rounded-2xl border p-3.5 shadow-sm sm:p-4 ${m.internal ? 'border-amber-500/30 bg-amber-500/5 dark:border-amber-400/20' : isAgent ? 'border-line bg-card dark:border-white/10' : 'border-line bg-paper/60 dark:border-white/10 dark:bg-white/[0.02]'}`}>
+                <div key={m.id} className={`rounded-2xl border p-3.5 shadow-sm sm:p-4 ${m.internal ? 'border-amber-500/30 bg-amber-500/5 dark:border-amber-400/20' : isAgent ? 'border-line bg-white dark:border-white/10 dark:bg-white/5' : 'border-line bg-paper/60 dark:border-white/10 dark:bg-white/[0.02]'}`}>
                   <div className="mb-1.5 flex flex-wrap items-center gap-2 text-[0.72rem]">
                     <span className="grid h-6 w-6 place-items-center rounded-md bg-navy/10 text-[0.6rem] font-bold text-navy dark:bg-white/10 dark:text-white">
                       {initialsOf(m.author)}
@@ -565,7 +556,7 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
             })}
           </div>
 
-          <form onSubmit={send} className="rounded-2xl border border-line bg-card p-3 shadow-sm dark:border-white/10 sm:p-4">
+          <form onSubmit={send} className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-3 shadow-sm sm:p-4">
             <div className="mb-2 flex items-center gap-1.5">
               <button type="button" onClick={() => setIsInternal(false)} className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[0.72rem] font-semibold transition ${!isInternal ? 'bg-forest text-white dark:bg-emerald dark:text-[#06331F]' : 'text-ink-soft hover:text-navy dark:hover:text-white'}`}>
                 <Send size={10} /> Reply to requester
@@ -584,9 +575,8 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
           </form>
         </div>
 
-        {/* Sidebar */}
         <aside className="space-y-3">
-          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10">
+          <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm">
             <h3 className="mb-3 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
               <Filter size={11} /> Status & priority
             </h3>
@@ -610,7 +600,7 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10">
+          <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm">
             <h3 className="mb-3 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
               <UserIcon size={11} /> Requester
             </h3>
@@ -631,7 +621,7 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10">
+          <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm">
             <h3 className="mb-2.5 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
               <Timer size={11} /> SLA tracking
             </h3>
@@ -648,7 +638,7 @@ function TicketDetail({ ticket, onBack, onUpdate, onMessage, onRemove }) {
           </div>
 
           {ticket.watchers.length > 0 && (
-            <div className="rounded-2xl border border-line bg-card p-4 shadow-sm dark:border-white/10">
+            <div className="rounded-2xl border border-line bg-white dark:border-white/10 dark:bg-white/5 p-4 shadow-sm">
               <h3 className="mb-2 flex items-center gap-1.5 text-[0.7rem] font-bold uppercase tracking-wider text-ink-soft">
                 <Eye size={11} /> Watchers
               </h3>
