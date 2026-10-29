@@ -9,7 +9,7 @@ from flask_jwt_extended import JWTManager, get_jwt, get_jwt_identity, verify_jwt
 from flask_cors import CORS
 from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
-from sqlalchemy import MetaData  # <-- NEW IMPORT
+from sqlalchemy import MetaData
 
 from app.config import Config
 from app.logging_config import configure_logging
@@ -21,10 +21,10 @@ convention = {
     "uq": "uq_%(table_name)s_%(column_0_name)s",
     "ck": "ck_%(table_name)s_%(constraint_name)s",
     "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
-    "pk": "pk_%(table_name)s"
+    "pk": "pk_%(table_name)s",
 }
 
-db = SQLAlchemy(metadata=MetaData(naming_convention=convention))  # <-- UPDATED
+db = SQLAlchemy(metadata=MetaData(naming_convention=convention))
 jwt = JWTManager()
 migrate = Migrate()
 
@@ -74,6 +74,7 @@ def create_app(config_class=Config):
     from app.routes.ledger import ledger_bp
     from app.routes.notifications import notif_bp
     from app.routes.superadmin import superadmin_bp
+    from app.routes.chat import chat_bp
 
     app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(auth_bp,     url_prefix="/api/auth")
@@ -85,6 +86,7 @@ def create_app(config_class=Config):
     app.register_blueprint(rewards_bp,  url_prefix="/api/rewards")
     app.register_blueprint(ledger_bp,   url_prefix="/api/ledger")
     app.register_blueprint(notif_bp,    url_prefix="/api/notifications")
+    app.register_blueprint(chat_bp,     url_prefix="/api/chat")
 
     # ---------- request lifecycle ----------
     @app.before_request
@@ -92,8 +94,6 @@ def create_app(config_class=Config):
         attach_request_id()
         g._start_time = time.perf_counter()
 
-        # Try to extract JWT context so logs have chama_id/user_id.
-        # We do this defensively — public endpoints don't have a JWT.
         try:
             verify_jwt_in_request(optional=True)
             claims = get_jwt() or {}
@@ -103,7 +103,6 @@ def create_app(config_class=Config):
             if uid:
                 set_context(user_id=uid)
         except Exception:
-            # Malformed token — let the route's @jwt_required handle it
             pass
 
     @app.after_request
@@ -143,8 +142,6 @@ def create_app(config_class=Config):
             rewards_service.seed_rewards_if_empty()
             logger.info('rewards/tier catalogs verified')
         except Exception as exc:
-            # On first boot before `flask db upgrade`, tables don't exist yet.
-            # Log at INFO (not WARNING) so the boot isn't noisy.
             logger.info('seed skipped (tables not ready): %s', exc)
 
     # ---------- health ----------

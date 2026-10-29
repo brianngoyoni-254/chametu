@@ -24,7 +24,7 @@ import InviteMembers from '../dashboard/admin/InviteMembers'
 import MyChama from '../dashboard/admin/MyChama'
 import Support from '../dashboard/admin/Support'
 import Settings from '../dashboard/admin/Settings'
-import Upgrade from '../dashboard/admin/Upgrade' // <-- Added Import
+import Upgrade from '../dashboard/admin/Upgrade'
 
 import Payments from '../dashboard/admin/Payments'
 import Transactions from '../dashboard/admin/Transactions'
@@ -66,6 +66,7 @@ import SuperAdminBilling from '../superadmin/SuperAdminBilling'
 import SuperAdminChamas from '../superadmin/SuperAdminChamas'
 import SuperAdminPayments from '../superadmin/SuperAdminPayments'
 import SuperAdminSupport from '../superadmin/SuperAdminSupport'
+import SuperAdminChats from '../superadmin/SuperAdminChats'
 import SuperAdminAudit from '../superadmin/SuperAdminAudit'
 import SuperAdminSettings from '../superadmin/SuperAdminSettings'
 import SuperAdminLogin from '../superadmin/SuperAdminLogin'
@@ -92,10 +93,10 @@ export default function AppRoutes() {
       <Route path="/privacy" element={<Privacy />} />
       <Route path="/terms" element={<Terms />} />
       <Route path="/contact" element={<Contact />} />
-      
+
       {/* Member invite link */}
       <Route path="/join/:chamaCode/:token" element={<MemberJoin />} />
-      
+
       {/* Local preview */}
       <Route path="/demo/member" element={<DemoMemberEntry />} />
 
@@ -107,8 +108,6 @@ export default function AppRoutes() {
           <Route path="/dashboard/chama" element={<MyChama />} />
           <Route path="/dashboard/support" element={<Support />} />
           <Route path="/dashboard/settings" element={<Settings />} />
-          
-          {/* <-- ADDED UPGRADE ROUTE HERE --> */}
           <Route path="/dashboard/upgrade" element={<Upgrade />} />
 
           <Route path="/dashboard/payments" element={<Payments />} />
@@ -162,6 +161,7 @@ export default function AppRoutes() {
           <Route path="chamas" element={<SuperAdminChamas />} />
           <Route path="billing" element={<SuperAdminBilling />} />
           <Route path="payments" element={<SuperAdminPayments />} />
+          <Route path="chats" element={<SuperAdminChats />} />
           <Route path="support" element={<SuperAdminSupport />} />
           <Route path="audit" element={<SuperAdminAudit />} />
           <Route path="settings" element={<SuperAdminSettings />} />
