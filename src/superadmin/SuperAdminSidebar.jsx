@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
 import { NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Building2, CreditCard, Smartphone, LifeBuoy, ShieldCheck, Settings, LogOut, X } from 'lucide-react'
+import {
+  LayoutDashboard, Building2, CreditCard, Smartphone, MessageCircle,
+  LifeBuoy, ShieldCheck, Settings, LogOut, X,
+} from 'lucide-react'
 import logo from '../assets/logos.png'
 
 const LINKS = [
@@ -8,6 +11,7 @@ const LINKS = [
   { to: '/superadmin/chamas', icon: Building2, label: 'All chamas' },
   { to: '/superadmin/billing', icon: CreditCard, label: 'Billing & tiers' },
   { to: '/superadmin/payments', icon: Smartphone, label: 'Payments & M-Pesa' },
+  { to: '/superadmin/chats', icon: MessageCircle, label: 'Chat sessions' },
   { to: '/superadmin/support', icon: LifeBuoy, label: 'Support tickets' },
   { to: '/superadmin/audit', icon: ShieldCheck, label: 'Audit log' },
   { to: '/superadmin/settings', icon: Settings, label: 'Platform settings' },
@@ -30,6 +34,7 @@ export default function SuperAdminSidebar({ open, onClose }) {
   }, [open])
 
   const handleLogout = () => {
+    localStorage.removeItem('superadmin_token')
     localStorage.removeItem('superadmin_session')
     navigate('/superadmin/login')
   }
@@ -75,10 +80,7 @@ export default function SuperAdminSidebar({ open, onClose }) {
             <div className="truncate text-[0.7rem] text-white/50">Full platform access</div>
           </div>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2 text-[0.8rem] font-semibold text-white/60 transition hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20"
-        >
+        <button onClick={handleLogout} className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 py-2 text-[0.8rem] font-semibold text-white/60 transition hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20">
           <LogOut size={14} /> Sign out
         </button>
       </div>
