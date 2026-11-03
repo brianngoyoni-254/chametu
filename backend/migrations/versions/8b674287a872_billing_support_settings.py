@@ -14,6 +14,7 @@ partially-applied state from earlier failed upgrades.
 """
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 revision = '8b674287a872'
@@ -24,33 +25,32 @@ depends_on = None
 
 def upgrade():
     bind = op.get_bind()
+    inspector = inspect(bind)
 
     # ---------- chamas ----------
-    cols = {c[1] for c in bind.execute(sa.text("PRAGMA table_info(chamas)")).fetchall()}
-    if 'is_blocked' not in cols:
+    existing_chamas_cols = [col['name'] for col in inspector.get_columns('chamas')]
+    if 'is_blocked' not in existing_chamas_cols:
         op.add_column(
             'chamas',
-            sa.Column('is_blocked', sa.Boolean(), nullable=False, server_default=sa.text('0'))
+            sa.Column('is_blocked', sa.Boolean(), nullable=False, server_default=sa.text('false'))
         )
-    if 'blocked_at' not in cols:
+    if 'blocked_at' not in existing_chamas_cols:
         op.add_column('chamas', sa.Column('blocked_at', sa.DateTime(), nullable=True))
 
     # ---------- tickets ----------
-    cols = {c[1] for c in bind.execute(sa.text("PRAGMA table_info(tickets)")).fetchall()}
-    if 'assignee' not in cols:
+    existing_tickets_cols = [col['name'] for col in inspector.get_columns('tickets')]
+    if 'assignee' not in existing_tickets_cols:
         op.add_column('tickets', sa.Column('assignee', sa.String(100), nullable=True))
-    if 'tags' not in cols:
+    if 'tags' not in existing_tickets_cols:
         op.add_column('tickets', sa.Column('tags', sa.JSON(), nullable=True))
-    if 'sla_response_due' not in cols:
+    if 'sla_response_due' not in existing_tickets_cols:
         op.add_column('tickets', sa.Column('sla_response_due', sa.DateTime(), nullable=True))
-    if 'sla_resolve_due' not in cols:
+    if 'sla_resolve_due' not in existing_tickets_cols:
         op.add_column('tickets', sa.Column('sla_resolve_due', sa.DateTime(), nullable=True))
 
     # ---------- platform_settings ----------
-    tables = {row[0] for row in bind.execute(
-        sa.text("SELECT name FROM sqlite_master WHERE type='table'")
-    ).fetchall()}
-    if 'platform_settings' not in tables:
+    existing_tables = inspector.get_table_names()
+    if 'platform_settings' not in existing_tables:
         op.create_table(
             'platform_settings',
             sa.Column('id', sa.String(36), primary_key=True),

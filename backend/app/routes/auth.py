@@ -1,7 +1,5 @@
 # app/routes/auth.py
 import logging
-import random
-import string
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
@@ -10,7 +8,7 @@ from flask_jwt_extended import (
 
 from app import db
 from app.models.user import User
-from app.models.chama import Chama, Member, ChamaSettings
+from app.models.chama import Chama, Member
 from app.logging_utils import log_writes
 from app.services import member_service
 
@@ -18,11 +16,6 @@ auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
 
 ADMIN_ROLES = ["Chairman", "Treasurer", "Secretary"]
-
-
-def generate_chama_code():
-    chars = string.ascii_uppercase + string.digits
-    return "CHM-" + "".join(random.choices(chars, k=6))
 
 
 def _portal_for(role: str) -> str:
@@ -101,94 +94,11 @@ def accept_invite():
 
 
 # ---------------------------------------------------------------------
-# REGISTER
+# NOTE: there is intentionally no /register endpoint here.
+# Every chama starts with a paid plan: sign-up goes through
+# POST /api/billing/signup/checkout (routes/billing.py), which only creates the
+# account and chama after the M-Pesa payment is confirmed.
 # ---------------------------------------------------------------------
-@auth_bp.route("/register", methods=["POST"])
-@log_writes(logger, 'auth.register')
-def register():
-    data = request.get_json(silent=True) or {}
-
-    name = (data.get("name") or "").strip()
-    email = (data.get("email") or "").lower().strip()
-    password = data.get("password") or ""
-    phone = (data.get("phone") or "").strip()
-    chama_name = (data.get("chama_name") or "").strip() or f"{name}'s Chama"
-    tier = data.get("tier") or "Starter"
-    monthly = float(data.get("amount") or 1000)
-
-    if not name or not email or not phone or len(password) < 8:
-        logger.warning('register validation failed: name=%r email=%r phone=%r', name, email, phone)
-        return jsonify({"message": "Name, email, phone, and password (min 8 chars) are required"}), 400
-
-    if User.query.filter_by(email=email).first():
-        logger.warning('register duplicate email: %s', email)
-        return jsonify({"message": "An account with that email already exists"}), 409
-
-    if User.query.filter_by(phone=phone).first():
-        logger.warning('register duplicate phone: %s', phone)
-        return jsonify({"message": "That phone number is already in use"}), 409
-
-    user = User(name=name, email=email, phone=phone)
-    user.set_password(password)
-    db.session.add(user)
-    db.session.flush()
-
-    chama = Chama(
-        name=chama_name,
-        code=generate_chama_code(),
-        type="Investment",
-        base_tier=tier,
-        monthly_contribution=monthly,
-    )
-    db.session.add(chama)
-    db.session.flush()
-
-    db.session.add(ChamaSettings(chama_id=chama.id))
-
-    member = Member(
-        user_id=user.id,
-        chama_id=chama.id,
-        role="Chairman",
-        status="active",
-        phone=phone,
-        savings=0.0,
-    )
-    db.session.add(member)
-    db.session.commit()
-
-    logger.info(
-        'registered user=%s chama=%s code=%s',
-        user.email, chama.name, chama.code,
-    )
-
-    token = create_access_token(
-        identity=user.id,
-        additional_claims={
-            "chama_id": chama.id,
-            "role": member.role,
-            "portal": _portal_for(member.role),
-        },
-    )
-
-    return jsonify({
-        "token": token,
-        "user": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "phone": user.phone,
-            "role": member.role,
-            "portal": _portal_for(member.role),
-        },
-        "chama": {
-            "id": chama.id,
-            "name": chama.name,
-            "code": chama.code,
-            "tier": chama.base_tier,
-            "monthly_contribution": chama.monthly_contribution,
-            "due_day": chama.due_day,
-        },
-    }), 201
 
 
 # ---------------------------------------------------------------------
