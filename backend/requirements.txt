@@ -16,3 +16,4 @@ werkzeug==3.1.9; python_version >= '3.9'
 flask-migrate
 requests
 intasend-python
+gunicorn==23.0.0

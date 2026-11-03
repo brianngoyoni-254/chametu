@@ -5,3 +5,10 @@ dist/
 *.log
 .env
 .env.local
+
+backend/.env
+.env
+backend/venv/
+venv/
+.venv/
+__pycache__/
