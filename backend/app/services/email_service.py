@@ -11,7 +11,8 @@ def send_email(to_email, subject, html_content):
     Requires BREVO_API_KEY and BREVO_SENDER_EMAIL in .env
     """
     api_key = current_app.config.get('BREVO_API_KEY')
-    sender_email = current_app.config.get('BREVO_SENDER_EMAIL', 'no-reply@chametu.co.ke')
+    # Updated default fallback to your new Gmail address
+    sender_email = current_app.config.get('BREVO_SENDER_EMAIL', 'chametu.co.ke@gmail.com')
 
     if not api_key:
         logger.warning("BREVO_API_KEY is not set. Skipping email to %s", to_email)

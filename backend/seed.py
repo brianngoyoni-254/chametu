@@ -1,3 +1,7 @@
+# backend/seed.py
+from dotenv import load_dotenv
+load_dotenv()
+
 from app import create_app, db
 from app.models.user import SuperAdmin
 
@@ -29,10 +33,10 @@ def seed_superadmin():
             existing = SuperAdmin.query.filter_by(email=dev["email"]).first()
             
             if existing:
-                print(f"Admin already exists: {dev['email']}")
-                # Optional: Update the password if they forgot it
-                # existing.set_password(dev["password"])
-                # db.session.commit()
+                # Force-reset the password so it always matches what's in this file
+                existing.set_password(dev["password"])
+                existing.name = dev["name"]
+                print(f"Updated password for existing admin: {dev['email']}")
             else:
                 admin = SuperAdmin(email=dev["email"], name=dev["name"])
                 admin.set_password(dev["password"])

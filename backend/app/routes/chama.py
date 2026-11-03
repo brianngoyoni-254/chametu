@@ -266,6 +266,21 @@ def delete_member(member_id):
     return jsonify({'message': 'Member deactivated'}), 200
 
 
+# NEW: Permanent Delete Route
+@chama_bp.route('/members/<member_id>/permanent', methods=['DELETE'])
+@jwt_required()
+@require_permission('manageMembers')
+@log_writes(logger, 'member.hard_delete')
+def hard_delete_member(member_id):
+    if _role() != 'Chairman':
+        return jsonify({'message': 'Only the Chairman can permanently delete members'}), 403
+    try:
+        member_service.hard_delete_member(_cid(), member_id)
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 404
+    return jsonify({'message': 'Member permanently deleted'}), 200
+
+
 @chama_bp.route('/members/<member_id>/role', methods=['PATCH'])
 @jwt_required()
 @require_permission('editRoles')

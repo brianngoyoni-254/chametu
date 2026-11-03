@@ -61,6 +61,7 @@ function getMenuItems(member) {
       { key: 'role',     label: 'Change role',      icon: ShieldCheck },
       { divider: true },
       { key: 'reactivate', label: 'Reactivate',     icon: UserCheck },
+      { key: 'delete_permanent', label: 'Delete permanently', icon: Trash2, danger: true },
     ]
   }
   return [
@@ -70,6 +71,7 @@ function getMenuItems(member) {
     { key: 'record',   label: 'Record payment',   icon: Wallet },
     { divider: true },
     { key: 'deactivate', label: 'Deactivate',     icon: UserMinus },
+    { key: 'delete_permanent', label: 'Delete permanently', icon: Trash2, danger: true },
   ]
 }
 
@@ -115,7 +117,7 @@ function RowMenu({ member, onAction }) {
     e.stopPropagation()
     if (!open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect()
-      const menuHeight = 180
+      const menuHeight = 220
       const spaceBelow = window.innerHeight - rect.bottom
       const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom
       setCoords({ top, left: rect.right - 224 })
@@ -433,7 +435,7 @@ function InviteModal({ open, onClose, onInvite, existingEmails, atCap, capInfo, 
 export default function Members() {
   const {
     members, contributions, refetchMembers, roles,
-    updateMember, removeMember, changeRole,
+    updateMember, removeMember, hardDeleteMember, changeRole,
     inviteMember, recordContribution,
     isLoadingMembers,
   } = useChama()
@@ -544,6 +546,20 @@ export default function Members() {
           onConfirm: async () => {
             const res = await removeMember(member.id)
             if (res.ok) toast.success(`${member.name.split(' ')[0]} deactivated`)
+            else toast.error(res.message)
+            setConfirm(null)
+          },
+        })
+        break
+      case 'delete_permanent':
+        setConfirm({
+          title: `Permanently delete ${member.name}?`,
+          body: 'This action CANNOT be undone. All their data, history, and account will be permanently erased from the system.',
+          confirmLabel: 'Delete Permanently',
+          danger: true,
+          onConfirm: async () => {
+            const res = await hardDeleteMember(member.id)
+            if (res.ok) toast.success(`${member.name.split(' ')[0]} permanently deleted`)
             else toast.error(res.message)
             setConfirm(null)
           },
