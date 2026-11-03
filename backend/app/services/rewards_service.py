@@ -363,18 +363,39 @@ def list_tiers():
     ]
 
 
+def is_upgrade(chama_id, tier_name):
+    """True if moving to tier_name would be a move UP from the current base tier."""
+    target = TierConfig.query.get(tier_name) if tier_name else None
+    if not target:
+        return False
+    sub = get_or_create_subscription(chama_id)
+    current = tier_config(sub.base_tier)
+    return bool(current and target.rank > current.rank)
+
+
+def _sync_chama_tier(chama_id, tier_name):
+    # login/me read Chama.base_tier, so keep it in step with the subscription row
+    from app.models.chama import Chama
+    chama = Chama.query.get(chama_id)
+    if chama:
+        chama.base_tier = tier_name
+
+
 def set_base_tier(chama_id, tier_name):
     cfg = TierConfig.query.get(tier_name)
     if not cfg:
         raise ValueError(f'Unknown tier: {tier_name}')
     sub = get_or_create_subscription(chama_id)
     sub.base_tier = tier_name
+    _sync_chama_tier(chama_id, tier_name)
     db.session.commit()
     return sub
 
 
 def start_trial(chama_id):
     sub = get_or_create_subscription(chama_id)
+    if sub.trial_expires_at is not None:
+        raise ValueError('Your free trial has already been used.')
     sub.trial_expires_at = datetime.utcnow() + timedelta(days=TRIAL_DAYS)
     db.session.commit()
     return sub
@@ -387,6 +408,7 @@ def upgrade_tier(chama_id, tier_name):
     sub = get_or_create_subscription(chama_id)
     sub.base_tier = tier_name
     sub.trial_expires_at = None
+    _sync_chama_tier(chama_id, tier_name)
     db.session.commit()
     return sub
 

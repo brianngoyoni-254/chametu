@@ -71,6 +71,11 @@ def set_base_tier():
     if get_jwt().get('role') not in ADMIN_ROLES:
         return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
+    if svc.is_upgrade(_cid(), data.get('tier')):
+        return jsonify({
+            'message': 'Upgrading requires payment. Use the checkout to pay for this plan.',
+            'paymentRequired': True,
+        }), 402
     try:
         sub = svc.set_base_tier(_cid(), data.get('tier'))
     except ValueError as e:
@@ -88,7 +93,10 @@ def set_base_tier():
 def start_trial():
     if get_jwt().get('role') not in ADMIN_ROLES:
         return jsonify({'message': 'Unauthorized'}), 403
-    sub = svc.start_trial(_cid())
+    try:
+        sub = svc.start_trial(_cid())
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
     logger.info('trial started, expires %s', sub.trial_expires_at)
     return jsonify({
         'trialExpiresAt': sub.trial_expires_at.isoformat() if sub.trial_expires_at else None,
@@ -102,6 +110,11 @@ def upgrade():
     if get_jwt().get('role') not in ADMIN_ROLES:
         return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
+    if svc.is_upgrade(_cid(), data.get('tier')):
+        return jsonify({
+            'message': 'Upgrading requires payment. Use the checkout to pay for this plan.',
+            'paymentRequired': True,
+        }), 402
     try:
         sub = svc.upgrade_tier(_cid(), data.get('tier'))
     except ValueError as e:

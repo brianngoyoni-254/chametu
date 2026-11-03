@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Sun, Moon, Eye, EyeOff, Check, Mail, Lock, User,
-  Building2, Phone, Gift, Smartphone, Vote, Star, Sparkles,
-  ArrowLeft, Crown, ShieldCheck,
+  Building2, Phone, Smartphone, Vote, Star, Sparkles,
+  ArrowLeft, Crown, ShieldCheck, Loader2, CheckCircle2, AlertCircle, Lock as LockIcon,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
 import { ORDER } from '../lib/tiers'
 import { toast } from 'sonner'
+import { api } from '../lib/api'
+import { friendlyFailureReason } from '../lib/paymentMessages'
 import logo from '../assets/logos.png'
 
 const PLAN_META = {
@@ -24,12 +26,24 @@ const BENEFITS = [
   { Icon: Star,       text: 'Earn Chametu Points for on-time payments and redeem digital perks' },
 ]
 
+const POLL_MS = 3000
+const MAX_POLLS = 40
+const PENDING_KEY = 'chametu_pending_signup'
+
+const readPending = () => {
+  try { return JSON.parse(sessionStorage.getItem(PENDING_KEY) || 'null') } catch { return null }
+}
+const writePending = (v) => { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(v)) } catch {} }
+const clearPending = () => { try { sessionStorage.removeItem(PENDING_KEY) } catch {} }
+
+const STEPS = ['Details & plan', 'Pay with M-Pesa', 'Chama ready']
+
 const isValidEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
 const isValidPhone = (v) => /^0[17]\d{8}$/.test(v.replace(/\s/g, ''))
 
 export default function Register() {
-  const { register } = useAuth()
-  const { setBaseTier, startTrial, tiers } = useTier()
+  const { adoptSession } = useAuth()
+  const { tiers, refresh: refreshTier } = useTier()
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
@@ -42,8 +56,25 @@ export default function Register() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  const [stage, setStage] = useState('form')
+  const [signup, setSignup] = useState(null)
+  const [failReason, setFailReason] = useState('')
+  const [pollKick, setPollKick] = useState(0)
+  const [destination, setDestination] = useState('/dashboard')
+
+  const claimRef = useRef(null)
+  const signupIdRef = useRef(null)
+  const triesRef = useRef(0)
+
   useEffect(() => {
-    setError('')
+    const p = readPending()
+    if (p?.id && p?.claim) {
+      claimRef.current = p.claim
+      signupIdRef.current = p.id
+      setSignup({ id: p.id, tier: p.tier, amount: p.amount, phone: p.phone })
+      if (p.tier) setSelectedTier(p.tier)
+      setStage('waiting')
+    }
   }, [])
 
   const pwStrength = (() => {
@@ -57,6 +88,11 @@ export default function Register() {
     )
   })()
 
+  const selectedPlan = tiers[selectedTier]
+  const price = Number(selectedPlan?.price ?? 0)
+
+  const routeFor = (portal) => (portal === 'member' ? '/member' : '/dashboard')
+
   const submit = async (e) => {
     e.preventDefault()
     setError('')
@@ -67,43 +103,138 @@ export default function Register() {
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
     if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number (e.g., 0712345678).')
 
+    const cleanPhone = phone.replace(/\s/g, '')
     setBusy(true)
     try {
-      // 1. Create the account + chama in the backend database
-      const session = await register({
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
-        password,
-        phone: phone.replace(/\s/g, ''),
-        chamaName: chamaName.trim(),
-        tier: selectedTier,
-      })
-
-      // 2. Set the local tier context so the UI reflects their choice
-      setBaseTier(selectedTier)
-      startTrial()
-
-      // 3. Show success
-      toast.success(`Welcome, ${name.split(' ')[0]}! Your chama is ready.`)
-      
-      // 4. Route based on their portal role 👇
-      if (session.portal === 'member') {
-        navigate('/member', { replace: true })
-      } else {
-        navigate('/dashboard', { replace: true })
+      if (price <= 0) {
+        setError('This plan is not available right now. Please choose another plan.')
+        return
       }
+
+      const res = await api('/api/billing/signup/checkout', {
+        method: 'POST',
+        body: {
+          name: name.trim(),
+          email: email.trim().toLowerCase(),
+          password,
+          phone: cleanPhone,
+          chama_name: chamaName.trim(),
+          tier: selectedTier,
+        },
+      })
+      claimRef.current = res.claim
+      signupIdRef.current = res.signup.id
+      writePending({
+        id: res.signup.id,
+        claim: res.claim,
+        tier: res.signup.tier,
+        amount: res.signup.amount,
+        phone: res.signup.phone,
+      })
+      setSignup(res.signup)
+      triesRef.current = 0
+      setStage('waiting')
     } catch (err) {
-      setError(err?.message || 'Could not create your account. Please try again.')
+      setError(err?.message || 'Could not start your signup. Please try again.')
     } finally {
       setBusy(false)
     }
   }
 
-  const selectedPlan = tiers[selectedTier]
+  // Poll: depends only on `stage` and `pollKick`; the signup id is read
+  // from a ref so setSignup() during polling does NOT restart the interval.
+  useEffect(() => {
+    if (stage !== 'waiting' || !signupIdRef.current) return undefined
+
+    let cancelled = false
+    const signupId = signupIdRef.current
+
+    const applyOutcome = async (s) => {
+      setSignup(s)
+
+      if (s.status === 'complete') {
+        clearPending()
+        if (s.session) {
+          const sessionUser = adoptSession(s.session)
+          setDestination(routeFor(sessionUser.portal))
+          try { await refreshTier() } catch { /* tier loads on next navigation */ }
+        } else {
+          setDestination('/login')
+        }
+        setStage('success')
+        toast.success(`${s.tier} plan activated`)
+        return true
+      }
+      if (['failed', 'expired', 'review'].includes(s.status)) {
+        clearPending()
+        setFailReason(friendlyFailureReason(s.failedReason, s.status))
+        setStage('failed')
+        if (s.status === 'failed') toast.error('Payment not completed')
+        return true
+      }
+      return false
+    }
+
+    const check = async () => {
+      try {
+        const res = await api(`/api/billing/signup/${signupId}/status`, {
+          method: 'POST',
+          body: { claim: claimRef.current },
+        })
+        if (cancelled) return true
+        const payload = { ...res.signup, session: res.session }
+        return await applyOutcome(payload)
+      } catch {
+        return false
+      }
+    }
+
+    ;(async () => {
+      const done = await check()
+      if (done || cancelled) return
+    })()
+
+    const id = setInterval(async () => {
+      triesRef.current += 1
+      const done = await check()
+      if (done) return clearInterval(id)
+      if (triesRef.current >= MAX_POLLS) {
+        clearInterval(id)
+        if (!cancelled) setStage('timeout')
+      }
+      return undefined
+    }, POLL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, pollKick])
+
+  const retryCheck = () => {
+    triesRef.current = 0
+    setStage('waiting')
+    setPollKick((n) => n + 1)
+  }
+
+  const backToForm = () => {
+    clearPending()
+    claimRef.current = null
+    signupIdRef.current = null
+    setSignup(null)
+    setFailReason('')
+    setError('')
+    setStage('form')
+  }
+
+  const finish = () => {
+    if (destination !== '/login') toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your chama is ready.`)
+    navigate(destination, { replace: true })
+  }
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-paper lg:grid-cols-[minmax(340px,5fr)_7fr]">
-      {/* Left panel */}
       <aside className="relative flex flex-col gap-4 overflow-hidden bg-navy p-7 text-white lg:sticky lg:top-0 lg:h-screen lg:gap-7 lg:p-11">
         <div
           className="pointer-events-none absolute inset-0"
@@ -139,15 +270,14 @@ export default function Register() {
         </ul>
 
         <div className="relative mt-auto hidden items-start gap-2.5 rounded-2xl border border-white/20 bg-white/[0.07] p-4 text-[0.88rem] leading-relaxed lg:flex">
-          <Gift size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-gold" />
+          <LockIcon size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-gold" />
           <span>
-            <b className="text-gold">14 days free</b> with every plan. You get Gold
-            features during the trial.
+            <b className="text-gold">Pay first, then you're in.</b> Your chama is
+            created the moment M-Pesa confirms your plan payment.
           </span>
         </div>
       </aside>
 
-      {/* Right panel */}
       <main className="flex justify-center px-6 py-10">
         <div className="w-full max-w-[600px]">
           <div className="mb-6 flex items-center justify-between text-[0.88rem] text-ink-soft">
@@ -161,7 +291,6 @@ export default function Register() {
             <ThemeToggle />
           </div>
 
-          {/* Chairman badge */}
           <div className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-widest text-[#8A6417]">
             <Crown size={11} />
             Chairman signup
@@ -171,10 +300,24 @@ export default function Register() {
             Create your chama
           </h1>
           <p className="mb-5 mt-2 leading-relaxed text-ink-soft">
-            You'll be set up as the chama's chairman. First 14 days are on us —
-            Gold features included.
+            You'll be set up as the chama's chairman. Choose a plan, pay securely
+            with M-Pesa, and your chama is created as soon as payment is confirmed.
           </p>
 
+          <Stepper stage={stage} />
+
+          {stage !== 'form' && (
+            <StatusCard
+              stage={stage}
+              signup={signup}
+              failReason={failReason}
+              onRetryCheck={retryCheck}
+              onBack={backToForm}
+              onFinish={finish}
+            />
+          )}
+
+          {stage === 'form' && (
           <form onSubmit={submit}>
             <Field label="Your full name">
               <IconInput
@@ -260,7 +403,7 @@ export default function Register() {
                 Choose your plan
               </b>
               <span className="text-[0.76rem] text-ink-soft">
-                Change anytime · 14 days free
+                Upgrade anytime · billed monthly
               </span>
             </div>
 
@@ -282,10 +425,12 @@ export default function Register() {
                 <b>Due today</b>
                 <br />
                 <span className="text-ink-soft">
-                  14-day free trial, then KSh {selectedPlan.price.toLocaleString()}/mo
+                  {selectedTier} plan · billed monthly via M-Pesa
                 </span>
               </div>
-              <b className="font-mono text-[1.25rem] text-navy">KSh 0</b>
+              <b className="font-mono text-[1.25rem] text-navy">
+                KSh {price.toLocaleString()}
+              </b>
             </div>
 
             <button
@@ -293,8 +438,12 @@ export default function Register() {
               disabled={busy}
               className="mt-2 w-full cursor-pointer rounded-2xl border-0 bg-gradient-to-br from-forest to-emerald py-4 font-display text-base font-bold text-white shadow-[0_10px_24px_rgba(11,122,90,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:transform-none disabled:opacity-55"
             >
-              {busy ? 'Creating your chama…' : 'Create your chama'}
+              {busy ? 'Sending M-Pesa prompt…' : `Pay KSh ${price.toLocaleString()} with M-Pesa`}
             </button>
+
+            <p className="mt-2.5 text-center text-[0.76rem] text-ink-soft">
+              An M-Pesa prompt will be sent to {phone.trim() || 'your phone number'}. Your chama is created once payment is confirmed.
+            </p>
 
             {error && (
               <div
@@ -313,13 +462,12 @@ export default function Register() {
               </span>
             </div>
           </form>
+          )}
         </div>
       </main>
     </div>
   )
 }
-
-/* ---------- plan card ---------- */
 
 function PlanCard({ tierName, tier, meta, selected, onSelect }) {
   return (
@@ -422,7 +570,120 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
   )
 }
 
-/* ---------- shared bits ---------- */
+function Stepper({ stage }) {
+  const active = stage === 'form' ? 0 : stage === 'success' ? 2 : 1
+  return (
+    <ol className="m-0 mb-6 flex list-none items-center gap-2 p-0">
+      {STEPS.map((label, i) => {
+        const done = i < active || (i === 2 && stage === 'success')
+        const current = i === active
+        return (
+          <li key={label} className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-[0.7rem] font-bold ${
+                done
+                  ? 'bg-forest text-white'
+                  : current
+                    ? 'bg-gold text-[#2E2200]'
+                    : 'bg-line text-ink-soft'
+              }`}
+            >
+              {done ? <Check size={12} strokeWidth={3} /> : i + 1}
+            </span>
+            <span
+              className={`truncate text-[0.74rem] font-semibold ${
+                current || done ? 'text-navy' : 'text-ink-soft'
+              }`}
+            >
+              {label}
+            </span>
+            {i < STEPS.length - 1 && <span className="h-px flex-1 bg-line" />}
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish }) {
+  const amount = Number(signup?.amount ?? 0).toLocaleString()
+  const btnGhost =
+    'rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy'
+  const btnSolid =
+    'rounded-xl bg-forest px-5 py-2.5 text-[0.86rem] font-semibold text-white'
+
+  return (
+    <div className="rounded-2xl border border-line bg-white px-6 py-9 text-center shadow-sm">
+      {stage === 'waiting' && (
+        <>
+          <Loader2 size={34} className="mx-auto animate-spin text-forest" />
+          <p className="mt-4 font-display text-[1.05rem] font-semibold text-navy">
+            Check your phone
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
+            Enter your M-Pesa PIN to pay <b className="text-navy">KSh {amount}</b> for
+            the {signup?.tier} plan. Please keep this page open — your chama is
+            created as soon as payment is confirmed.
+          </p>
+          <p className="mx-auto mt-3 max-w-[42ch] text-[0.76rem] text-ink-soft/80">
+            This page updates automatically when the payment is confirmed or cancelled.
+          </p>
+        </>
+      )}
+
+      {stage === 'success' && (
+        <>
+          <CheckCircle2 size={40} className="mx-auto text-emerald" />
+          <p className="mt-4 font-display text-[1.1rem] font-semibold text-navy">
+            Payment received — your chama is ready
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
+            Your {signup?.tier} plan is active and you're set up as the chairman.
+          </p>
+          <button type="button" onClick={onFinish} className={`mt-6 ${btnSolid}`}>
+            Go to my dashboard
+          </button>
+        </>
+      )}
+
+      {stage === 'failed' && (
+        <>
+          <AlertCircle size={40} className="mx-auto text-red-500" />
+          <p className="mt-4 font-display text-[1.05rem] font-semibold text-navy">
+            Payment not completed
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
+            {failReason} No chama was created and you have not been charged for one.
+          </p>
+          <button type="button" onClick={onBack} className={`mt-6 ${btnSolid}`}>
+            Try again
+          </button>
+        </>
+      )}
+
+      {stage === 'timeout' && (
+        <>
+          <AlertCircle size={40} className="mx-auto text-amber-500" />
+          <p className="mt-4 font-display text-[1.05rem] font-semibold text-navy">
+            Still waiting for M-Pesa
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
+            We haven't received confirmation yet. If you already entered your PIN,
+            check again in a moment.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <button type="button" onClick={onBack} className={btnGhost}>
+              Start over
+            </button>
+            <button type="button" onClick={onRetryCheck} className={btnSolid}>
+              Check again
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 function Field({ label, children }) {
   return (

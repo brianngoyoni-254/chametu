@@ -9,6 +9,7 @@ from app import db
 from app.models.user import SuperAdmin, User
 from app.models.chama import Chama, Member
 from app.models.ledger import Payment, AuditLogEntry
+from app.models.billing import SubscriptionPayment
 from app.models.support import Ticket, TicketMessage
 from app.models.settings import PlatformSettings
 from app.models.chat import ChatSession
@@ -188,6 +189,27 @@ def get_all_payments():
         status_map = {'matched': 'paid', 'unmatched': 'pending', 'failed': 'failed'}
         result = []
 
+        # Tier-subscription payments made through IntaSend
+        sub_status = {
+            'complete': 'paid', 'pending': 'pending', 'processing': 'pending',
+            'failed': 'failed', 'expired': 'failed', 'review': 'failed',
+        }
+        for sp in SubscriptionPayment.query.order_by(SubscriptionPayment.created_at.desc()).limit(500).all():
+            sp_chama = Chama.query.get(sp.chama_id)
+            sp_user = User.query.get(sp.user_id)
+            result.append({
+                'id': sp.id,
+                'channel': 'mpesa',
+                'ref': sp.invoice_id or sp.api_ref,
+                'chama': sp_chama.name if sp_chama else 'Unknown Chama',
+                'tier': sp.tier,
+                'payer': sp_user.name if sp_user else 'Unknown',
+                'phone': sp.phone,
+                'amount': sp.amount,
+                'time': (sp.completed_at or sp.created_at).isoformat(),
+                'status': sub_status.get(sp.status, 'pending'),
+            })
+
         for p in payments:
             chama = Chama.query.get(p.chama_id)
             result.append({
@@ -203,6 +225,7 @@ def get_all_payments():
                 'status': status_map.get(p.status, 'pending'),
             })
 
+        result.sort(key=lambda r: r['time'], reverse=True)
         return jsonify(result), 200
     except Exception as e:
         logger.error("Error fetching payments: %s", e)
@@ -226,7 +249,15 @@ def get_billing():
         }
 
         invoices = []
+        paid_recently = {
+            row[0] for row in db.session.query(SubscriptionPayment.chama_id).filter(
+                SubscriptionPayment.status == 'complete',
+                SubscriptionPayment.completed_at >= datetime.utcnow() - timedelta(days=30),
+            ).all()
+        }
         for c in Chama.query.all():
+            if c.id in paid_recently:
+                continue
             days_since_creation = (datetime.utcnow() - c.created_at).days
             is_overdue = days_since_creation > 30
 

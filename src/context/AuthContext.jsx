@@ -55,29 +55,17 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const register = async ({ name, email, password, phone, chamaName, tier }) => {
-    setLoading(true)
-    try {
-      const data = await api('/api/auth/register', {
-        method: 'POST',
-        body: {
-          name, email, password, phone,
-          chama_name: chamaName,
-          tier: tier || 'Starter',
-          amount: 1000,
-        },
-      })
-      const sessionUser = {
-        ...data.user,
-        portal: data.user.portal || portalForRole(data.user.role),
-      }
-      localStorage.setItem(TOKEN_KEY, data.token)
-      setUser(sessionUser)
-      notifyAuthChanged()
-      return sessionUser
-    } finally {
-      setLoading(false)
+  // Adopt a ready-made session (token + user), e.g. the one returned after a
+  // pay-first signup is confirmed. Same effect as a successful login.
+  const adoptSession = ({ token, user: sessionUser }) => {
+    const nextUser = {
+      ...sessionUser,
+      portal: sessionUser.portal || portalForRole(sessionUser.role),
     }
+    localStorage.setItem(TOKEN_KEY, token)
+    setUser(nextUser)
+    notifyAuthChanged()
+    return nextUser
   }
 
   const refreshProfile = async () => {
@@ -125,7 +113,7 @@ export function AuthProvider({ children }) {
     isAuthenticated: !!user,
     loading,
     login,
-    register,
+    adoptSession,
     logout,
     refreshProfile,
     updateUser,

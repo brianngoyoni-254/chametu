@@ -23,18 +23,6 @@ export async function redeemReward(rewardId) {
   })
 }
 
-export async function setBaseTier(tier) {
-  return api('/api/rewards/tier/base', {
-    method: 'PUT', token: token(), body: { tier },
-  })
-}
-
-export async function startTrial() {
-  return api('/api/rewards/tier/trial', { method: 'POST', token: token() })
-}
-
-export async function upgradeTier(tier) {
-  return api('/api/rewards/tier/upgrade', {
-    method: 'POST', token: token(), body: { tier },
-  })
-}
+// NOTE: there are deliberately no setBaseTier / startTrial / upgradeTier helpers.
+// A plan can only change through a verified M-Pesa payment (see /api/billing),
+// never from the browser.

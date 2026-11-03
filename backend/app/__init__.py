@@ -75,6 +75,7 @@ def create_app(config_class=Config):
     from app.routes.notifications import notif_bp
     from app.routes.superadmin import superadmin_bp
     from app.routes.chat import chat_bp
+    from app.routes.billing import billing_bp
 
     app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(auth_bp,     url_prefix="/api/auth")
@@ -87,6 +88,7 @@ def create_app(config_class=Config):
     app.register_blueprint(ledger_bp,   url_prefix="/api/ledger")
     app.register_blueprint(notif_bp,    url_prefix="/api/notifications")
     app.register_blueprint(chat_bp,     url_prefix="/api/chat")
+    app.register_blueprint(billing_bp,  url_prefix="/api/billing")
 
     # ---------- request lifecycle ----------
     @app.before_request

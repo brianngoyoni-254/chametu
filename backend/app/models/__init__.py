@@ -16,6 +16,8 @@ from .ledger import (
     SavingsLedger, Payment, WelfareContribution, AuditLogEntry,
 )
 from .contribution import Contribution, MemberInvite
+from .billing import SubscriptionPayment
+from .pending_signup import PendingSignup
 from .notification import (
     Notification, NotificationPreference, NotificationReadReceipt,
 )

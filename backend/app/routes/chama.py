@@ -789,38 +789,27 @@ def record_payout():
 @jwt_required()
 @log_writes(logger, 'chama.billing_upgrade')
 def upgrade_subscription():
+    """Kept for backward compatibility. Delegates to the tracked IntaSend flow
+    (see app/routes/billing.py). The tier only changes once payment is confirmed."""
     if _role() != 'Chairman':
         return jsonify({'message': 'Only the Chairman can upgrade the plan'}), 403
-        
+
     data = request.get_json() or {}
-    tier = data.get('tier')
-    phone = data.get('phone')
-    
-    if not tier or not phone:
+    if not data.get('tier') or not data.get('phone'):
         return jsonify({'message': 'Tier and phone number are required'}), 400
-        
-    # Fetch dynamic prices from DB
-    settings = PlatformSettings.query.first()
-    tier_prices = settings.prices if settings and settings.prices else {'Starter': 500, 'Growth': 1000, 'Business': 2000, 'Gold': 3000}
-    
-    amount = tier_prices.get(tier)
-    
-    if not amount:
-        return jsonify({'message': 'Invalid tier selected'}), 400
 
-    chama = Chama.query.get(_cid())
-    if not chama:
-        return jsonify({'message': 'Chama not found'}), 404
+    from app.services import billing_service
+    try:
+        payment = billing_service.start_payment(
+            chama_id=_cid(),
+            user_id=get_jwt_identity(),
+            tier_name=data.get('tier'),
+            phone_raw=data.get('phone'),
+        )
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
 
-    # Trigger IntaSend STK Push
-    result = send_stk_push(
-        phone_number=phone,
-        amount=amount,
-        api_ref=f"CHAMETU-SUB-{chama.id[:8]}",
-        name=chama.name
-    )
-
-    if result['status'] == 'success':
-        return jsonify({"message": f"STK Push sent to {phone}. Please enter your M-Pesa PIN."}), 200
-    else:
-        return jsonify({"message": result.get('message', 'Payment initiation failed')}), 400
+    return jsonify({
+        'message': 'Check your phone and enter your M-Pesa PIN to complete payment.',
+        'payment': billing_service.serialize(payment),
+    }), 201
