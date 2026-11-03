@@ -16,6 +16,14 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
+    # ------------------------------------------------------------------
+    # Neon Database Connection Pooling (Fixes the "sleep" SSL error)
+    # ------------------------------------------------------------------
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,  # Check connection health before querying
+        "pool_recycle": 300,    # Recycle connections every 5 minutes
+    }
+
     # 24h in dev makes it easy to refresh the React app without re-logging in.
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 
@@ -29,7 +37,8 @@ class Config:
     # Brevo Email Integration
     # ------------------------------------------------------------------
     BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "")
-    BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "no-reply@chametu.co.ke")
+    # Updated default fallback to the new Gmail address
+    BREVO_SENDER_EMAIL = os.environ.get("BREVO_SENDER_EMAIL", "chametu.co.ke@gmail.com")
 
     # ------------------------------------------------------------------
     # Logging (read by app.logging_config)

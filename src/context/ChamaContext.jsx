@@ -193,6 +193,17 @@ export function ChamaProvider({ children }) {
     }
   }, [fetchData])
 
+  // NEW: Permanent Delete Function
+  const hardDeleteMember = useCallback(async (memberId) => {
+    try {
+      await api(`/api/chama/members/${memberId}/permanent`, { method: 'DELETE' })
+      await fetchData()
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, message: err.message }
+    }
+  }, [fetchData])
+
   const changeRole = useCallback(async (memberId, role) => {
     try {
       await api(`/api/chama/members/${memberId}/role`, { method: 'PATCH', body: { role } })
@@ -311,7 +322,7 @@ export function ChamaProvider({ children }) {
     refetchInvites,
     refreshChama,
     recordContribution, setContributionSchedule, setContributionOverride,
-    updateMember, removeMember, changeRole,
+    updateMember, removeMember, changeRole, hardDeleteMember, // Added here
     inviteMember, cancelInvite,
     applyForLoan, updateLoanStatus, repayLoan,
     updateRole, addRole, deleteRole, setRoles,
@@ -321,7 +332,7 @@ export function ChamaProvider({ children }) {
     contributions, invites, isLoadingMembers, permissions, can, updateChama,
     fetchData, refetchInvites, refreshChama,
     recordContribution, setContributionSchedule, setContributionOverride,
-    updateMember, removeMember, changeRole, inviteMember, cancelInvite,
+    updateMember, removeMember, changeRole, hardDeleteMember, inviteMember, cancelInvite,
     applyForLoan, updateLoanStatus, repayLoan, updateRole, addRole, deleteRole,
     recordPayout,
   ])
