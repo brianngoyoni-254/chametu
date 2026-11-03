@@ -17,4 +17,4 @@ flask-migrate
 requests
 intasend-python
 gunicorn==23.0.0
-psycopg2-binary
+psycopg[binary]
