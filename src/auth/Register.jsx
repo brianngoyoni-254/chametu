@@ -11,7 +11,83 @@ import { ORDER } from '../lib/tiers'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
 import { friendlyFailureReason } from '../lib/paymentMessages'
+import MpesaWaiting from '../components/MpesaWaiting'
 import logo from '../assets/logos.png'
+
+/* ---------- Inline M-Pesa wordmark (no asset file required) ---------- */
+function MpesaLogo({ className = 'h-5', color = '#00A651' }) {
+  return (
+    <svg
+      viewBox="0 0 200 44"
+      role="img"
+      aria-label="M-Pesa"
+      className={className}
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <text
+        x="0"
+        y="34"
+        fontFamily="'Helvetica Neue', Arial, sans-serif"
+        fontSize="34"
+        fontWeight="800"
+        letterSpacing="-1.2"
+        fill={color}
+      >
+        M-PESA
+      </text>
+      <path
+        d="M2 40 C 18 35, 34 35, 48 40"
+        stroke={color}
+        strokeWidth="2.8"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  )
+}
+
+/* ---------- Kenya flag chip ---------- */
+function KenyaFlag() {
+  return (
+    <svg viewBox="0 0 24 16" className="h-4 w-6 rounded-sm shadow-sm" aria-hidden="true">
+      <rect width="24" height="16" fill="#000" />
+      <rect y="4" width="24" height="8" fill="#BB0000" />
+      <rect y="12" width="24" height="4" fill="#006600" />
+      <rect y="3.4" width="24" height="1" fill="#fff" />
+      <rect y="11.6" width="24" height="1" fill="#fff" />
+    </svg>
+  )
+}
+
+/* ---------- Per-tier visual identity ---------- */
+const TIER_STYLES = {
+  Starter: {
+    accent: '#64748B',
+    accentSoft: 'rgba(100,116,139,0.10)',
+    accentRing: 'rgba(100,116,139,0.25)',
+    gradient: 'linear-gradient(135deg, #64748B, #94A3B8)',
+  },
+  Growth: {
+    accent: '#00A651',
+    accentSoft: 'rgba(0,166,81,0.10)',
+    accentRing: 'rgba(0,166,81,0.28)',
+    gradient: 'linear-gradient(135deg, #00A651, #008C44)',
+    badge: { text: 'MOST POPULAR', bg: 'linear-gradient(135deg, #00A651, #008C44)', color: '#fff' },
+  },
+  Business: {
+    accent: '#0B1F33',
+    accentSoft: 'rgba(11,31,51,0.08)',
+    accentRing: 'rgba(11,31,51,0.22)',
+    gradient: 'linear-gradient(135deg, #0B1F33, #0A3D46)',
+  },
+  Gold: {
+    accent: '#B8860B',
+    accentSoft: 'rgba(245,185,66,0.16)',
+    accentRing: 'rgba(245,185,66,0.45)',
+    gradient: 'linear-gradient(135deg, #F5B942, #E8A21F)',
+    badge: { text: 'BEST VALUE', bg: 'linear-gradient(135deg, #F5B942, #E8A21F)', color: '#2E2200' },
+  },
+}
 
 const PLAN_META = {
   Starter:  { features: ['Core chama management for small groups'] },
@@ -39,7 +115,16 @@ const clearPending = () => { try { sessionStorage.removeItem(PENDING_KEY) } catc
 const STEPS = ['Details & plan', 'Pay with M-Pesa', 'Chama ready']
 
 const isValidEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
-const isValidPhone = (v) => /^0[17]\d{8}$/.test(v.replace(/\s/g, ''))
+
+/* ---------- Phone helpers: enforce exactly 10 digits ---------- */
+const stripDigits = (v) => String(v || '').replace(/\D/g, '').slice(0, 10)
+const formatPhone = (digits) => {
+  // 0712 345 678  |  0123 456 789
+  if (digits.length <= 4) return digits
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 10)}`
+}
+const isValidPhone = (digits) => /^0[17]\d{8}$/.test(digits)
 
 export default function Register() {
   const { adoptSession } = useAuth()
@@ -51,7 +136,7 @@ export default function Register() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [chamaName, setChamaName] = useState('')
-  const [phone, setPhone] = useState('')
+  const [phone, setPhone] = useState('')          // digits only, max 10
   const [selectedTier, setSelectedTier] = useState('Growth')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -61,6 +146,8 @@ export default function Register() {
   const [failReason, setFailReason] = useState('')
   const [pollKick, setPollKick] = useState(0)
   const [destination, setDestination] = useState('/dashboard')
+  const [elapsed, setElapsed] = useState(0)
+  const [pollCount, setPollCount] = useState(0)
 
   const claimRef = useRef(null)
   const signupIdRef = useRef(null)
@@ -77,6 +164,12 @@ export default function Register() {
       setStage('waiting')
     }
   }, [])
+
+  useEffect(() => {
+    if (stage !== 'waiting') return undefined
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000)
+    return () => clearInterval(id)
+  }, [stage])
 
   const pwStrength = (() => {
     const v = password
@@ -102,9 +195,11 @@ export default function Register() {
     if (!isValidEmail(email)) return setError('Enter a valid email address.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
-    if (!isValidPhone(phone)) return setError('Enter a valid Kenyan phone number (e.g., 0712345678).')
+    if (!isValidPhone(phone)) {
+      return setError('Enter a valid 10-digit Kenyan phone number (e.g., 0712 345 678).')
+    }
 
-    const cleanPhone = phone.replace(/\s/g, '')
+    const cleanPhone = phone
     setBusy(true)
     try {
       if (price <= 0) {
@@ -135,6 +230,8 @@ export default function Register() {
       setSignup(res.signup)
       triesRef.current = 0
       reviewSeenRef.current = 0
+      setElapsed(0)
+      setPollCount(0)
       setStage('waiting')
     } catch (err) {
       setError(err?.message || 'Could not start your signup. Please try again.')
@@ -143,8 +240,6 @@ export default function Register() {
     }
   }
 
-  // Poll: depends only on `stage` and `pollKick`; the signup id is read
-  // from a ref so setSignup() during polling does NOT restart the interval.
   useEffect(() => {
     if (stage !== 'waiting' || !signupIdRef.current) return undefined
 
@@ -168,10 +263,6 @@ export default function Register() {
         return true
       }
       if (s.status === 'review') {
-        // The payment arrived but needs a check. Give the server a few more
-        // polls to settle (it may just be finishing the account), then show
-        // the "confirming" screen. Never show the red failure screen for this.
-        // The pending signup stays in sessionStorage so a refresh resumes here.
         reviewSeenRef.current += 1
         if (reviewSeenRef.current <= 4) return false
         setStage('review')
@@ -187,8 +278,6 @@ export default function Register() {
       return false
     }
 
-    // Only one status request at a time. The status call can be slow (it may
-    // create the chama), and overlapping calls can race each other.
     let inFlight = false
 
     const check = async () => {
@@ -216,6 +305,7 @@ export default function Register() {
     const id = setInterval(async () => {
       if (inFlight) return undefined
       triesRef.current += 1
+      setPollCount(triesRef.current)
       const done = await check()
       if (done) return clearInterval(id)
       if (triesRef.current >= MAX_POLLS) {
@@ -235,6 +325,7 @@ export default function Register() {
   const retryCheck = () => {
     triesRef.current = 0
     reviewSeenRef.current = 0
+    setPollCount(0)
     setStage('waiting')
     setPollKick((n) => n + 1)
   }
@@ -247,13 +338,19 @@ export default function Register() {
     setSignup(null)
     setFailReason('')
     setError('')
+    setElapsed(0)
+    setPollCount(0)
     setStage('form')
   }
 
   const finish = () => {
-    if (destination !== '/login') toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your chama is ready.`)
+    if (destination !== '/login') {
+      toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your chama is ready.`)
+    }
     navigate(destination, { replace: true })
   }
+
+  const phoneValid = isValidPhone(phone)
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-paper lg:grid-cols-[minmax(340px,5fr)_7fr]">
@@ -271,8 +368,7 @@ export default function Register() {
         </Link>
 
         <h2 className="relative max-w-[15ch] font-display text-[1.4rem] font-bold leading-[1.15] tracking-tight lg:text-[clamp(1.7rem,2.6vw,2.4rem)]">
-          Start your chama with{' '}
-          <em className="not-italic text-gold">total clarity</em>
+          Start your chama with <em className="not-italic text-gold">total clarity</em>
         </h2>
 
         <p className="relative hidden max-w-[38ch] leading-relaxed text-white/75 lg:block">
@@ -333,6 +429,8 @@ export default function Register() {
               stage={stage}
               signup={signup}
               failReason={failReason}
+              elapsed={elapsed}
+              attempts={pollCount}
               onRetryCheck={retryCheck}
               onBack={backToForm}
               onFinish={finish}
@@ -408,19 +506,33 @@ export default function Register() {
                   placeholder="e.g. Umoja Investment Chama"
                 />
               </Field>
+
+              {/* ---------- Modern M-Pesa phone field, max 10 digits ---------- */}
               <Field label="M-Pesa phone (required)">
-                <IconInput
-                  inputMode="tel"
-                  icon={<Phone size={18} strokeWidth={1.8} />}
+                <PhoneInput
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="0712345678"
-                  required
+                  onChange={(digits) => setPhone(digits)}
+                  valid={phoneValid}
                 />
               </Field>
             </div>
 
-            <div className="mb-3.5 mt-7 flex items-center justify-between">
+            {/* ---------- M-Pesa brand banner above plans ---------- */}
+            <div className="mb-3.5 mt-7 flex items-center gap-3 rounded-2xl border border-[#00A651]/20 bg-gradient-to-r from-[#00A651]/[0.06] to-transparent px-4 py-3">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-white shadow-sm ring-1 ring-[#00A651]/20">
+                <MpesaLogo className="h-3.5" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-[0.82rem] font-semibold text-navy">
+                  Pay securely with M-Pesa
+                </div>
+                <div className="text-[0.74rem] leading-snug text-ink-soft">
+                  STK Push to your phone · No card needed · Instant activation
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-3.5 flex items-center justify-between">
               <b className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-ink-soft">
                 Choose your plan
               </b>
@@ -442,6 +554,7 @@ export default function Register() {
               ))}
             </div>
 
+            {/* ---------- Due today summary ---------- */}
             <div className="mb-4 mt-4 flex items-center justify-between rounded-2xl border border-dashed border-line bg-white px-4 py-3.5 text-[0.86rem]">
               <div>
                 <b>Due today</b>
@@ -455,16 +568,63 @@ export default function Register() {
               </b>
             </div>
 
+            {/* ---------- Professional M-Pesa pay button ---------- */}
             <button
               type="submit"
               disabled={busy}
-              className="mt-2 w-full cursor-pointer rounded-2xl border-0 bg-gradient-to-br from-forest to-emerald py-4 font-display text-base font-bold text-white shadow-[0_10px_24px_rgba(11,122,90,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:transform-none disabled:opacity-55"
+              className="group relative mt-2 flex w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border-0 bg-gradient-to-r from-[#00A651] via-[#009947] to-[#008C44] px-4 py-3.5 text-left text-white shadow-[0_12px_28px_-10px_rgba(0,166,81,0.55),inset_0_1px_0_rgba(255,255,255,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-10px_rgba(0,166,81,0.65),inset_0_1px_0_rgba(255,255,255,0.22)] disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60"
             >
-              {busy ? 'Sending M-Pesa prompt…' : `Pay KSh ${price.toLocaleString()} with M-Pesa`}
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full"
+              />
+
+              <span className="relative flex items-center gap-3">
+                <span className="grid h-10 w-10 flex-none place-items-center rounded-xl bg-white shadow-sm">
+                  {busy ? (
+                    <Loader2 size={17} className="animate-spin text-[#00A651]" />
+                  ) : (
+                    <MpesaLogo className="h-3.5" />
+                  )}
+                </span>
+                <span className="flex flex-col leading-tight">
+                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">
+                    {busy ? 'Sending STK push…' : 'Pay with M-Pesa'}
+                  </span>
+                  <span className="font-display text-[1rem] font-bold">
+                    KSh {price.toLocaleString()}
+                  </span>
+                </span>
+              </span>
+
+              <span className="relative flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1 text-[0.72rem] font-bold tracking-wide backdrop-blur">
+                {busy ? 'Please wait' : 'Continue'}
+                {!busy && (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path
+                      d="M4.5 2.5L8 6l-3.5 3.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </span>
             </button>
 
-            <p className="mt-2.5 text-center text-[0.76rem] text-ink-soft">
-              An M-Pesa prompt will be sent to {phone.trim() || 'your phone number'}. Your chama is created once payment is confirmed.
+            {/* Trust line under button */}
+            <div className="mt-3 flex items-center justify-center gap-2 text-[0.72rem] text-ink-soft">
+              <ShieldCheck size={12} className="text-[#00A651]" />
+              <span>Secured by Safaricom · No card needed · Instant activation</span>
+            </div>
+
+            <p className="mt-3 text-center text-[0.76rem] text-ink-soft">
+              An M-Pesa prompt will be sent to{' '}
+              <b className="font-mono text-navy">
+                {phone ? formatPhone(phone) : 'your phone number'}
+              </b>
+              . Your chama is created once payment is confirmed.
             </p>
 
             {error && (
@@ -491,103 +651,205 @@ export default function Register() {
   )
 }
 
+/* ---------- Modern M-Pesa phone field (10 digits, auto-formatted) ---------- */
+function PhoneInput({ value = '', onChange, valid = false }) {
+  const [focused, setFocused] = useState(false)
+  const shown = formatPhone(value)
+  const complete = value.length === 10
+  const showGreen = complete && valid
+  const showWarn = complete && !valid
+  const remaining = Math.max(0, 10 - value.length)
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 rounded-xl border-[1.5px] bg-[#F8FAFC] px-2.5 py-1.5 transition ${
+          focused
+            ? 'border-[#00A651] bg-white ring-4 ring-[#00A651]/15'
+            : showWarn
+              ? 'border-red-300 bg-white'
+              : showGreen
+                ? 'border-[#00A651]/60 bg-white'
+                : 'border-line'
+        }`}
+      >
+        {/* Kenya flag + +254 pill */}
+        <span
+          className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[0.78rem] font-semibold transition ${
+            focused
+              ? 'border-[#00A651]/40 bg-[#00A651]/[0.08] text-navy'
+              : 'border-line bg-white text-navy'
+          }`}
+        >
+          <KenyaFlag />
+          <span className="font-mono tracking-tight">+254</span>
+        </span>
+
+        {/* Number input */}
+        <input
+          inputMode="numeric"
+          autoComplete="tel"
+          value={shown}
+          onChange={(e) => {
+            const digits = stripDigits(e.target.value)
+            onChange(digits)
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          maxLength={12}
+          placeholder="0712 345 678"
+          aria-label="M-Pesa phone number"
+          aria-invalid={showWarn || undefined}
+          className="min-w-0 flex-1 border-0 bg-transparent py-2 font-mono text-sm tracking-wide text-navy outline-none placeholder:font-sans placeholder:text-ink-soft/70"
+        />
+
+        {/* Right indicator */}
+        <span className="grid h-6 w-6 flex-none place-items-center">
+          {showGreen && <Check size={14} strokeWidth={3} className="text-[#00A651]" />}
+          {showWarn && <AlertCircle size={14} strokeWidth={2.4} className="text-red-500" />}
+          {!complete && focused && (
+            <span className="rounded-md bg-[#00A651]/10 px-1.5 py-0.5 font-mono text-[0.6rem] font-bold text-[#008C44]">
+              {remaining}
+            </span>
+          )}
+        </span>
+      </div>
+
+      {/* Hint line */}
+      <div className="mt-1.5 flex items-center justify-between text-[0.68rem] leading-tight">
+        <span className="flex items-center gap-1 text-ink-soft">
+          <Smartphone size={10} className="text-[#00A651]" />
+          Safaricom or Airtel · 10 digits
+        </span>
+        <span
+          className={`font-mono ${
+            showWarn ? 'text-red-500' : showGreen ? 'text-[#008C44]' : 'text-ink-soft/70'
+          }`}
+        >
+          {value.length}/10
+        </span>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- Modern, colour-coded plan card ---------- */
 function PlanCard({ tierName, tier, meta, selected, onSelect }) {
+  const style = TIER_STYLES[tierName] || TIER_STYLES.Starter
+  const badge = meta.popular || meta.star ? style.badge : null
+
   return (
     <button
       type="button"
       onClick={onSelect}
-      className={`relative flex flex-col rounded-[18px] px-4.5 py-5 text-left transition ${
-        selected
-          ? 'border border-gold text-white shadow-[0_0_0_1px_rgba(245,185,66,0.8),0_18px_40px_rgba(11,31,51,0.3)]'
-          : 'border border-line bg-white hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(11,31,51,0.12)]'
+      aria-pressed={selected}
+      className={`group relative flex flex-col overflow-hidden rounded-[18px] text-left transition-all duration-200 ${
+        selected ? '-translate-y-0.5' : 'hover:-translate-y-0.5'
       }`}
-      style={
-        selected
-          ? { background: 'linear-gradient(155deg, #0B1F33, #0A3D46)' }
-          : undefined
-      }
+      style={{
+        background: '#ffffff',
+        border: selected ? `1.5px solid ${style.accent}` : '1.5px solid #E3E9EF',
+        boxShadow: selected
+          ? `0 0 0 3px ${style.accentSoft}, 0 18px 40px -16px ${style.accentRing}`
+          : '0 1px 2px rgba(11,31,51,0.04)',
+      }}
     >
-      {meta.popular && (
-        <span className="absolute -top-2.5 left-4 rounded-full bg-gradient-to-br from-gold to-[#E8A21F] px-2.5 py-1 text-[0.6rem] font-bold tracking-widest text-[#2E2200]">
-          MOST POPULAR
-        </span>
-      )}
-
-      <span
-        className={`absolute right-4 top-5 grid h-[18px] w-[18px] place-items-center rounded-full border-[1.5px] ${
-          selected ? 'border-gold' : 'border-line'
-        }`}
-      >
-        <span
-          className={`h-2 w-2 rounded-full bg-gold transition-transform ${
-            selected ? 'scale-100' : 'scale-0'
-          }`}
-        />
-      </span>
-
       <div
-        className={`flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-[0.16em] ${
-          selected ? 'text-white/65' : 'text-ink-soft'
-        }`}
-      >
-        {meta.star && (
-          <Sparkles
-            size={11}
-            strokeWidth={2.4}
-            className={selected ? 'text-gold' : 'text-forest'}
-          />
-        )}
-        {tierName}
-      </div>
-
-      <div
-        className={`mb-0.5 mt-2.5 font-display text-[1.65rem] font-bold tracking-tight ${
-          selected ? 'text-white' : 'text-navy'
-        }`}
-      >
-        KSh {tier.price.toLocaleString()}{' '}
-        <small
-          className={`text-[0.78rem] font-medium ${
-            selected ? 'text-white/65' : 'text-ink-soft'
-          }`}
-        >
-          / month
-        </small>
-      </div>
-
-      <div
-        className="my-3.5 h-px"
+        className="h-[4px] w-full"
         style={{
-          background: selected
-            ? 'linear-gradient(90deg, rgba(245,185,66,0.55), transparent)'
-            : 'linear-gradient(90deg, #E3E9EF, transparent)',
+          background: selected ? style.gradient : 'linear-gradient(90deg, #E3E9EF, #EEF2F6)',
+          opacity: selected ? 1 : 0.9,
         }}
       />
 
-      <ul
-        className={`m-0 grid list-none gap-2 p-0 text-[0.8rem] leading-snug ${
-          selected ? 'text-white/90' : 'text-ink-soft'
-        }`}
-      >
-        <li className="flex items-start gap-2">
-          <Check
-            size={13}
-            strokeWidth={2.6}
-            className={`mt-0.5 shrink-0 ${selected ? 'text-gold' : 'text-forest'}`}
-          />
-          <span>Up to {tier.maxMembers} members</span>
-        </li>
-        {meta.features.map((f) => (
-          <li key={f} className="flex items-start gap-2">
-            <Check
-              size={13}
-              strokeWidth={2.6}
-              className={`mt-0.5 shrink-0 ${selected ? 'text-gold' : 'text-forest'}`}
-            />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
+      {badge && (
+        <span
+          className="absolute right-3 top-3 z-10 rounded-full px-2.5 py-1 text-[0.58rem] font-bold tracking-[0.14em] shadow-sm"
+          style={{ background: badge.bg, color: badge.color }}
+        >
+          {badge.text}
+        </span>
+      )}
+
+      <div className="flex flex-1 flex-col px-4 pb-5 pt-4">
+        <div className="flex items-center gap-2.5">
+          <span
+            className="grid h-9 w-9 flex-none place-items-center rounded-xl text-white shadow-sm"
+            style={{ background: style.gradient }}
+          >
+            {meta.star ? (
+              <Sparkles size={15} strokeWidth={2.4} />
+            ) : meta.popular ? (
+              <Star size={15} strokeWidth={2.4} />
+            ) : (
+              <ShieldCheck size={15} strokeWidth={2.4} />
+            )}
+          </span>
+          <div className="min-w-0">
+            <div
+              className="text-[0.68rem] font-bold uppercase tracking-[0.16em]"
+              style={{ color: style.accent }}
+            >
+              {tierName}
+            </div>
+            <div className="text-[0.72rem] font-medium text-ink-soft">
+              {tier.maxMembers} members max
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-baseline gap-1">
+          <span className="font-display text-[1.7rem] font-bold leading-none tracking-tight text-navy">
+            KSh {tier.price.toLocaleString()}
+          </span>
+          <span className="text-[0.76rem] font-medium text-ink-soft">/mo</span>
+        </div>
+
+        <div
+          className="my-3.5 h-px w-full"
+          style={{
+            background: selected
+              ? `linear-gradient(90deg, ${style.accent}, ${style.accent}00)`
+              : 'linear-gradient(90deg, #E3E9EF, transparent)',
+            opacity: selected ? 0.6 : 1,
+          }}
+        />
+
+        <ul className="m-0 grid list-none gap-2 p-0 text-[0.8rem] leading-snug text-ink-soft">
+          {meta.features.map((f) => (
+            <li key={f} className="flex items-start gap-2">
+              <span
+                className="mt-0.5 grid h-4 w-4 flex-none place-items-center rounded-full"
+                style={{ background: style.accentSoft }}
+              >
+                <Check size={10} strokeWidth={3} style={{ color: style.accent }} />
+              </span>
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-auto pt-4">
+          <div
+            className="flex items-center justify-between rounded-xl px-3 py-2 text-[0.72rem] font-semibold transition-colors"
+            style={{
+              background: selected ? style.accentSoft : 'rgba(11,31,51,0.03)',
+              color: selected ? style.accent : '#6B7A8C',
+            }}
+          >
+            <span>{selected ? 'Selected plan' : 'Tap to choose'}</span>
+            <span
+              className="grid h-4 w-4 place-items-center rounded-full border-[1.5px]"
+              style={{
+                borderColor: selected ? style.accent : '#CBD5E1',
+                background: selected ? style.accent : 'transparent',
+              }}
+            >
+              {selected && <Check size={9} strokeWidth={3} className="text-white" />}
+            </span>
+          </div>
+        </div>
+      </div>
     </button>
   )
 }
@@ -627,33 +889,32 @@ function Stepper({ stage }) {
   )
 }
 
-function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish }) {
-  const amount = Number(signup?.amount ?? 0).toLocaleString()
+function StatusCard({ stage, signup, failReason, elapsed, attempts, onRetryCheck, onBack, onFinish }) {
+  const amount = Number(signup?.amount ?? 0)
+  const tier = signup?.tier || ''
+  const phone = signup?.phone || ''
   const reference = String(signup?.id || '').slice(0, 8).toUpperCase() || 'N/A'
   const btnGhost =
     'rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy'
   const btnSolid =
     'rounded-xl bg-forest px-5 py-2.5 text-[0.86rem] font-semibold text-white'
 
+  if (stage === 'waiting') {
+    return (
+      <MpesaWaiting
+        amount={amount}
+        phone={phone}
+        tier={tier}
+        elapsed={elapsed}
+        attempts={attempts}
+        onRetry={onRetryCheck}
+        onCancel={onBack}
+      />
+    )
+  }
+
   return (
     <div className="rounded-2xl border border-line bg-white px-6 py-9 text-center shadow-sm">
-      {stage === 'waiting' && (
-        <>
-          <Loader2 size={34} className="mx-auto animate-spin text-forest" />
-          <p className="mt-4 font-display text-[1.05rem] font-semibold text-navy">
-            Check your phone
-          </p>
-          <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
-            Enter your M-Pesa PIN to pay <b className="text-navy">KSh {amount}</b> for
-            the {signup?.tier} plan. Please keep this page open. Your chama is
-            created as soon as payment is confirmed.
-          </p>
-          <p className="mx-auto mt-3 max-w-[42ch] text-[0.76rem] text-ink-soft/80">
-            This page updates automatically when the payment is confirmed or cancelled.
-          </p>
-        </>
-      )}
-
       {stage === 'success' && (
         <>
           <CheckCircle2 size={40} className="mx-auto text-emerald" />
@@ -691,7 +952,7 @@ function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish 
             Payment received, we are confirming it
           </p>
           <p className="mx-auto mt-1.5 max-w-[44ch] text-[0.86rem] leading-relaxed text-ink-soft">
-            Your payment of <b className="text-navy">KSh {amount}</b> came through
+            Your payment of <b className="text-navy">KSh {amount.toLocaleString()}</b> came through
             and needs a quick check before your chama is created. Please do not
             pay again. This usually takes a few minutes.
           </p>
