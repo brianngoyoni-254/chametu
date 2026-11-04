@@ -28,6 +28,19 @@ STALE_PROCESSING_MINUTES = 3
 OPEN_STATES = ('pending', 'processing')
 
 
+def _gross_amount(res):
+    """Amount the customer actually paid. IntaSend's `value` is the gross
+    amount; `net_amount` has gateway fees deducted, so comparing it with the
+    plan price wrongly flags every payment as an amount mismatch."""
+    if not isinstance(res, dict):
+        return None
+    for key in ('value', 'net_amount'):
+        v = res.get(key)
+        if v is not None:
+            return v
+    return None
+
+
 def _fmt_ksh(n):
     return 'KSh ' + f'{int(round(float(n))):,}'
 
@@ -209,7 +222,7 @@ def refresh(payment):
     updated = _apply_state(
         payment.id, res['state'],
         friendly_failure_reason(res['failed_reason'], res['state']),
-        amount_seen=res['net_amount'] if res['net_amount'] is not None else res['value'],
+        amount_seen=_gross_amount(res),
         source='poll',
     ) or payment
 
@@ -247,11 +260,11 @@ def _verify_with_gateway(invoice_id, payload):
         res = intasend.get_status(invoice_id)
         state = res['state'] or state
         failed_reason = res['failed_reason'] or failed_reason
-        amount_seen = res['net_amount'] if res['net_amount'] is not None else res['value']
+        amount_seen = _gross_amount(res)
     except intasend.IntaSendError:
         logger.warning('Could not verify webhook with IntaSend; using payload')
         try:
-            amount_seen = float(payload.get('net_amount') or payload.get('value'))
+            amount_seen = float(payload.get('value') or payload.get('net_amount'))
         except (TypeError, ValueError):
             amount_seen = None
     return state, failed_reason, amount_seen
@@ -437,7 +450,7 @@ def refresh_signup(ps):
     updated = _apply_signup_state(
         ps.id, res['state'],
         friendly_failure_reason(res['failed_reason'], res['state']),
-        amount_seen=res['net_amount'] if res['net_amount'] is not None else res['value'],
+        amount_seen=_gross_amount(res),
         source='poll',
     ) or ps
 
@@ -473,6 +486,7 @@ def _apply_signup_state(signup_id, state, failed_reason=None, amount_seen=None, 
             ps.status = 'review'
             ps.failed_reason = f'Amount mismatch: expected {ps.amount}, got {amount_seen}'
             db.session.commit()
+            logger.error('SIGNUP AMOUNT MISMATCH signup=%s expected=%s got=%s', ps.id, ps.amount, amount_seen)
             return ps
         return _finalize_signup(ps, source)
 
@@ -489,6 +503,7 @@ def _apply_signup_state(signup_id, state, failed_reason=None, amount_seen=None, 
 
 
 def _mark_signup_review(signup_id, reason):
+    logger.error('SIGNUP REVIEW signup=%s reason=%s', signup_id, reason)
     ps = PendingSignup.query.get(signup_id)
     if ps:
         ps.status = 'review'
