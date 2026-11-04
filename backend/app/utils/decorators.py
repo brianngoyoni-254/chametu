@@ -3,6 +3,7 @@ from functools import wraps
 from flask import jsonify
 from flask_jwt_extended import get_jwt, get_jwt_identity
 from app.models.chama import Member, Role
+from app.utils.db_retry import retry_db
 
 def require_permission(permission_key):
     """
@@ -26,7 +27,11 @@ def require_permission(permission_key):
                 return jsonify({'message': 'Missing authentication data'}), 401
                 
             # Find the member in this chama
-            member = Member.query.filter_by(user_id=user_id, chama_id=chama_id).first()
+            # (wrapped in retry_db so a transient Neon SSL drop mid-query
+            #  is retried once instead of bubbling up as a 500)
+            member = retry_db(
+                lambda: Member.query.filter_by(user_id=user_id, chama_id=chama_id).first()
+            )
             if not member:
                 return jsonify({'message': 'Member not found in this chama'}), 403
                 
