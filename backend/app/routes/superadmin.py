@@ -409,6 +409,7 @@ def request_mpesa():
             amount=amount,
             api_ref=f"CHAMETU-SA-{chama_id[:8]}",
             name=chama.name,
+            email=chair_email,
         )
         if result['status'] == 'success':
             return jsonify({"message": f"STK Push sent to {phone}"}), 200
@@ -420,6 +421,7 @@ def request_mpesa():
             api_ref=f"CHAMETU-{method.upper()}-{chama_id[:8]}",
             name=chair_name,
             email=chair_email,
+            method="CARD-PAYMENT" if method == 'card' else "M-PESA",
         )
         if result['status'] == 'success':
             return jsonify({

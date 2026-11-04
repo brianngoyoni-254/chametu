@@ -180,9 +180,12 @@ def friendly_failure_reason(raw, state=None):
 
 def send_stk_push(phone_number, amount, api_ref, name="Chama Member", email="support@chametu.co.ke"):
     """Legacy wrapper for the old function signature."""
+    phone = normalize_phone(phone_number)
+    if not phone:
+        return {"status": "error", "message": "Enter a valid Safaricom number, e.g. 0712345678."}
     try:
         res = stk_push(
-            phone=phone_number,
+            phone=phone,
             amount=amount,
             api_ref=api_ref,
             narrative=name,
@@ -191,3 +194,48 @@ def send_stk_push(phone_number, amount, api_ref, name="Chama Member", email="sup
         return {"status": "success", "data": res}
     except IntaSendError as exc:
         return {"status": "error", "message": str(exc)}
+
+
+def generate_checkout_link(amount, api_ref, name="Chama Member", email="support@chametu.co.ke", method=None):
+    """Create a hosted IntaSend checkout page (card / M-Pesa till) and return its URL.
+
+    Returns {"status": "success", "url": ...} or {"status": "error", "message": ...}.
+    `method` is optional: e.g. "CARD-PAYMENT" or "M-PESA". Leave None to show all options.
+    """
+    try:
+        svc = _client()
+        amt = int(amount) if float(amount).is_integer() else float(amount)
+
+        kwargs = {
+            "email": email,
+            "amount": amt,
+            "currency": "KES",
+            "comment": name,
+            "api_ref": api_ref,
+            "first_name": (name or "Chama").split(" ")[0],
+        }
+        redirect_url = current_app.config.get('INTASEND_REDIRECT_URL')
+        if redirect_url:
+            kwargs["redirect_url"] = redirect_url
+        if method:
+            kwargs["method"] = method
+
+        try:
+            resp = svc.collect.checkout(**kwargs)
+        except TypeError:
+            # Older SDK versions may not accept some kwargs
+            logger.warning('intasend SDK rejected optional checkout kwargs, retrying with basics')
+            for k in ('method', 'redirect_url', 'first_name'):
+                kwargs.pop(k, None)
+            resp = svc.collect.checkout(**kwargs)
+    except IntaSendError as exc:
+        return {"status": "error", "message": str(exc)}
+    except Exception as exc:
+        logger.error('IntaSend checkout failed: %s', _friendly(exc))
+        return {"status": "error", "message": _friendly(exc)}
+
+    url = resp.get('url') if isinstance(resp, dict) else None
+    if not url:
+        logger.error('IntaSend checkout returned no url: %r', resp)
+        return {"status": "error", "message": "Payment provider did not return a payment link."}
+    return {"status": "success", "url": url}
