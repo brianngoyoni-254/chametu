@@ -177,3 +177,17 @@ def friendly_failure_reason(raw, state=None):
         return ('That phone number could not receive the M-Pesa request. Please check the number and try again.')
         
     return ('The payment was not completed and no money was taken. Please try again, or contact support@chametu.co.ke if it keeps failing.')
+
+def send_stk_push(phone_number, amount, api_ref, name="Chama Member", email="support@chametu.co.ke"):
+    """Legacy wrapper for the old function signature."""
+    try:
+        res = stk_push(
+            phone=phone_number,
+            amount=amount,
+            api_ref=api_ref,
+            narrative=name,
+            email=email,
+        )
+        return {"status": "success", "data": res}
+    except IntaSendError as exc:
+        return {"status": "error", "message": str(exc)}
