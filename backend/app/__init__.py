@@ -18,7 +18,6 @@ from app.config import Config
 from app.logging_config import configure_logging
 from app.logging_utils import attach_request_id, set_context
 
-# Add naming convention to permanently fix SQLite constraint naming issues
 convention = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",
@@ -79,6 +78,7 @@ def create_app(config_class=Config):
     from app.routes.superadmin import superadmin_bp
     from app.routes.chat import chat_bp
     from app.routes.billing import billing_bp
+    from app.routes.receipts import receipts_bp            # <-- NEW
 
     app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(auth_bp,     url_prefix="/api/auth")
@@ -92,6 +92,7 @@ def create_app(config_class=Config):
     app.register_blueprint(notif_bp,    url_prefix="/api/notifications")
     app.register_blueprint(chat_bp,     url_prefix="/api/chat")
     app.register_blueprint(billing_bp,  url_prefix="/api/billing")
+    app.register_blueprint(receipts_bp, url_prefix="/api/billing/receipts")   # <-- NEW
 
     # ---------- request lifecycle ----------
     @app.before_request
@@ -139,7 +140,7 @@ def create_app(config_class=Config):
         )
         return response
 
-    # ---------- seed (idempotent; only warn once) ----------
+    # ---------- seed ----------
     from app.services import rewards_service
     with app.app_context():
         try:
@@ -165,9 +166,7 @@ def create_app(config_class=Config):
                 logger.warning('HTTP %s: %s', e.code, message)
             return jsonify({"message": message}), e.code
 
-        logger.exception(
-            'Unhandled error on %s %s', request.method, request.path,
-        )
+        logger.exception('Unhandled error on %s %s', request.method, request.path)
         body = {"message": "Internal server error"}
         if app.debug:
             body["detail"] = f"{type(e).__name__}: {e}"
@@ -192,8 +191,6 @@ def create_app(config_class=Config):
     # ------------------------------------------------------------------
     # BACKGROUND RECONCILIATION JOB (APScheduler)
     # ------------------------------------------------------------------
-    # Only start the scheduler in the main process to prevent it from 
-    # running twice when Flask's debug reloader is active.
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         from app.services.billing_service import reconcile_stale_payments
 
@@ -205,11 +202,9 @@ def create_app(config_class=Config):
                     logger.error("Background reconciliation job failed: %s", e, exc_info=True)
 
         scheduler = BackgroundScheduler()
-        # Check every 3 minutes for payments stuck in 'pending' or 'processing'
-        scheduler.add_job(id='reconcile_payments', func=reconcile_job, trigger="interval", minutes=3)
+        scheduler.add_job(id='reconcile_payments', func=reconcile_job,
+                          trigger="interval", minutes=3)
         scheduler.start()
-        
-        # Ensure the scheduler shuts down cleanly when the app exits
         atexit.register(lambda: scheduler.shutdown())
 
     logger.info(

@@ -29,9 +29,6 @@ OPEN_STATES = ('pending', 'processing')
 
 
 def _gross_amount(res):
-    """Amount the customer actually paid. IntaSend's `value` is the gross
-    amount; `net_amount` has gateway fees deducted, so comparing it with the
-    plan price wrongly flags every payment as an amount mismatch."""
     if not isinstance(res, dict):
         return None
     for key in ('value', 'net_amount'):
@@ -98,7 +95,7 @@ def start_payment(chama_id, user_id, tier_name, phone_raw):
     sub = rewards_service.get_or_create_subscription(chama_id)
     current = rewards_service.tier_config(sub.base_tier)
     target = TierConfig.query.get(tier_name)
-    
+
     if current and target.rank <= current.rank:
         raise ValueError(f'Your chama is already on {sub.base_tier} or higher.')
 
@@ -108,13 +105,13 @@ def start_payment(chama_id, user_id, tier_name, phone_raw):
         SubscriptionPayment.status.in_(OPEN_STATES),
         SubscriptionPayment.created_at >= datetime.utcnow() - DUPLICATE_WINDOW,
     ).first()
-    
+
     if recent:
         raise ValueError('A payment is already in progress. Check your phone.')
 
     user = User.query.get(user_id)
     prefix = current_app.config.get('BILLING_API_REF_PREFIX', 'CHMT')
-    
+
     payment = SubscriptionPayment(
         chama_id=chama_id,
         user_id=user_id,
@@ -147,7 +144,8 @@ def start_payment(chama_id, user_id, tier_name, phone_raw):
         payment.status = 'processing'
     db.session.commit()
 
-    logger.info('STK sent chama=%s tier=%s amount=%s ref=%s', chama_id, tier_name, charge, payment.api_ref)
+    logger.info('STK sent chama=%s tier=%s amount=%s ref=%s',
+                chama_id, tier_name, charge, payment.api_ref)
     return payment
 
 
@@ -178,7 +176,15 @@ def _apply_state(payment_id, state, failed_reason=None, amount_seen=None, source
             chama.base_tier = p.tier
         db.session.commit()
 
-        logger.info('PAYMENT COMPLETE (%s) payment=%s chama=%s -> %s', source, p.id, p.chama_id, p.tier)
+        # Issue the persistent receipt exactly once.
+        try:
+            from app.services import receipt_service
+            receipt_service.issue_for_payment(p)
+        except Exception:
+            logger.exception('receipt issuance failed for payment=%s', p.id)
+
+        logger.info('PAYMENT COMPLETE (%s) payment=%s chama=%s -> %s',
+                    source, p.id, p.chama_id, p.tier)
         _after_success(p)
         return p
 
@@ -234,7 +240,6 @@ def refresh(payment):
 
 
 def reconcile_stale_payments():
-    """Background worker to catch missed webhooks."""
     cutoff = datetime.utcnow() - timedelta(minutes=STALE_PROCESSING_MINUTES)
     stale = SubscriptionPayment.query.filter(
         SubscriptionPayment.status.in_(OPEN_STATES),
@@ -271,13 +276,9 @@ def _verify_with_gateway(invoice_id, payload):
 
 
 def handle_webhook(payload):
-    """Returns (http_status, body)."""
-    # 1. IntaSend wraps the data inside an "invoice" or "data" key
     data = payload.get('invoice') or payload.get('data') or payload
-
-    # 2. Extract challenge from either root or nested data
     challenge = payload.get('challenge') or data.get('challenge')
-    
+
     if not intasend.verify_challenge(challenge):
         logger.warning('Webhook rejected (bad/missing challenge)')
         return 401, {'message': 'Invalid challenge'}
@@ -286,13 +287,12 @@ def handle_webhook(payload):
     invoice_id = data.get('invoice_id') or data.get('id')
     prefix = current_app.config.get('BILLING_API_REF_PREFIX', 'CHMT')
 
-    # Check if this is a signup payment
     signup = None
     if api_ref.startswith(prefix + '-SU-'):
         signup = PendingSignup.query.filter_by(api_ref=api_ref).first()
     if not signup and invoice_id:
         signup = PendingSignup.query.filter_by(invoice_id=invoice_id).first()
-    
+
     if signup:
         if signup.status == 'complete':
             return 200, {'ok': True}
@@ -308,7 +308,6 @@ def handle_webhook(payload):
         )
         return 200, {'ok': True}
 
-    # Check if this is an upgrade payment
     payment = None
     if api_ref.startswith(prefix + '-'):
         payment = SubscriptionPayment.query.filter_by(api_ref=api_ref).first()
@@ -441,7 +440,6 @@ def get_signup(signup_id, claim):
 
 def refresh_signup(ps):
     if ps.status == 'review':
-        # A signup flagged by a concurrent worker may actually be finished.
         return _adopt_finished_signup(ps.id) or ps
     if ps.status not in OPEN_STATES or not ps.invoice_id:
         return ps
@@ -489,7 +487,8 @@ def _apply_signup_state(signup_id, state, failed_reason=None, amount_seen=None, 
             ps.status = 'review'
             ps.failed_reason = f'Amount mismatch: expected {ps.amount}, got {amount_seen}'
             db.session.commit()
-            logger.error('SIGNUP AMOUNT MISMATCH signup=%s expected=%s got=%s', ps.id, ps.amount, amount_seen)
+            logger.error('SIGNUP AMOUNT MISMATCH signup=%s expected=%s got=%s',
+                         ps.id, ps.amount, amount_seen)
             return ps
         return _finalize_signup(ps, source)
 
@@ -506,9 +505,6 @@ def _apply_signup_state(signup_id, state, failed_reason=None, amount_seen=None, 
 
 
 def _adopt_finished_signup(signup_id):
-    """If another worker (e.g. the Render webhook while a local poll is running,
-    or two overlapping polls) already created the account for this signup,
-    mark it complete instead of treating the duplicate attempt as a problem."""
     ps = PendingSignup.query.filter_by(id=signup_id).populate_existing().first()
     if not ps:
         return None
@@ -581,6 +577,14 @@ def _finalize_signup(ps, source):
         sub.trial_expires_at = None
         chama.base_tier = ps.tier
         db.session.commit()
+
+        # Issue the persistent receipt exactly once.
+        try:
+            from app.services import receipt_service
+            receipt_service.issue_for_signup(ps)
+        except Exception:
+            logger.exception('receipt issuance failed for signup=%s', ps.id)
+
     except IntegrityError:
         db.session.rollback()
         return _mark_signup_review(signup_id, 'Account could not be created.')
