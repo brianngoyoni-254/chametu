@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Sparkles, Users, Smartphone, Loader2, X, CheckCircle2, AlertCircle,
+  ArrowLeft, Sparkles, Users, Smartphone, Loader2, X, CheckCircle2, AlertCircle, Clock,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { ORDER } from '../../lib/tiers'
@@ -19,7 +19,7 @@ const BLURB = {
 const POLL_MS = 3000
 const MAX_POLLS = 40
 
-// stage: 'form' -> 'waiting' -> 'success' | 'failed' | 'timeout'
+// stage: 'form' -> 'waiting' -> 'success' | 'failed' | 'review' | 'timeout'
 export default function Upgrade() {
   const location = useLocation()
   const navigate = useNavigate()
@@ -107,7 +107,12 @@ export default function Upgrade() {
         toast.success(`${p.tier} plan activated`)
         return true
       }
-      if (['failed', 'expired', 'review'].includes(p.status)) {
+      if (p.status === 'review') {
+        // Paid, but needs a manual check. Not a failure: no red screen, no retry.
+        setStage('review')
+        return true
+      }
+      if (['failed', 'expired'].includes(p.status)) {
         setFailReason(friendlyFailureReason(p.failedReason, p.status))
         setStage('failed')
         if (p.status === 'failed') toast.error('Payment not completed')
@@ -116,7 +121,11 @@ export default function Upgrade() {
       return false
     }
 
+    // Only one status request at a time, so slow responses never overlap.
+    let inFlight = false
+
     const check = async () => {
+      inFlight = true
       try {
         const res = await api(`/api/billing/payments/${paymentId}`)
         if (cancelled) return true
@@ -128,6 +137,8 @@ export default function Upgrade() {
         return done
       } catch {
         return false
+      } finally {
+        inFlight = false
       }
     }
 
@@ -137,6 +148,7 @@ export default function Upgrade() {
     })()
 
     const id = setInterval(async () => {
+      if (inFlight) return undefined
       triesRef.current += 1
       const done = await check()
       if (done) return clearInterval(id)
@@ -371,6 +383,41 @@ export default function Upgrade() {
                     className="px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold"
                   >
                     Try again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {stage === 'review' && (
+              <div className="px-5 py-8 text-center">
+                <Clock size={36} className="mx-auto text-amber-500" />
+                <p className="mt-4 font-display font-semibold text-navy">
+                  Payment received, we are confirming it
+                </p>
+                <p className="mt-1 text-[0.84rem] text-ink-soft">
+                  Your payment of KSh {Number(payment?.amount ?? 0).toLocaleString()} came through and
+                  needs a quick check before your plan is upgraded. Please do not pay again.
+                </p>
+                <p className="mt-3 text-[0.76rem] text-ink-soft">
+                  Reference:{' '}
+                  <span className="font-mono text-navy">
+                    {String(payment?.id || '').slice(0, 8).toUpperCase() || 'N/A'}
+                  </span>
+                  <br />
+                  If your plan is not active within a few hours, email support@chametu.co.ke with this reference.
+                </p>
+                <div className="mt-6 flex justify-center gap-2">
+                  <button
+                    onClick={closeModal}
+                    className="px-4 py-2.5 rounded-xl border border-line bg-white text-navy text-[0.86rem] font-semibold"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={retryCheck}
+                    className="px-4 py-2.5 rounded-xl bg-forest text-white text-[0.86rem] font-semibold"
+                  >
+                    Check again
                   </button>
                 </div>
               </div>

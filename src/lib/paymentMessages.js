@@ -38,7 +38,7 @@ export function friendlyFailureReason(raw, status) {
     return 'We didn’t get a response from M-Pesa in time. No money was taken. Please try again.'
   }
   if (status === 'review') {
-    return 'We received a payment that needs a quick manual check. Our team will confirm it shortly — no further action needed from you.'
+    return 'We received your payment and it needs a quick check before it is confirmed. You do not need to pay again.'
   }
   if (!text) {
     return 'The payment was not completed and no money was taken. Please try again.'

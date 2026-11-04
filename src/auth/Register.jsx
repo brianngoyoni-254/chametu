@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import {
   Sun, Moon, Eye, EyeOff, Check, Mail, Lock, User,
   Building2, Phone, Smartphone, Vote, Star, Sparkles,
-  ArrowLeft, Crown, ShieldCheck, Loader2, CheckCircle2, AlertCircle, Lock as LockIcon,
+  ArrowLeft, Crown, ShieldCheck, Loader2, CheckCircle2, AlertCircle, Clock, Lock as LockIcon,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
@@ -21,7 +21,7 @@ const PLAN_META = {
 }
 
 const BENEFITS = [
-  { Icon: Smartphone, text: 'Members pay by Paybill or STK Push — the dashboard updates for everyone' },
+  { Icon: Smartphone, text: 'Members pay by Paybill or STK Push, and the dashboard updates for everyone' },
   { Icon: Vote,       text: 'Loan requests approved by member vote with clear repayment tracking' },
   { Icon: Star,       text: 'Earn Chametu Points for on-time payments and redeem digital perks' },
 ]
@@ -65,6 +65,7 @@ export default function Register() {
   const claimRef = useRef(null)
   const signupIdRef = useRef(null)
   const triesRef = useRef(0)
+  const reviewSeenRef = useRef(0)
 
   useEffect(() => {
     const p = readPending()
@@ -133,6 +134,7 @@ export default function Register() {
       })
       setSignup(res.signup)
       triesRef.current = 0
+      reviewSeenRef.current = 0
       setStage('waiting')
     } catch (err) {
       setError(err?.message || 'Could not start your signup. Please try again.')
@@ -165,7 +167,17 @@ export default function Register() {
         toast.success(`${s.tier} plan activated`)
         return true
       }
-      if (['failed', 'expired', 'review'].includes(s.status)) {
+      if (s.status === 'review') {
+        // The payment arrived but needs a check. Give the server a few more
+        // polls to settle (it may just be finishing the account), then show
+        // the "confirming" screen. Never show the red failure screen for this.
+        // The pending signup stays in sessionStorage so a refresh resumes here.
+        reviewSeenRef.current += 1
+        if (reviewSeenRef.current <= 4) return false
+        setStage('review')
+        return true
+      }
+      if (['failed', 'expired'].includes(s.status)) {
         clearPending()
         setFailReason(friendlyFailureReason(s.failedReason, s.status))
         setStage('failed')
@@ -175,7 +187,12 @@ export default function Register() {
       return false
     }
 
+    // Only one status request at a time. The status call can be slow (it may
+    // create the chama), and overlapping calls can race each other.
+    let inFlight = false
+
     const check = async () => {
+      inFlight = true
       try {
         const res = await api(`/api/billing/signup/${signupId}/status`, {
           method: 'POST',
@@ -186,6 +203,8 @@ export default function Register() {
         return await applyOutcome(payload)
       } catch {
         return false
+      } finally {
+        inFlight = false
       }
     }
 
@@ -195,6 +214,7 @@ export default function Register() {
     })()
 
     const id = setInterval(async () => {
+      if (inFlight) return undefined
       triesRef.current += 1
       const done = await check()
       if (done) return clearInterval(id)
@@ -214,6 +234,7 @@ export default function Register() {
 
   const retryCheck = () => {
     triesRef.current = 0
+    reviewSeenRef.current = 0
     setStage('waiting')
     setPollKick((n) => n + 1)
   }
@@ -222,6 +243,7 @@ export default function Register() {
     clearPending()
     claimRef.current = null
     signupIdRef.current = null
+    reviewSeenRef.current = 0
     setSignup(null)
     setFailReason('')
     setError('')
@@ -607,6 +629,7 @@ function Stepper({ stage }) {
 
 function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish }) {
   const amount = Number(signup?.amount ?? 0).toLocaleString()
+  const reference = String(signup?.id || '').slice(0, 8).toUpperCase() || 'N/A'
   const btnGhost =
     'rounded-xl border border-line bg-white px-4 py-2.5 text-[0.86rem] font-semibold text-navy'
   const btnSolid =
@@ -622,7 +645,7 @@ function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish 
           </p>
           <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
             Enter your M-Pesa PIN to pay <b className="text-navy">KSh {amount}</b> for
-            the {signup?.tier} plan. Please keep this page open — your chama is
+            the {signup?.tier} plan. Please keep this page open. Your chama is
             created as soon as payment is confirmed.
           </p>
           <p className="mx-auto mt-3 max-w-[42ch] text-[0.76rem] text-ink-soft/80">
@@ -635,7 +658,7 @@ function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish 
         <>
           <CheckCircle2 size={40} className="mx-auto text-emerald" />
           <p className="mt-4 font-display text-[1.1rem] font-semibold text-navy">
-            Payment received — your chama is ready
+            Payment received, your chama is ready
           </p>
           <p className="mx-auto mt-1.5 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft">
             Your {signup?.tier} plan is active and you're set up as the chairman.
@@ -658,6 +681,40 @@ function StatusCard({ stage, signup, failReason, onRetryCheck, onBack, onFinish 
           <button type="button" onClick={onBack} className={`mt-6 ${btnSolid}`}>
             Try again
           </button>
+        </>
+      )}
+
+      {stage === 'review' && (
+        <>
+          <Clock size={40} className="mx-auto text-amber-500" />
+          <p className="mt-4 font-display text-[1.05rem] font-semibold text-navy">
+            Payment received, we are confirming it
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[44ch] text-[0.86rem] leading-relaxed text-ink-soft">
+            Your payment of <b className="text-navy">KSh {amount}</b> came through
+            and needs a quick check before your chama is created. Please do not
+            pay again. This usually takes a few minutes.
+          </p>
+          <p className="mx-auto mt-3 max-w-[44ch] text-[0.78rem] leading-relaxed text-ink-soft">
+            Reference: <span className="font-mono text-navy">{reference}</span>
+            <br />
+            If your chama is not ready within a few hours, email{' '}
+            <a
+              href={`mailto:support@chametu.co.ke?subject=Chametu%20payment%20${reference}`}
+              className="font-semibold text-forest hover:underline"
+            >
+              support@chametu.co.ke
+            </a>{' '}
+            with this reference.
+          </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <Link to="/login" className={`${btnGhost} no-underline`}>
+              Back to login
+            </Link>
+            <button type="button" onClick={onRetryCheck} className={btnSolid}>
+              Check again
+            </button>
+          </div>
         </>
       )}
 

@@ -440,6 +440,9 @@ def get_signup(signup_id, claim):
 
 
 def refresh_signup(ps):
+    if ps.status == 'review':
+        # A signup flagged by a concurrent worker may actually be finished.
+        return _adopt_finished_signup(ps.id) or ps
     if ps.status not in OPEN_STATES or not ps.invoice_id:
         return ps
     try:
