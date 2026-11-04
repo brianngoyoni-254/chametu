@@ -2,6 +2,9 @@
 import logging
 import time
 import uuid
+import os
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from flask import Flask, jsonify, request, g
 from flask_sqlalchemy import SQLAlchemy
@@ -185,6 +188,29 @@ def create_app(config_class=Config):
     def expired_token(_h, _p):
         logger.info('JWT expired')
         return jsonify({"message": "Token has expired"}), 401
+
+    # ------------------------------------------------------------------
+    # BACKGROUND RECONCILIATION JOB (APScheduler)
+    # ------------------------------------------------------------------
+    # Only start the scheduler in the main process to prevent it from 
+    # running twice when Flask's debug reloader is active.
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        from app.services.billing_service import reconcile_stale_payments
+
+        def reconcile_job():
+            with app.app_context():
+                try:
+                    reconcile_stale_payments()
+                except Exception as e:
+                    logger.error("Background reconciliation job failed: %s", e, exc_info=True)
+
+        scheduler = BackgroundScheduler()
+        # Check every 3 minutes for payments stuck in 'pending' or 'processing'
+        scheduler.add_job(id='reconcile_payments', func=reconcile_job, trigger="interval", minutes=3)
+        scheduler.start()
+        
+        # Ensure the scheduler shuts down cleanly when the app exits
+        atexit.register(lambda: scheduler.shutdown())
 
     logger.info(
         'Chametu app started | env=%s | debug=%s',
