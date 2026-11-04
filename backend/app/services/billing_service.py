@@ -502,7 +502,32 @@ def _apply_signup_state(signup_id, state, failed_reason=None, amount_seen=None, 
     return ps
 
 
+def _adopt_finished_signup(signup_id):
+    """If another worker (e.g. the Render webhook while a local poll is running,
+    or two overlapping polls) already created the account for this signup,
+    mark it complete instead of treating the duplicate attempt as a problem."""
+    ps = PendingSignup.query.filter_by(id=signup_id).populate_existing().first()
+    if not ps:
+        return None
+    if ps.status == 'complete':
+        return ps
+    done = SubscriptionPayment.query.filter_by(api_ref=ps.api_ref).first()
+    if not done:
+        return None
+    ps.status = 'complete'
+    ps.failed_reason = None
+    ps.user_id = ps.user_id or done.user_id
+    ps.chama_id = ps.chama_id or done.chama_id
+    ps.completed_at = ps.completed_at or done.completed_at or datetime.utcnow()
+    db.session.commit()
+    logger.info('SIGNUP already finalized by another worker signup=%s', signup_id)
+    return ps
+
+
 def _mark_signup_review(signup_id, reason):
+    adopted = _adopt_finished_signup(signup_id)
+    if adopted:
+        return adopted
     logger.error('SIGNUP REVIEW signup=%s reason=%s', signup_id, reason)
     ps = PendingSignup.query.get(signup_id)
     if ps:
