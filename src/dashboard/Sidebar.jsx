@@ -1,31 +1,11 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, Link } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Mail,
-  Users,
-  Star,
-  Gift,
-  Layers,
-  Wallet,
-  Receipt,
-  Percent,
-  PiggyBank,
-  ArrowLeftRight,
-  Heart,
-  TrendingUp,
-  Building2,
-  RefreshCw,
-  CalendarDays,
-  Vote,
-  ShieldCheck,
-  FileText,
-  BarChart3,
-  X,
-  LogOut,
-  Pencil,
-  LifeBuoy,
-  Settings as SettingsIcon,
+  LayoutDashboard, Mail, Users, Star, Gift, Layers, Wallet, Receipt,
+  Percent, PiggyBank, ArrowLeftRight, Heart, TrendingUp, Building2,
+  RefreshCw, CalendarDays, Vote, ShieldCheck, FileText, BarChart3,
+  X, LogOut, Pencil, LifeBuoy, Settings as SettingsIcon,
+  ArrowRightLeft, // Added for the switch
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTier } from "../context/TierContext";
@@ -136,6 +116,9 @@ export default function Sidebar({ open, onClose }) {
     }
   };
 
+  // Only show the switch button if they actually have an admin role
+  const isAdmin = ["Chairman", "Treasurer", "Secretary"].includes(currentMember?.role);
+
   return (
     <>
       {open && (
@@ -179,7 +162,25 @@ export default function Sidebar({ open, onClose }) {
         ))}
 
         <div className="mt-auto pt-3.5 px-2.5 border-t border-white/10 flex flex-col gap-3">
-          <div className="text-[0.72rem] text-white/40">
+          
+          {/* --- NEW: Switch to Member Portal --- */}
+          {isAdmin && (
+            <Link
+              to="/member"
+              onClick={onClose}
+              className="flex items-center justify-between gap-2 w-full p-2.5 rounded-xl bg-white/[0.06] hover:bg-white/10 border border-white/10 transition group"
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="grid h-7 w-7 place-items-center rounded-lg bg-emerald/20 text-emerald group-hover:bg-emerald/30 transition">
+                  <ArrowRightLeft size={14} strokeWidth={2.5} />
+                </span>
+                <span className="text-[0.82rem] font-semibold text-white">Member Portal</span>
+              </div>
+              <span className="text-[0.6rem] font-bold uppercase tracking-wider text-emerald bg-emerald/10 px-2 py-0.5 rounded">Switch</span>
+            </Link>
+          )}
+
+          <div className="text-[0.72rem] text-white/40 mt-1">
             <b className="text-gold font-display">{tier}</b> plan{isTrial ? " · trial" : ""} · up to{" "}
             <b className="text-gold font-display">{config?.maxMembers || 10}</b> members
           </div>

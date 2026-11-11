@@ -4,6 +4,7 @@ import { Outlet, Navigate, useLocation, useNavigate, Link } from 'react-router-d
 import {
   LogOut, Bell, Menu, CheckCheck, Trash2, X,
   AlertTriangle, Info, CheckCircle2, ArrowRight, LayoutDashboard, Loader2,
+  ArrowLeftRight,
 } from 'lucide-react'
 import MemberSidebar from './MemberSidebar'
 import { useAuth } from '../context/AuthContext'
@@ -105,6 +106,9 @@ function MemberShell() {
 
   const displayName = profile?.name || user?.name || 'Member'
   const displayRole = profile?.role || user?.role || 'Member'
+  
+  // Check if the current member has admin privileges
+  const isAdmin = ["Chairman", "Treasurer", "Secretary"].includes(displayRole)
 
   function handleLogout() {
     logout()
@@ -143,12 +147,14 @@ function MemberShell() {
               <p className="truncate text-[0.72rem] text-ink-soft">{subtitle}</p>
             </div>
 
-            {displayRole && displayRole !== 'Member' && (
+            {/* --- SWITCH TO ADMIN BUTTON --- */}
+            {isAdmin && (
               <Link
                 to="/dashboard"
-                className="hidden items-center gap-1.5 rounded-lg border border-line bg-card px-3 py-1.5 text-[0.72rem] font-semibold text-navy transition hover:border-forest sm:inline-flex"
+                className="hidden items-center gap-2 rounded-xl border border-forest/20 bg-forest/[0.06] px-3 py-1.5 text-[0.75rem] font-semibold text-forest transition hover:bg-forest/10 sm:inline-flex"
               >
-                <LayoutDashboard size={13} /> Admin Dashboard
+                <ArrowLeftRight size={13} /> 
+                Admin Dashboard
               </Link>
             )}
 
