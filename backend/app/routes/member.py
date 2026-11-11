@@ -3,7 +3,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
 
 from app.models.user import User
-from app.models.chama import Chama, Member
+from app.models.chama import Chama, Member, ChamaSettings
 from app.services.member_service import (
     get_member_finance_data,
     accept_member_invite,
@@ -120,6 +120,7 @@ def me():
         return jsonify({"message": "Membership not found"}), 404
 
     chama = Chama.query.get(member.chama_id)
+    settings = ChamaSettings.query.filter_by(chama_id=chama.id).first()
     portal = "member" if member.role.lower() == "member" else "admin"
 
     return jsonify({
@@ -129,10 +130,16 @@ def me():
             "portal": portal,
         },
         "chama": {
-            "id": chama.id, "name": chama.name, "code": chama.code,
+            "id": chama.id,
+            "name": chama.name,
+            "code": chama.code,
             "tier": chama.base_tier,
             "monthly_contribution": chama.monthly_contribution,
             "due_day": chama.due_day,
+            # ---- NEW: M-Pesa contribution method fields ----
+            "contribution_method": (settings.contribution_method if settings else 'paybill') or 'paybill',
+            "contribution_number": (settings.contribution_number if settings else '') or '',
+            "contribution_account_ref": (settings.contribution_account_ref if settings else '') or '',
         },
         "savings": member.savings,
     }), 200

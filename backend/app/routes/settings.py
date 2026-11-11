@@ -42,6 +42,10 @@ def get_settings():
             'monthlyProfitTarget': float(settings.monthly_profit_target or 0),
             'profitTargetBasis': settings.profit_target_basis or 'savings',
             'profitTargetPeriod': settings.profit_target_period or 'month',
+            # ---- NEW: M-Pesa contribution method fields ----
+            'contribution_method': settings.contribution_method or 'paybill',
+            'contribution_number': settings.contribution_number or '',
+            'contribution_account_ref': settings.contribution_account_ref or '',
         },
     }), 200
 
@@ -103,6 +107,16 @@ def update_settings():
         if data['profitTargetPeriod'] not in ('month', 'quarter', 'year'):
             return jsonify({'message': 'Invalid profit target period'}), 400
         settings.profit_target_period = data['profitTargetPeriod']
+
+    # ---------- NEW: M-Pesa contribution method ----------
+    if 'contribution_method' in data:
+        if data['contribution_method'] not in ('send_money', 'paybill', 'till'):
+            return jsonify({'message': 'Invalid contribution method'}), 400
+        settings.contribution_method = data['contribution_method']
+    if 'contribution_number' in data:
+        settings.contribution_number = (data['contribution_number'] or '').strip()
+    if 'contribution_account_ref' in data:
+        settings.contribution_account_ref = (data['contribution_account_ref'] or '').strip()
 
     db.session.add(settings)
     db.session.commit()

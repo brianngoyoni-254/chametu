@@ -3,6 +3,7 @@ from app import db
 from datetime import datetime
 import uuid
 
+
 class Chama(db.Model):
     __tablename__ = 'chamas'
 
@@ -33,7 +34,7 @@ class Chama(db.Model):
 class Role(db.Model):
     """
     Dynamic roles for each chama. Permissions are stored as JSON.
-    System roles (Chairman, Treasurer, etc.) are seeded automatically 
+    System roles (Chairman, Treasurer, etc.) are seeded automatically
     and cannot be deleted.
     """
     __tablename__ = 'roles'
@@ -44,7 +45,7 @@ class Role(db.Model):
     description = db.Column(db.String(255), default='')
     icon = db.Column(db.String(50), default='UserCog')
     system = db.Column(db.Boolean, default=False)
-    
+
     # Stores the exact structure frontend expects: {"manageMembers": true, "approveLoans": false, ...}
     perms = db.Column(db.JSON, nullable=False, default=dict)
 
@@ -90,3 +91,12 @@ class ChamaSettings(db.Model):
     monthly_profit_target = db.Column(db.Float, nullable=False, default=0.0)
     profit_target_basis = db.Column(db.String(20), nullable=False, default='savings')
     profit_target_period = db.Column(db.String(20), nullable=False, default='month')
+
+    # ---------- M-Pesa contribution method (NEW) ----------
+    # Where members send their contribution payments.
+    #   'send_money' → personal phone number
+    #   'paybill'    → paybill number + account ref
+    #   'till'       → buy goods / till number
+    contribution_method = db.Column(db.String(20), nullable=False, default='paybill')
+    contribution_number = db.Column(db.String(20), nullable=False, default='')
+    contribution_account_ref = db.Column(db.String(50), nullable=False, default='')

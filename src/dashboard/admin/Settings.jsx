@@ -5,6 +5,7 @@ import {
   User, Bell, Building2, ShieldCheck, Save, Loader2, Camera,
   Mail, Smartphone, Lock, Globe, Check, AlertCircle,
   BadgeCheck, Building, MapPin, Target, TrendingUp, Calendar, Coins,
+  Wallet,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '../../context/AuthContext'
@@ -344,7 +345,7 @@ function ProfileSkeleton() {
 }
 
 /* ==========================================================
-   CHAMA TAB — Target Profit + Contribution Schedule
+   CHAMA TAB — Includes the Contribution Method Selector
    ========================================================== */
 function ChamaTab() {
   const [data, setData] = useState(null)
@@ -363,6 +364,10 @@ function ChamaTab() {
             contribution_frequency: details.contribution_frequency ?? 'monthly',
             due_day: details.due_day ?? 30,
             due_weekday: details.due_weekday ?? 1,
+            // New fields for contribution method
+            contribution_method: res.settings?.contribution_method || 'paybill',
+            contribution_number: res.settings?.contribution_number || '',
+            contribution_account_ref: res.settings?.contribution_account_ref || 'CHAMETU',
           },
           settings: {
             ...res.settings,
@@ -396,7 +401,7 @@ function ChamaTab() {
         },
       })
 
-      // 2. Workspace + target profit
+      // 2. Workspace + target profit + Contribution Method
       await api('/api/settings/', {
         method: 'PUT',
         token: localStorage.getItem('auth_token'),
@@ -408,11 +413,13 @@ function ChamaTab() {
           timezone: data.settings.timezone,
           gracePeriod: data.settings.gracePeriod,
           autoBlockDays: data.settings.autoBlockDays,
-          paybill: data.settings.paybill,
-          accountRef: data.settings.accountRef,
           monthlyProfitTarget: Number(data.settings.monthlyProfitTarget || 0),
           profitTargetBasis: data.settings.profitTargetBasis,
           profitTargetPeriod: data.settings.profitTargetPeriod,
+          // Save the M-Pesa method fields
+          contribution_method: data.chama.contribution_method,
+          contribution_number: data.chama.contribution_number,
+          contribution_account_ref: data.chama.contribution_account_ref,
         },
       })
       toast.success('Chama settings saved')
@@ -455,15 +462,14 @@ function ChamaTab() {
         </div>
       </div>
 
-      {/* ---------- Contribution Schedule ---------- */}
+      {/* Contribution Schedule */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center gap-2">
           <Coins size={18} className="text-forest" />
           <h2 className="font-display text-lg font-bold text-navy">Contribution Schedule</h2>
         </div>
         <p className="mb-4 text-[0.84rem] leading-relaxed text-ink-soft">
-          Set how much each active member contributes and how often. Individual members can be
-          overridden from the Contributions page if the group agrees on a different amount.
+          Set how much each active member contributes and how often.
         </p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -523,63 +529,102 @@ function ChamaTab() {
             </label>
           )}
         </div>
+      </div>
 
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-emerald/[0.06] px-3.5 py-3 text-[0.82rem] text-navy ring-1 ring-emerald/10">
-          <Calendar size={14} className="mt-0.5 shrink-0 text-forest" />
-          <span>
-            Members are expected to contribute{' '}
-            <b>KSh {Number(data.chama.monthly_contribution || 0).toLocaleString()}</b>{' '}
-            <b>{data.chama.contribution_frequency}</b>. Contributions in the current period
-            are visible on the Contributions page and update automatically as deposits land.
+      {/* NEW: M-Pesa Contribution Method */}
+      <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Wallet size={18} className="text-forest" />
+            <h2 className="font-display text-lg font-bold text-navy">M-Pesa Collection Method</h2>
+          </div>
+          <span className="rounded-full bg-emerald/10 px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-wider text-forest">
+            Visible to members
           </span>
+        </div>
+
+        <p className="mb-4 text-[0.84rem] leading-relaxed text-ink-soft">
+          Select how members should pay their contributions. This will appear automatically on their contributions page.
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-4">
+          {[
+            { id: 'send_money', label: 'Send Money', icon: Smartphone },
+            { id: 'paybill', label: 'Paybill', icon: Building },
+            { id: 'till', label: 'Till Number', icon: Wallet },
+          ].map((method) => (
+            <button
+              key={method.id}
+              type="button"
+              onClick={() => setData({ ...data, chama: { ...data.chama, contribution_method: method.id } })}
+              className={`flex flex-col items-center justify-center gap-2 rounded-xl border-2 p-4 transition ${
+                data.chama.contribution_method === method.id
+                  ? 'border-forest bg-forest/[0.04] shadow-sm'
+                  : 'border-line bg-white hover:border-forest/50'
+              }`}
+            >
+              <method.icon size={20} className={data.chama.contribution_method === method.id ? 'text-forest' : 'text-ink-soft'} />
+              <span className={`text-[0.86rem] font-semibold ${data.chama.contribution_method === method.id ? 'text-forest' : 'text-navy'}`}>
+                {method.label}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 bg-paper/50 p-4 rounded-xl border border-line">
+          <label>
+            <span className={labelCls}>
+              {data.chama.contribution_method === 'send_money' ? 'Phone Number' : 
+               data.chama.contribution_method === 'paybill' ? 'Paybill Number' : 'Till Number'}
+            </span>
+            <input
+              value={data.chama.contribution_number}
+              onChange={(e) =>
+                setData({ ...data, chama: { ...data.chama, contribution_number: e.target.value } })
+              }
+              placeholder={data.chama.contribution_method === 'send_money' ? '0712 345 678' : '400200'}
+              className={inputCls}
+            />
+          </label>
+          <label>
+            <span className={labelCls}>Account Reference (if Paybill)</span>
+            <input
+              value={data.chama.contribution_account_ref}
+              onChange={(e) =>
+                setData({ ...data, chama: { ...data.chama, contribution_account_ref: e.target.value } })
+              }
+              placeholder="e.g. Your Name"
+              className={inputCls}
+              disabled={data.chama.contribution_method !== 'paybill'}
+            />
+          </label>
         </div>
       </div>
 
-      {/* ---------- Target profit ---------- */}
+      {/* Target profit */}
       <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Target size={18} className="text-forest" />
             <h2 className="font-display text-lg font-bold text-navy">Target Profit</h2>
           </div>
-          <span className="rounded-full bg-emerald/10 px-2.5 py-1 text-[0.66rem] font-bold uppercase tracking-wider text-forest">
-            Tracked on Savings
-          </span>
         </div>
-
-        <p className="mb-4 text-[0.84rem] leading-relaxed text-ink-soft">
-          Set a monthly net-movement goal for the chama. Savings shows progress toward this
-          based on real deposits minus withdrawals. Leave at zero to disable.
-        </p>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <label>
             <span className={labelCls}>Monthly target (KSh)</span>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-ink-soft">
-                KSh
-              </span>
-              <input
-                type="number" min="0" step="100"
-                value={data.settings.monthlyProfitTarget}
-                onChange={(e) =>
-                  setData({
-                    ...data,
-                    settings: { ...data.settings, monthlyProfitTarget: e.target.value },
-                  })
-                }
-                className={`${inputCls} pl-12`}
-                placeholder="0"
-              />
-            </div>
+            <input
+              type="number" min="0" step="100"
+              value={data.settings.monthlyProfitTarget}
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, monthlyProfitTarget: e.target.value } })}
+              className={inputCls}
+              placeholder="0"
+            />
           </label>
           <label>
             <span className={labelCls}>Based on</span>
             <select
               value={data.settings.profitTargetBasis}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, profitTargetBasis: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, profitTargetBasis: e.target.value } })}
               className={inputCls}
             >
               <option value="savings">Savings net movement</option>
@@ -590,9 +635,7 @@ function ChamaTab() {
             <span className={labelCls}>Period</span>
             <select
               value={data.settings.profitTargetPeriod}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, profitTargetPeriod: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, profitTargetPeriod: e.target.value } })}
               className={inputCls}
             >
               <option value="month">Monthly</option>
@@ -614,9 +657,7 @@ function ChamaTab() {
             <span className={labelCls}>Platform Name</span>
             <input
               value={data.settings.platformName}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, platformName: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, platformName: e.target.value } })}
               className={inputCls}
             />
           </label>
@@ -624,9 +665,7 @@ function ChamaTab() {
             <span className={labelCls}>Support Email</span>
             <input
               value={data.settings.supportEmail}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, supportEmail: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, supportEmail: e.target.value } })}
               className={inputCls}
             />
           </label>
@@ -634,76 +673,12 @@ function ChamaTab() {
             <span className={labelCls}>Timezone</span>
             <select
               value={data.settings.timezone}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, timezone: e.target.value } })
-              }
+              onChange={(e) => setData({ ...data, settings: { ...data.settings, timezone: e.target.value } })}
               className={inputCls}
             >
               <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
               <option value="UTC">UTC</option>
             </select>
-          </label>
-        </div>
-      </div>
-
-      {/* Enforcement */}
-      <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
-        <div className="mb-5 flex items-center gap-2">
-          <ShieldCheck size={18} className="text-forest" />
-          <h2 className="font-display text-lg font-bold text-navy">Enforcement Rules</h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label>
-            <span className={labelCls}>Grace Period (Days)</span>
-            <input
-              type="number"
-              value={data.settings.gracePeriod}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, gracePeriod: e.target.value } })
-              }
-              className={inputCls}
-            />
-          </label>
-          <label>
-            <span className={labelCls}>Auto-block after (Days Overdue)</span>
-            <input
-              type="number"
-              value={data.settings.autoBlockDays}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, autoBlockDays: e.target.value } })
-              }
-              className={inputCls}
-            />
-          </label>
-        </div>
-      </div>
-
-      {/* M-Pesa */}
-      <div className="rounded-2xl border border-line bg-white p-6 shadow-sm">
-        <div className="mb-5 flex items-center gap-2">
-          <Smartphone size={18} className="text-forest" />
-          <h2 className="font-display text-lg font-bold text-navy">M-Pesa Collection</h2>
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label>
-            <span className={labelCls}>Paybill / Till Number</span>
-            <input
-              value={data.settings.paybill}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, paybill: e.target.value } })
-              }
-              className={inputCls}
-            />
-          </label>
-          <label>
-            <span className={labelCls}>Account Reference</span>
-            <input
-              value={data.settings.accountRef}
-              onChange={(e) =>
-                setData({ ...data, settings: { ...data.settings, accountRef: e.target.value } })
-              }
-              className={inputCls}
-            />
           </label>
         </div>
       </div>
