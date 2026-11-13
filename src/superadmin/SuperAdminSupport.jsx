@@ -7,22 +7,13 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTickets, TICKET_STATUSES, TICKET_PRIORITIES, TICKET_CATEGORIES } from './useTickets'
+import { fmtDate, fmtRelative, parseUtc } from '../lib/time'
 
 const AGENTS = ['Danny (Lead Dev)', 'Brian (Dev 2)']
 
-const fmtDate = (iso) => new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-const fmtRelative = (iso) => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  return `${Math.floor(hr / 24)}d ago`
-}
 const slaState = (dueIso, resolved) => {
   if (resolved) return { label: 'Met', tone: 'text-emerald', Icon: CheckCircle2, bg: 'bg-emerald/10' }
-  const due = new Date(dueIso).getTime()
+  const due = parseUtc(dueIso).getTime()
   const now = Date.now()
   if (due < now) return { label: 'Breached', tone: 'text-red-600 dark:text-red-400', Icon: AlertTriangle, bg: 'bg-red-500/10' }
   const hours = Math.round((due - now) / 3600000)
@@ -32,7 +23,7 @@ const slaState = (dueIso, resolved) => {
 const initialsOf = (name) => name?.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?'
 
 export default function SuperAdminSupport() {
-  const { tickets, create, update, addMessage, bulkUpdate, remove, stats } = useTickets()
+  const { tickets, create, update, addMessage, bulkUpdate, remove, stats, markRead } = useTickets()
   const [view, setView] = useState('list')
   const [activeId, setActiveId] = useState(null)
   const [query, setQuery] = useState('')
@@ -223,7 +214,7 @@ export default function SuperAdminSupport() {
                 const sla = slaState(t.slaResponseDue, t.status === 'resolved' || t.status === 'closed')
                 const SlaIcon = sla.Icon
                 return (
-                  <tr key={t.id} onClick={() => { setView('detail'); setActiveId(t.id) }} className="group cursor-pointer transition hover:bg-paper/50 dark:hover:bg-white/[0.02]">
+                  <tr key={t.id} onClick={() => { setView('detail'); setActiveId(t.id); markRead(t.id); }} className="group cursor-pointer transition hover:bg-paper/50 dark:hover:bg-white/[0.02]">
                     <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(t.id)} onChange={() => handleSelect(t.id)} className="h-4 w-4 accent-forest" />
                     </td>
@@ -231,7 +222,14 @@ export default function SuperAdminSupport() {
                       <div className="flex items-start gap-2.5">
                         <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${pr.dot}`} />
                         <div className="min-w-0">
-                          <p className="truncate font-semibold text-navy group-hover:text-forest dark:text-white dark:group-hover:text-emerald">{t.subject}</p>
+                          <div className="flex items-center gap-2">
+                            {(t.unreadCount > 0) && (
+                              <span className="grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[0.58rem] font-bold text-white shrink-0">
+                                {t.unreadCount > 9 ? '9+' : t.unreadCount}
+                              </span>
+                            )}
+                            <p className={`truncate text-navy group-hover:text-forest dark:text-white dark:group-hover:text-emerald ${t.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>{t.subject}</p>
+                          </div>
                           <div className="mt-0.5 flex items-center gap-1.5 text-[0.7rem] text-ink-soft">
                             <span className="font-mono">{t.id}</span>
                             <span>·</span>
@@ -288,10 +286,17 @@ export default function SuperAdminSupport() {
             const sla = slaState(t.slaResponseDue, t.status === 'resolved' || t.status === 'closed')
             const SlaIcon = sla.Icon
             return (
-              <li key={t.id} onClick={() => { setView('detail'); setActiveId(t.id) }} className="cursor-pointer p-3 transition hover:bg-paper/40 dark:hover:bg-white/[0.02]">
+              <li key={t.id} onClick={() => { setView('detail'); setActiveId(t.id); markRead(t.id); }} className="cursor-pointer p-3 transition hover:bg-paper/40 dark:hover:bg-white/[0.02]">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[0.9rem] font-bold text-navy dark:text-white">{t.subject}</p>
+                    <div className="flex items-center gap-2">
+                      {(t.unreadCount > 0) && (
+                        <span className="grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[0.58rem] font-bold text-white shrink-0">
+                          {t.unreadCount > 9 ? '9+' : t.unreadCount}
+                        </span>
+                      )}
+                      <p className={`truncate text-[0.9rem] text-navy dark:text-white ${t.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}>{t.subject}</p>
+                    </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-[0.68rem] text-ink-soft">
                       <span className="font-mono">{t.id}</span>
                       <span>·</span>

@@ -2,11 +2,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   LifeBuoy, Plus, MessageSquare, Clock, CheckCircle2, X, Send, Search,
-  Loader2,
+  Loader2, Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useMember } from '../context/MemberContext'
 import { api } from '../lib/api'
+import { fmtDate, fmtRelative } from '../lib/time'
 
 const CATEGORIES = [
   { key: 'billing', label: 'Billing & payments' },
@@ -34,19 +35,6 @@ const PRIORITY_META = {
   urgent: 'bg-red-100 text-red-700',
 }
 
-const fmtDate = (iso) =>
-  new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
-const fmtRelative = (iso) => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
 const initials = (name) =>
   (name || '??').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -104,6 +92,34 @@ export default function MemberSupport() {
       await refresh()
     } catch (err) {
       toast.error(err.message)
+    }
+  }
+
+  // Marks ticket as read and clears the badge
+  const openTicket = async (t) => {
+    setViewing(t)
+    if (t.unreadCount > 0) {
+      try {
+        await api(`/api/support/me/${t.id}/read`, { method: 'POST' })
+        setTickets((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, unreadCount: 0 } : x)),
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  // Delete ticket function
+  const deleteTicket = async (ticketId) => {
+    if (!window.confirm('Are you sure you want to permanently delete this ticket?')) return
+    try {
+      await api(`/api/support/me/${ticketId}`, { method: 'DELETE' })
+      toast.success('Ticket deleted')
+      setViewing(null)
+      await refresh()
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete ticket')
     }
   }
 
@@ -201,31 +217,41 @@ export default function MemberSupport() {
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {filtered.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setViewing(t)}
-                className="flex w-full items-start gap-3 p-4 text-left hover:bg-forest/[0.03] transition"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-forest/10 text-forest">
-                  <LifeBuoy size={15} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[0.7rem] text-ink-soft">{t.id.slice(0, 8)}</span>
-                    <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[t.status].cls}`}>
-                      {STATUS_META[t.status].label}
-                    </span>
-                    <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${PRIORITY_META[t.priority]}`}>
-                      {t.priority}
-                    </span>
+            {filtered.map((t) => {
+              const unread = t.unreadCount || 0
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => openTicket(t)}
+                  className="flex w-full items-start gap-3 p-4 text-left hover:bg-forest/[0.03] transition"
+                >
+                  <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-forest/10 text-forest">
+                    <LifeBuoy size={15} />
+                    {unread > 0 && (
+                      <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[0.58rem] font-bold text-white">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-[0.7rem] text-ink-soft">{t.id.slice(0, 8)}</span>
+                      <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[t.status].cls}`}>
+                        {STATUS_META[t.status].label}
+                      </span>
+                      <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${PRIORITY_META[t.priority]}`}>
+                        {t.priority}
+                      </span>
+                    </div>
+                    <p className={`mt-1 truncate text-navy ${unread > 0 ? 'font-bold' : 'font-semibold'}`}>
+                      {t.subject}
+                    </p>
+                    <p className="mt-0.5 truncate text-[0.76rem] text-ink-soft">{t.description}</p>
+                    <p className="mt-1 text-[0.7rem] text-ink-soft">Updated {fmtRelative(t.updatedAt)}</p>
                   </div>
-                  <p className="mt-1 truncate font-semibold text-navy">{t.subject}</p>
-                  <p className="mt-0.5 truncate text-[0.76rem] text-ink-soft">{t.description}</p>
-                  <p className="mt-1 text-[0.7rem] text-ink-soft">Updated {fmtRelative(t.updatedAt)}</p>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -236,6 +262,7 @@ export default function MemberSupport() {
           ticket={viewing}
           onClose={() => setViewing(null)}
           onReply={(body) => addReply(viewing, body)}
+          onDelete={() => deleteTicket(viewing.id)}
         />
       )}
     </div>
@@ -326,7 +353,7 @@ function NewTicketModal({ onClose, onSubmit }) {
   )
 }
 
-function TicketModal({ ticket, onClose, onReply }) {
+function TicketModal({ ticket, onClose, onReply, onDelete }) {
   const [reply, setReply] = useState('')
 
   const submit = (e) => {
@@ -342,6 +369,7 @@ function TicketModal({ ticket, onClose, onReply }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+        
         <div className="flex items-start justify-between border-b border-line px-5 py-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -355,9 +383,19 @@ function TicketModal({ ticket, onClose, onReply }) {
             </div>
             <h3 className="mt-1 truncate font-display font-semibold text-navy">{ticket.subject}</h3>
           </div>
-          <button onClick={onClose} className="ml-3 rounded-lg p-1.5 text-ink-soft hover:bg-paper">
-            <X size={16} />
-          </button>
+          
+          <div className="ml-3 flex items-center gap-1">
+            <button 
+              onClick={onDelete} 
+              className="rounded-lg p-1.5 text-red-500 hover:bg-red-50 transition"
+              title="Delete ticket"
+            >
+              <Trash2 size={16} />
+            </button>
+            <button onClick={onClose} className="rounded-lg p-1.5 text-ink-soft hover:bg-paper">
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 space-y-2 overflow-y-auto p-4">

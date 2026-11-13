@@ -10,11 +10,12 @@ from app.models.user import SuperAdmin, User
 from app.models.chama import Chama, Member
 from app.models.ledger import Payment, AuditLogEntry
 from app.models.billing import SubscriptionPayment
-from app.models.support import Ticket, TicketMessage
+from app.models.support import Ticket, TicketMessage, TicketReadState
 from app.models.settings import PlatformSettings
 from app.models.chat import ChatSession
 from app.services.email_service import send_email
 from app.services.intasend import send_stk_push, generate_checkout_link
+from app.services import support_service
 
 superadmin_bp = Blueprint('superadmin', __name__)
 logger = logging.getLogger(__name__)
@@ -444,6 +445,7 @@ def get_all_tickets():
         return guard
 
     try:
+        admin_id = get_jwt().get('sub')
         tickets = Ticket.query.order_by(Ticket.updated_at.desc()).all()
         result = []
 
@@ -458,10 +460,13 @@ def get_all_tickets():
                     'role': m.role,
                     'body': m.body,
                     'internal': m.internal,
-                    'at': m.created_at.isoformat(),
+                    'at': support_service._iso_utc(m.created_at),
                 }
                 for m in t.messages
             ]
+
+            sla_resp = t.sla_response_due or (t.created_at + timedelta(hours=4))
+            sla_res = t.sla_resolve_due or (t.created_at + timedelta(hours=24))
 
             result.append({
                 'id': f"TKT-{t.id[:4].upper()}",
@@ -479,11 +484,12 @@ def get_all_tickets():
                 'assignee': t.assignee,
                 'watchers': [],
                 'tags': t.tags or [],
-                'createdAt': t.created_at.isoformat(),
-                'updatedAt': t.updated_at.isoformat(),
-                'slaResponseDue': t.sla_response_due.isoformat() if t.sla_response_due else (t.created_at + timedelta(hours=4)).isoformat(),
-                'slaResolveDue': t.sla_resolve_due.isoformat() if t.sla_resolve_due else (t.created_at + timedelta(hours=24)).isoformat(),
+                'createdAt': support_service._iso_utc(t.created_at),
+                'updatedAt': support_service._iso_utc(t.updated_at),
+                'slaResponseDue': support_service._iso_utc(sla_resp),
+                'slaResolveDue': support_service._iso_utc(sla_res),
                 'messages': messages,
+                'unreadCount': support_service._get_unread_count(t, admin_id, is_superadmin=True),
             })
 
         return jsonify(result), 200
@@ -617,6 +623,31 @@ def delete_ticket(ticket_id):
     db.session.delete(ticket)
     db.session.commit()
     return jsonify({"message": "Ticket deleted"}), 200
+
+
+@superadmin_bp.route('/tickets/<ticket_id>/read', methods=['POST'])
+@jwt_required()
+def mark_ticket_read(ticket_id):
+    guard = _require_superadmin()
+    if guard:
+        return guard
+
+    real_id = ticket_id.replace('TKT-', '').lower()
+    ticket = Ticket.query.filter(Ticket.id.startswith(real_id)).first()
+    if not ticket:
+        return jsonify({"message": "Ticket not found"}), 404
+
+    admin_id = get_jwt().get('sub')
+    now = datetime.utcnow()
+    
+    state = TicketReadState.query.filter_by(ticket_id=ticket.id, user_id=admin_id).first()
+    if state:
+        state.last_read_at = now
+    else:
+        db.session.add(TicketReadState(ticket_id=ticket.id, user_id=admin_id, last_read_at=now))
+    
+    db.session.commit()
+    return jsonify({"ok": True}), 200
 
 
 # ---------------------------------------------------------------------
