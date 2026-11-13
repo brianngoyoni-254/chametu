@@ -1,3 +1,4 @@
+// src/dashboard/admin/MyChama.jsx
 import { useEffect, useState } from 'react'
 import { Pencil, Check, Building2, Users, Calendar, Coins } from 'lucide-react'
 import { useChama } from '../../context/ChamaContext'
@@ -25,53 +26,82 @@ function buildProfile(chama) {
   }
 }
 
-const INITIAL_CONTRIB = {
-  amount: 5000,
-  frequency: 'Monthly',
-  dueDay: 30,
-  grace: 3,
-}
-const INITIAL_LOAN = {
-  maxMultiple: 3,
-  interest: 10,
-  interestType: 'Reducing balance',
-  repayment: 'Monthly',
-  grace: 30,
-}
-
 export default function MyChama() {
   const { chama, members, updateChama } = useChama()
   
   const [profile, setProfile] = useState(() => buildProfile(chama))
-  const [contrib, setContrib] = useState(() => ({
-    ...INITIAL_CONTRIB,
-    amount: chama?.amount ?? INITIAL_CONTRIB.amount,
-    dueDay: chama?.due ?? INITIAL_CONTRIB.dueDay,
-    grace: chama?.grace ?? INITIAL_CONTRIB.grace,
-  }))
-  const [loan, setLoan] = useState(() => ({
-    ...INITIAL_LOAN,
-    maxMultiple: chama?.maxLoanMultiple ?? INITIAL_LOAN.maxMultiple,
-  }))
+  
+  const [contrib, setContrib] = useState({
+    amount: chama?.monthly_contribution || 5000,
+    frequency: chama?.contribution_frequency || 'Monthly',
+    dueDay: chama?.due_day || 30,
+    grace: chama?.loan_grace_period || 3,
+  })
+  
+  const [loan, setLoan] = useState({
+    maxMultiple: chama?.max_loan_multiple || 3,
+    interest: chama?.interest_rate || 10,
+    interestType: chama?.interest_type || 'Reducing balance',
+    repayment: chama?.repayment_frequency || 'Monthly',
+    grace: chama?.loan_grace_period || 30,
+  })
+  
   const [editing, setEditing] = useState(null)
 
   // Keep local state in sync if the chama data loads after the component mounts
   useEffect(() => {
     if (chama) {
       setProfile(buildProfile(chama))
+      setContrib({
+        amount: chama.monthly_contribution || 5000,
+        frequency: chama.contribution_frequency || 'Monthly',
+        dueDay: chama.due_day || 30,
+        grace: chama.loan_grace_period || 3,
+      })
+      setLoan({
+        maxMultiple: chama.max_loan_multiple || 3,
+        interest: chama.interest_rate || 10,
+        interestType: chama.interest_type || 'Reducing balance',
+        repayment: chama.repayment_frequency || 'Monthly',
+        grace: chama.loan_grace_period || 30,
+      })
     }
   }, [chama])
 
-  // Persist name changes directly to the context and localStorage
-  function finishEditing() {
-    setEditing(null)
-    updateChama(profile)
-    toast.success('Chama details updated')
+  // Persist name changes directly to the context and backend
+  async function finishEditing() {
+    let payload = {}
+    if (editing === 'profile') payload = profile
+    if (editing === 'contrib') payload = contrib
+    if (editing === 'loan') payload = loan
+
+    const res = await updateChama(payload)
+    if (res.ok) {
+      toast.success('Settings updated')
+      setEditing(null)
+    } else {
+      toast.error(res.message || 'Failed to save')
+    }
   }
 
   function cancelEditing() {
     setEditing(null)
     setProfile(buildProfile(chama))
+    if (chama) {
+      setContrib({
+        amount: chama.monthly_contribution || 5000,
+        frequency: chama.contribution_frequency || 'Monthly',
+        dueDay: chama.due_day || 30,
+        grace: chama.loan_grace_period || 3,
+      })
+      setLoan({
+        maxMultiple: chama.max_loan_multiple || 3,
+        interest: chama.interest_rate || 10,
+        interestType: chama.interest_type || 'Reducing balance',
+        repayment: chama.repayment_frequency || 'Monthly',
+        grace: chama.loan_grace_period || 30,
+      })
+    }
   }
 
   return (
@@ -176,12 +206,20 @@ export default function MyChama() {
               Contribution rules
             </h3>
             {editing === 'contrib' ? (
-              <button
-                onClick={() => setEditing(null)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-forest"
-              >
-                <Check size={14} /> Done
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={cancelEditing}
+                  className="text-xs font-semibold text-ink-soft hover:text-navy"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={finishEditing}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-forest"
+                >
+                  <Check size={14} /> Done
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setEditing('contrib')}
@@ -224,12 +262,20 @@ export default function MyChama() {
               Loan rules
             </h3>
             {editing === 'loan' ? (
-              <button
-                onClick={() => setEditing(null)}
-                className="flex items-center gap-1.5 text-xs font-semibold text-forest"
-              >
-                <Check size={14} /> Done
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={cancelEditing}
+                  className="text-xs font-semibold text-ink-soft hover:text-navy"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={finishEditing}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-forest"
+                >
+                  <Check size={14} /> Done
+                </button>
+              </div>
             ) : (
               <button
                 onClick={() => setEditing('loan')}

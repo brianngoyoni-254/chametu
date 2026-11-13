@@ -30,6 +30,14 @@ def get_settings():
             'code': chama.code,
             'location': chama.type,
             'monthly_contribution': chama.monthly_contribution,
+            'due_day': chama.due_day,
+            'contribution_frequency': chama.contribution_frequency,
+            # Return the new loan fields
+            'max_loan_multiple': chama.max_loan_multiple,
+            'interest_rate': chama.interest_rate,
+            'interest_type': chama.interest_type,
+            'loan_grace_period': chama.loan_grace_period,
+            'repayment_frequency': chama.repayment_frequency,
         },
         'settings': {
             'platformName': settings.platform_name,
@@ -63,16 +71,35 @@ def update_settings():
     if not settings:
         settings = ChamaSettings(chama_id=cid)
 
+    # ---------- Chama Details ----------
     if 'name' in data and data['name']:
         chama.name = data['name']
     if 'location' in data:
         chama.type = data['location']
-    if 'monthlyContribution' in data:
+
+    # ---------- Contribution Rules ----------
+    if 'amount' in data or 'monthlyContribution' in data:
         try:
-            chama.monthly_contribution = float(data['monthlyContribution'])
+            val = data.get('amount') or data.get('monthlyContribution')
+            chama.monthly_contribution = float(val)
         except (TypeError, ValueError):
             return jsonify({'message': 'Invalid monthly contribution'}), 400
+    if 'dueDay' in data or 'due_day' in data:
+        chama.due_day = int(data.get('dueDay') or data.get('due_day') or 30)
 
+    # ---------- Loan Rules ----------
+    if 'maxMultiple' in data:
+        chama.max_loan_multiple = float(data['maxMultiple'])
+    if 'interest' in data:
+        chama.interest_rate = float(data['interest'])
+    if 'interestType' in data:
+        chama.interest_type = data['interestType']
+    if 'grace' in data:
+        chama.loan_grace_period = int(data['grace'])
+    if 'repayment' in data:
+        chama.repayment_frequency = data['repayment']
+
+    # ---------- Platform Settings ----------
     if 'platformName' in data:
         settings.platform_name = data['platformName']
     if 'supportEmail' in data:
