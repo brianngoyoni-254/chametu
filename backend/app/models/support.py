@@ -49,3 +49,17 @@ class TicketMessage(db.Model):
     body = db.Column(db.Text, nullable=False)
     internal = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+
+class TicketReadState(db.Model):
+    """Tracks when a user (or superadmin) last read a ticket to calculate unread replies."""
+    __tablename__ = 'ticket_read_states'
+
+    ticket_id = db.Column(db.String(36), db.ForeignKey('tickets.id', ondelete='CASCADE'), primary_key=True)
+    # Removed ForeignKey('users.id') so SuperAdmins can use this table too
+    user_id = db.Column(db.String(36), primary_key=True)
+    last_read_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        db.Index('ix_ticket_read_states_user', 'user_id'),
+    )

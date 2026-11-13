@@ -297,21 +297,17 @@ export function ChamaProvider({ children }) {
   const can = useCallback((permKey) => Boolean(permissions[permKey]), [permissions])
 
   // `updateChama` patches local chama state AND persists to backend via
-  // the two endpoints that own those fields (settings + chama details).
+  // the settings endpoint, then refreshes to sync across all roles.
   const updateChama = useCallback(async (patch) => {
     try {
-      const body = {}
-      if (patch.name !== undefined) body.name = patch.name
-      if (patch.location !== undefined) body.location = patch.location
-      if (Object.keys(body).length > 0) {
-        await api('/api/settings/', { method: 'PUT', body })
-      }
+      await api('/api/settings/', { method: 'PUT', body: patch })
       setChama((prev) => (prev ? { ...prev, ...patch } : prev))
+      await refreshChama()
       return { ok: true }
     } catch (err) {
       return { ok: false, message: err.message }
     }
-  }, [])
+  }, [refreshChama])
 
   const value = useMemo(() => ({
     chama, members, loans, roles, currentMember, sharedData,

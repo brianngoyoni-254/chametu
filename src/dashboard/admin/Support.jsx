@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
 import { useAuth } from '../../context/AuthContext'
 import { api } from '../../lib/api'
+import { fmtDate, fmtRelative } from '../../lib/time'
 
 const STATUS_META = {
   open: { label: 'Open', cls: 'bg-blue-100 text-blue-700' },
@@ -22,19 +23,6 @@ const PRIORITY_META = {
   urgent: 'bg-red-100 text-red-700',
 }
 
-const fmtRelative = (iso) => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const m = Math.floor(diff / 60000)
-  if (m < 1) return 'just now'
-  if (m < 60) return `${m}m ago`
-  const h = Math.floor(m / 60)
-  if (h < 24) return `${h}h ago`
-  return `${Math.floor(h / 24)}d ago`
-}
-const fmtDate = (iso) =>
-  new Date(iso).toLocaleString('en-GB', {
-    day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-  })
 const initials = (name) =>
   (name || '??').split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -378,7 +366,6 @@ function TicketModal({ ticket, onClose, onReply, onStatus }) {
           </button>
         </div>
 
-        {/* Status changer */}
         <div className="flex flex-wrap items-center gap-2 border-b border-line bg-paper/40 px-5 py-2.5">
           <span className="text-[0.72rem] font-semibold text-ink-soft">Status:</span>
           {statusOptions.map((s) => (

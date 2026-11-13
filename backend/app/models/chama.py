@@ -26,6 +26,13 @@ class Chama(db.Model):
     due_weekday = db.Column(db.Integer, default=1) # 0=Mon..6=Sun, for weekly
     late_fee = db.Column(db.Float, default=100.0)
 
+    # ---------- Loan rules ----------
+    max_loan_multiple = db.Column(db.Float, default=3.0)
+    interest_rate = db.Column(db.Float, default=10.0)
+    interest_type = db.Column(db.String(50), default='Reducing balance')
+    loan_grace_period = db.Column(db.Integer, default=30)
+    repayment_frequency = db.Column(db.String(20), default='Monthly')
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     members = db.relationship('Member', backref='chama', lazy=True)
     roles = db.relationship('Role', backref='chama', lazy=True, cascade="all, delete-orphan")

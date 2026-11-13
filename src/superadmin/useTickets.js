@@ -93,6 +93,15 @@ export function useTickets() {
     }
   }, [fetchTickets])
 
+  const markRead = useCallback(async (id) => {
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      await api(`/api/superadmin/tickets/${id}/read`, { method: 'POST', token })
+    } catch (err) {
+      console.error('Failed to mark as read', err)
+    }
+  }, [])
+
   const bulkUpdate = useCallback(async (ids, patch) => {
     for (const id of ids) {
       await update(id, patch)
@@ -112,5 +121,5 @@ export function useTickets() {
     }).length,
   }
 
-  return { tickets, loading, create, update, addMessage, bulkUpdate, remove, stats, refetch: fetchTickets }
+  return { tickets, loading, create, update, addMessage, bulkUpdate, remove, stats, markRead, refetch: fetchTickets }
 }

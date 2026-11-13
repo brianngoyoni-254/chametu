@@ -27,7 +27,8 @@ def _is_admin():
 @jwt_required()
 def list_all_tickets():
     """Admin sees every ticket from the chama."""
-    tickets = support_service.list_chama_tickets(_cid())
+    # Added viewer_user_id to calculate unread count
+    tickets = support_service.list_chama_tickets(_cid(), viewer_user_id=_uid())
     return jsonify(tickets), 200
 
 
@@ -51,19 +52,17 @@ def create_ticket():
 
     # ---------- NOTIFICATION LOGIC ----------
     try:
-        # Detect the special "I've Paid" contribution notification
-        is_contribution_notice = 'Contribution Payment from' in (ticket.subject or '')
+        is_contribution_notice = 'Contribution Payment from' in (ticket.get('subject') or '')
         
         title = 'Payment Confirmation' if is_contribution_notice else 'New support ticket'
         body = (
-            f"{ticket.requester_name or 'A member'} has submitted a payment confirmation and needs review."
+            f"{ticket.get('requester') or 'A member'} has submitted a payment confirmation and needs review."
             if is_contribution_notice
-            else f"{ticket.requester_name or 'A member'} raised a ticket: {ticket.subject}"
+            else f"{ticket.get('requester') or 'A member'} raised a ticket: {ticket.get('subject')}"
         )
         notif_type = 'success' if is_contribution_notice else 'warning'
         event = 'payments' if is_contribution_notice else 'system'
         
-        # Notify every admin (Chairman, Treasurer, Secretary)
         notif_svc.notify_chama_admins(
             chama_id=_cid(),
             type=notif_type,
@@ -73,8 +72,6 @@ def create_ticket():
             link='/dashboard/support',
         )
         
-        # If this is a real support ticket (not a payment), also notify the member
-        # that their ticket was received.
         if not is_contribution_notice:
             notif_svc.notify_member(
                 chama_id=_cid(),
@@ -88,15 +85,15 @@ def create_ticket():
     except Exception:
         logger.exception('Failed to notify admins about new ticket')
 
-    return jsonify(support_service.serialize_ticket(ticket, full=True)), 201
+    return jsonify(ticket), 201
 
 
 @support_bp.route('/<ticket_id>', methods=['GET'])
 @jwt_required()
 def get_ticket(ticket_id):
     try:
-        ticket = support_service.get_ticket(_cid(), ticket_id)
-        return jsonify(support_service.serialize_ticket(ticket, full=True)), 200
+        ticket = support_service.get_ticket(_cid(), ticket_id, viewer_user_id=_uid())
+        return jsonify(ticket), 200
     except ValueError as e:
         return jsonify({'message': str(e)}), 404
 
@@ -114,10 +111,10 @@ def add_reply(ticket_id):
             ticket_id=ticket_id,
             user_id=_uid(),
             body=data.get('body'),
-            role=data.get('role', 'agent'),
+            as_agent=True,
             internal=data.get('internal', False),
         )
-        return jsonify(support_service.serialize_ticket(ticket, full=True)), 201
+        return jsonify(ticket), 201
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
 
@@ -130,8 +127,18 @@ def update_status(ticket_id):
         return jsonify({'message': 'Unauthorized'}), 403
     data = request.get_json() or {}
     try:
-        ticket = support_service.set_status(_cid(), ticket_id, data.get('status'))
-        return jsonify(support_service.serialize_ticket(ticket, full=True)), 200
+        ticket = support_service.update_status(_cid(), ticket_id, data.get('status'), actor_user_id=_uid())
+        return jsonify(ticket), 200
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
+
+
+@support_bp.route('/<ticket_id>/read', methods=['POST'])
+@jwt_required()
+def mark_ticket_read(ticket_id):
+    try:
+        support_service.mark_read(_cid(), ticket_id, _uid())
+        return jsonify({'ok': True}), 200
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
 
@@ -140,7 +147,7 @@ def update_status(ticket_id):
 @support_bp.route('/me', methods=['GET'])
 @jwt_required()
 def list_my_tickets():
-    tickets = support_service.list_user_tickets(_cid(), _uid())
+    tickets = support_service.list_my_tickets(_cid(), _uid())
     return jsonify(tickets), 200
 
 
@@ -161,16 +168,14 @@ def create_my_ticket():
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
 
-    # ---------- NOTIFICATION LOGIC ----------
     try:
-        # Same detection: the member portal uses the same "I've Paid" pattern
-        is_contribution_notice = 'Contribution Payment from' in (ticket.subject or '')
+        is_contribution_notice = 'Contribution Payment from' in (ticket.get('subject') or '')
         
         title = 'Payment Confirmation' if is_contribution_notice else 'New support ticket'
         body = (
-            f"{ticket.requester_name or 'A member'} has submitted a payment confirmation and needs review."
+            f"{ticket.get('requester') or 'A member'} has submitted a payment confirmation and needs review."
             if is_contribution_notice
-            else f"{ticket.requester_name or 'A member'} raised a ticket: {ticket.subject}"
+            else f"{ticket.get('requester') or 'A member'} raised a ticket: {ticket.get('subject')}"
         )
         notif_type = 'success' if is_contribution_notice else 'warning'
         event = 'payments' if is_contribution_notice else 'system'
@@ -186,7 +191,7 @@ def create_my_ticket():
     except Exception:
         logger.exception('Failed to notify admins about member ticket')
 
-    return jsonify(support_service.serialize_ticket(ticket, full=True)), 201
+    return jsonify(ticket), 201
 
 
 @support_bp.route('/me/<ticket_id>/messages', methods=['POST'])
@@ -200,9 +205,30 @@ def add_my_reply(ticket_id):
             ticket_id=ticket_id,
             user_id=_uid(),
             body=data.get('body'),
-            role='user',
+            as_agent=False,
             internal=False,
         )
-        return jsonify(support_service.serialize_ticket(ticket, full=True)), 201
+        return jsonify(ticket), 201
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
+
+
+@support_bp.route('/me/<ticket_id>/read', methods=['POST'])
+@jwt_required()
+def mark_my_ticket_read(ticket_id):
+    try:
+        support_service.mark_read(_cid(), ticket_id, _uid())
+        return jsonify({'ok': True}), 200
+    except ValueError as e:
+        return jsonify({'message': str(e)}), 400
+
+
+@support_bp.route('/me/<ticket_id>', methods=['DELETE'])
+@jwt_required()
+@log_writes(logger, 'support.member_delete')
+def delete_my_ticket(ticket_id):
+    try:
+        support_service.delete_ticket(_cid(), ticket_id, _uid())
+        return jsonify({'message': 'Ticket deleted'}), 200
     except ValueError as e:
         return jsonify({'message': str(e)}), 400
