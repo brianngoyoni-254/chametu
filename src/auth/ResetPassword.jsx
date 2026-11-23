@@ -7,17 +7,7 @@ import { toast } from 'sonner'
 import { useAuth } from '../context/AuthContext'
 import logo from '../assets/logos.png'
 
-const CODE_KEY = 'chametu_reset_code'
 const CODE_LENGTH = 6
-
-function readReset() {
-  try {
-    const raw = sessionStorage.getItem(CODE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
 
 function strength(pw) {
   if (!pw) return 0
@@ -32,7 +22,7 @@ function strength(pw) {
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const { login } = useAuth()
+  const { resetPassword, forgotPassword } = useAuth()
 
   const emailFromUrl = params.get('email') || ''
   const [email, setEmail] = useState(emailFromUrl)
@@ -95,19 +85,18 @@ export default function ResetPassword() {
     inputsRef.current[Math.min(text.length, CODE_LENGTH - 1)]?.focus()
   }
 
-  const resend = () => {
-    const code = String(Math.floor(100000 + Math.random() * 900000))
+  const resend = async () => {
     const target = email.trim().toLowerCase()
+    if (!target) return setError('Enter your email first.')
+    
     try {
-      sessionStorage.setItem(
-        CODE_KEY,
-        JSON.stringify({ email: target, code, expiresAt: Date.now() + 10 * 60_000 })
-      )
-    } catch {}
-    toast.success(`New code sent to ${target}`)
-    toast.info(`Demo code: ${code}`, { duration: 12000 })
-    setDigits(Array(CODE_LENGTH).fill(''))
-    inputsRef.current[0]?.focus()
+      await forgotPassword(target)
+      toast.success(`New code sent to ${target}`)
+      setDigits(Array(CODE_LENGTH).fill(''))
+      inputsRef.current[0]?.focus()
+    } catch (err) {
+      toast.error(err?.message || 'Failed to resend code.')
+    }
   }
 
   /* ---------- submit ---------- */
@@ -124,30 +113,11 @@ export default function ResetPassword() {
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (password !== confirm) return setError('Passwords do not match.')
 
-    const reset = readReset()
-    if (!reset) {
-      return setError('No reset session found. Request a new code.')
-    }
-    if (reset.email !== target) {
-      return setError("The email doesn't match the one you requested the code for.")
-    }
-    if (Date.now() > reset.expiresAt) {
-      return setError('The code has expired. Request a new one.')
-    }
-    if (reset.code !== entered) {
-      return setError('Incorrect code. Check the number and try again.')
-    }
-
     setBusy(true)
     try {
-      // Demo mode: AuthContext accepts any password, so we just sign them in.
-      // In production this would be POST /auth/reset-password { email, code, newPassword }.
-      await login({ email: target, password })
-      try {
-        sessionStorage.removeItem(CODE_KEY)
-      } catch {}
+      await resetPassword(target, entered, password)
       toast.success('Password updated. Welcome back!')
-      navigate('/dashboard', { replace: true })
+      navigate('/login', { replace: true })
     } catch (err) {
       setError(err?.message || 'Could not update your password. Try again.')
     } finally {
@@ -352,10 +322,10 @@ export default function ResetPassword() {
             )}
           </form>
 
-          <p className="text-[0.76rem] text-ink-soft text-center mt-6 leading-relaxed">
+          {/* <p className="text-[0.76rem] text-ink-soft text-center mt-6 leading-relaxed">
             <b className="text-navy">Demo:</b> codes are shown in a toast. In production, verify
             server-side and rate-limit to 5 attempts per hour per email.
-          </p>
+          </p> */}
         </div>
       </main>
     </div>
