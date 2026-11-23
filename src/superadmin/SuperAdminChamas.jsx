@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, Download, X, Building2, MapPin, User, Users, CreditCard, RefreshCw, Phone } from 'lucide-react'
+import { Search, Download, X, Building2, MapPin, User, Users, CreditCard, RefreshCw, Phone, Clock, ShieldAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
 
-const TABS = ['All', 'Active', 'Overdue', 'Deactivated', 'Blocked']
+const TABS = ['All', 'Active', 'Trialing', 'Trial Expired', 'Overdue', 'Deactivated', 'Blocked']
 
 const statusLabel = (s) => {
   if (s.status === 'blocked') return 'Blocked'
   if (s.status === 'deactivated') return 'Deactivated'
+  if (s.trial_status === 'expired') return 'Trial Expired'
+  if (s.trial_status === 'trialing') return 'Trialing'
   if (s.od > 0) return 'Overdue'
   return 'Active'
 }
@@ -16,6 +18,8 @@ const statusBadge = (label) => {
   if (label === 'Blocked') return 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'
   if (label === 'Deactivated') return 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
   if (label === 'Overdue') return 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'
+  if (label === 'Trialing') return 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
+  if (label === 'Trial Expired') return 'bg-red-200 text-red-800 dark:bg-red-600/30 dark:text-red-300'
   return 'bg-gray-100'
 }
 const tierBadge = (tier) => {
@@ -71,6 +75,21 @@ export default function SuperAdminChamas() {
     a.href = url; a.download = `chametu-chamas-${new Date().toISOString().slice(0, 10)}.csv`
     document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url)
     toast.success('Export Complete', { description: `Downloaded ${filtered.length} chama(s).` })
+  }
+
+  const handleExtendTrial = async (id, name) => {
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      await api('/api/superadmin/billing/action', {
+        method: 'POST', token,
+        body: { chama_id: id, action: 'extend_trial' }
+      })
+      toast.success('Trial Extended', { description: `${name} has been granted 7 more days.` })
+      setSelected(null)
+      await fetchChamas()
+    } catch (err) {
+      toast.error(err.message)
+    }
   }
 
   return (
@@ -133,7 +152,12 @@ export default function SuperAdminChamas() {
                 <div className="mt-2.5 grid grid-cols-3 gap-2 text-[0.72rem]">
                   <div><span className="block text-ink-soft">Tier</span><span className={`mt-0.5 inline-flex rounded px-1.5 py-0.5 text-[0.66rem] font-bold ${tierBadge(c.tier)}`}>{c.tier}</span></div>
                   <div><span className="block text-ink-soft">Members</span><span className="font-mono font-semibold text-navy dark:text-white">{c.m}</span></div>
-                  <div><span className="block text-ink-soft">Billing</span><span className={`font-semibold ${c.od === 0 ? 'text-forest dark:text-emerald' : 'text-red-600'}`}>{c.od > 0 ? `Overdue ${c.od}d` : 'Paid'}</span></div>
+                  <div>
+                    <span className="block text-ink-soft">{c.trial_status === 'trialing' ? 'Trial Ends' : 'Billing'}</span>
+                    <span className={`font-semibold ${c.od === 0 ? 'text-forest dark:text-emerald' : 'text-red-600'}`}>
+                      {c.trial_status === 'trialing' ? `${c.days_left} days` : c.od > 0 ? `Overdue ${c.od}d` : 'Paid'}
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2.5">
                   <div className="flex items-center justify-between text-[0.68rem] text-ink-soft"><span>Collection</span><span className="font-mono">{c.col}%</span></div>
@@ -157,7 +181,7 @@ export default function SuperAdminChamas() {
                 <th className="px-4 py-3 font-semibold lg:px-5">Tier</th>
                 <th className="px-4 py-3 font-semibold lg:px-5">Members</th>
                 <th className="px-4 py-3 font-semibold lg:px-5 w-44">Collection</th>
-                <th className="px-4 py-3 font-semibold lg:px-5">Billing</th>
+                <th className="px-4 py-3 font-semibold lg:px-5">Billing / Trial</th>
                 <th className="px-4 py-3 font-semibold lg:px-5">Status</th>
                 <th className="px-4 py-3 text-right font-semibold lg:px-5">Actions</th>
               </tr>
@@ -184,9 +208,19 @@ export default function SuperAdminChamas() {
                       </div>
                     </td>
                     <td className="px-4 py-3 lg:px-5 lg:py-4">
-                      <span className={`font-semibold ${c.od === 0 ? 'text-forest dark:text-emerald' : 'text-red-600 dark:text-red-400'}`}>
-                        {c.od > 0 ? `Overdue ${c.od}d` : 'Paid'}
-                      </span>
+                      {c.trial_status === 'trialing' ? (
+                        <span className="flex items-center gap-1 text-blue-600 dark:text-blue-400 font-semibold text-[0.8rem]">
+                          <Clock size={13} /> {c.days_left} days left
+                        </span>
+                      ) : c.trial_status === 'expired' ? (
+                        <span className="flex items-center gap-1 text-red-600 dark:text-red-400 font-semibold text-[0.8rem]">
+                          <ShieldAlert size={13} /> Trial Expired
+                        </span>
+                      ) : (
+                        <span className={`font-semibold ${c.od === 0 ? 'text-forest dark:text-emerald' : 'text-red-600 dark:text-red-400'}`}>
+                          {c.od > 0 ? `Overdue ${c.od}d` : 'Paid'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 lg:px-5 lg:py-4"><span className={`inline-flex rounded-md px-2.5 py-1 text-[0.68rem] font-bold ${statusBadge(label)}`}>{label}</span></td>
                     <td className="px-4 py-3 lg:px-5 lg:py-4 text-right">
@@ -221,6 +255,7 @@ export default function SuperAdminChamas() {
                   { icon: User, label: 'Chairperson', val: selected.chair },
                   { icon: Phone, label: 'Phone Number', val: selected.chair_phone },
                   { icon: Users, label: 'Members', val: `${selected.active} active · ${selected.m} total`, fullWidth: true },
+                  { icon: Clock, label: 'Trial Status', val: selected.trial_status === 'trialing' ? `${selected.days_left} days remaining` : selected.trial_status === 'expired' ? 'Expired' : 'Not on trial', fullWidth: true },
                 ].map((x) => (
                   <div key={x.label} className={`rounded-xl border border-line p-2.5 dark:border-white/10 sm:p-3 ${x.fullWidth ? 'col-span-2' : ''}`}>
                     <div className="flex items-center gap-1.5 text-[0.62rem] font-semibold uppercase tracking-wider text-ink-soft sm:text-[0.68rem]"><x.icon size={11} /> {x.label}</div>
@@ -237,6 +272,22 @@ export default function SuperAdminChamas() {
                   <div className={`h-full rounded-full ${progressColor(selected.col)}`} style={{ width: `${selected.col}%` }} />
                 </div>
               </div>
+
+              {/* Trial Actions */}
+              {(selected.trial_status === 'expired' || selected.trial_status === 'trialing' || selected.status === 'blocked') && (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/30 dark:bg-blue-900/10">
+                  <h4 className="text-[0.8rem] font-bold text-blue-800 dark:text-blue-300 mb-2">Trial Management</h4>
+                  <p className="text-[0.72rem] text-blue-700 dark:text-blue-400 mb-3">
+                    If this chama needs more time, you can extend their trial by 7 days and unblock their account.
+                  </p>
+                  <button 
+                    onClick={() => handleExtendTrial(selected.id, selected.name)}
+                    className="w-full rounded-lg bg-blue-600 py-2 text-[0.8rem] font-semibold text-white hover:bg-blue-700 transition"
+                  >
+                    Extend Trial by 7 Days & Unblock
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex justify-end border-t border-line bg-paper/50 px-4 py-3 dark:border-white/10 dark:bg-white/5 sm:px-5 sm:py-4">
               <button onClick={() => setSelected(null)} className="rounded-xl border border-line bg-white dark:border-white/10 dark:bg-white/5 px-4 py-2 text-sm font-semibold text-navy dark:text-white">Close</button>

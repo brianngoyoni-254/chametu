@@ -13,9 +13,10 @@ from app.models.billing import SubscriptionPayment
 from app.models.support import Ticket, TicketMessage, TicketReadState
 from app.models.settings import PlatformSettings
 from app.models.chat import ChatSession
+from app.models.trial import ChamaTrial
 from app.services.email_service import send_email
 from app.services.intasend import send_stk_push, generate_checkout_link
-from app.services import support_service
+from app.services import support_service, trial_service
 
 superadmin_bp = Blueprint('superadmin', __name__)
 logger = logging.getLogger(__name__)
@@ -153,6 +154,12 @@ def get_all_chamas():
                 else:
                     chair_phone = chair_member.phone or '—'
 
+            # Fetch Trial Info
+            trial_info = trial_service.get_status(c.id)
+            trial_status = trial_info['status'] if trial_info else 'none'
+            trial_ends = trial_info['endsAt'] if trial_info else None
+            days_left = trial_info['daysLeft'] if trial_info else 0
+
             result.append({
                 'id': c.id,
                 'name': c.name,
@@ -166,7 +173,10 @@ def get_all_chamas():
                 'col': 100 if active_members > 0 else 0,
                 'od': 0,
                 'sav': 0,
-                'status': 'active',
+                'status': 'active' if not c.is_blocked else 'blocked',
+                'trial_status': trial_status,
+                'trial_ends': trial_ends,
+                'days_left': days_left,
             })
 
         return jsonify(result), 200
@@ -256,15 +266,28 @@ def get_billing():
                 SubscriptionPayment.completed_at >= datetime.utcnow() - timedelta(days=30),
             ).all()
         }
+        
         for c in Chama.query.all():
             if c.id in paid_recently:
                 continue
+                
+            # Check trial status
+            trial_info = trial_service.get_status(c.id)
+            trial_status = trial_info['status'] if trial_info else 'none'
+            days_left = trial_info['daysLeft'] if trial_info else 0
+            
             days_since_creation = (datetime.utcnow() - c.created_at).days
             is_overdue = days_since_creation > 30
 
             if c.is_blocked:
                 status = 'Blocked'
                 days_overdue = max(0, days_since_creation - 30)
+            elif trial_status == 'expired':
+                status = 'Trial Expired'
+                days_overdue = 0 
+            elif trial_status == 'trialing' and days_left <= 3:
+                status = 'Trial Ending'
+                days_overdue = 0
             elif is_overdue:
                 status = 'Overdue'
                 days_overdue = days_since_creation - 30
@@ -282,6 +305,8 @@ def get_billing():
                 'daysOverdue': days_overdue,
                 'amount': tier_prices.get(c.base_tier, 500),
                 'status': status,
+                'trial_status': trial_status,
+                'days_left': days_left
             })
 
         return jsonify(invoices), 200
@@ -373,6 +398,17 @@ def billing_action():
     if action == 'mark_paid':
         logger.info("Chama %s invoice marked paid", chama.code)
         return jsonify({"message": f"Invoice for {chama.name} cleared"}), 200
+
+    if action == 'extend_trial':
+        trial = ChamaTrial.query.filter_by(chama_id=chama_id).first()
+        if not trial:
+            return jsonify({"message": "No trial found for this chama"}), 404
+        trial.status = 'trialing'
+        trial.ends_at = datetime.utcnow() + timedelta(days=7)
+        chama.is_blocked = False
+        db.session.commit()
+        logger.info("Trial extended for Chama %s", chama.code)
+        return jsonify({"message": f"Trial extended for {chama.name} by 7 days"}), 200
 
     return jsonify({"message": "Invalid action"}), 400
 
