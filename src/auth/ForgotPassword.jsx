@@ -2,29 +2,17 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Sun, Moon, Mail, ArrowLeft, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
+import { useAuth } from '../context/AuthContext'
 import logo from '../assets/logos.png'
-
-const MEMBERS_KEY = 'chametu_members_v2'
-const CHAMA_KEY = 'chametu_chama_v1'
-const CODE_KEY = 'chametu_reset_code'
 
 function isValidEmail(v) {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
 }
 
-function emailExists(email) {
-  const target = email.trim().toLowerCase()
-  try {
-    const members = JSON.parse(localStorage.getItem(MEMBERS_KEY)) || []
-    if (members.some((m) => m.email?.toLowerCase() === target)) return true
-    const chama = JSON.parse(localStorage.getItem(CHAMA_KEY))
-    if (chama?.email?.toLowerCase() === target) return true
-  } catch {}
-  return false
-}
-
 export default function ForgotPassword() {
   const navigate = useNavigate()
+  const { forgotPassword } = useAuth()
+  
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -38,26 +26,14 @@ export default function ForgotPassword() {
 
     setBusy(true)
     try {
-      // Generate a 6-digit code and stash it for the next screen
-      const code = String(Math.floor(100000 + Math.random() * 900000))
-      const found = emailExists(trimmed)
-
-      try {
-        sessionStorage.setItem(
-          CODE_KEY,
-          JSON.stringify({ email: trimmed, code, expiresAt: Date.now() + 10 * 60_000 })
-        )
-      } catch {}
-
-      if (found) {
-        toast.success(`Reset code sent to ${trimmed}`, { duration: 6000 })
-        toast.info(`Demo code: ${code}`, { duration: 12000 })
-      } else {
-        // Don't reveal whether the account exists — same UX either way
-        toast.success(`If ${trimmed} is registered, a code has been sent`, { duration: 6000 })
-        toast.info(`Demo code (try it anyway): ${code}`, { duration: 12000 })
-      }
-
+      await forgotPassword(trimmed)
+      
+      toast.success('Reset code sent', {
+        description: 'Check your email for the 6-digit code.',
+        duration: 6000,
+      })
+      
+      // Pass the email to the next screen
       navigate(`/reset-password?email=${encodeURIComponent(trimmed)}`)
     } catch (err) {
       setError(err?.message || 'Could not send the code. Try again.')
@@ -100,7 +76,7 @@ export default function ForgotPassword() {
             Your chama's data stays safe.
           </div>
           <p className="text-[0.86rem] text-white/75 mt-2 leading-relaxed">
-            Codes expire in 10 minutes. We never email your existing password — only a code you
+            Codes expire in 15 minutes. We never email your existing password — only a code you
             use to set a new one.
           </p>
         </div>
@@ -162,10 +138,9 @@ export default function ForgotPassword() {
             )}
           </form>
 
-          <p className="text-[0.76rem] text-ink-soft text-center mt-6 leading-relaxed">
-            <b className="text-navy">Demo:</b> the code is shown in a toast above. In production it
-            would arrive by email from Chametu.
-          </p>
+          {/* <p className="text-[0.76rem] text-ink-soft text-center mt-6 leading-relaxed">
+            <b className="text-navy">Demo:</b> codes are shown in a toast. In production, verify server-side and rate-limit to 5 attempts per hour per email.
+          </p> */}
         </div>
       </main>
     </div>

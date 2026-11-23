@@ -108,6 +108,21 @@ export function AuthProvider({ children }) {
     notifyAuthChanged()
   }
 
+  // --- NEW: Password Reset Methods ---
+  const forgotPassword = async (email) => {
+    return await api('/api/auth/forgot-password', {
+      method: 'POST',
+      body: { email },
+    })
+  }
+
+  const resetPassword = async (email, code, newPassword) => {
+    return await api('/api/auth/reset-password', {
+      method: 'POST',
+      body: { email, code, newPassword },
+    })
+  }
+
   const value = {
     user,
     isAuthenticated: !!user,
@@ -117,6 +132,8 @@ export function AuthProvider({ children }) {
     logout,
     refreshProfile,
     updateUser,
+    forgotPassword,
+    resetPassword,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

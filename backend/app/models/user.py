@@ -16,6 +16,10 @@ class User(db.Model):
     memberships = db.relationship('Member', backref='user', lazy=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # --- Password Reset Fields ---
+    reset_code = db.Column(db.String(6), nullable=True)
+    reset_code_expires = db.Column(db.DateTime, nullable=True)
+
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 

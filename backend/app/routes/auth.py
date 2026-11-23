@@ -1,5 +1,8 @@
 # app/routes/auth.py
 import logging
+import random
+import string
+from datetime import datetime, timedelta
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import (
@@ -11,6 +14,7 @@ from app.models.user import User
 from app.models.chama import Chama, Member
 from app.logging_utils import log_writes
 from app.services import member_service, trial_service
+from app.services.email_service import send_email
 
 auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -229,3 +233,89 @@ def change_password():
     db.session.commit()
     logger.info('password changed for %s', user.email)
     return jsonify({"message": "Password updated successfully"}), 200
+
+
+# ---------------------------------------------------------------------
+# PASSWORD RESET
+# ---------------------------------------------------------------------
+@auth_bp.route("/forgot-password", methods=["POST"])
+@log_writes(logger, 'auth.forgot_password')
+def forgot_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").lower().strip()
+
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        # Return 200 even if user not found for security
+        return jsonify({"message": "If that email is registered, a reset code has been sent."}), 200
+
+    # Generate a 6-digit code
+    code = ''.join(random.choices(string.digits, k=6))
+    user.reset_code = code
+    user.reset_code_expires = datetime.utcnow() + timedelta(minutes=15)
+    db.session.commit()
+
+    subject = "Chametu Password Reset Code"
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #0B1F33; padding: 20px;">
+        <h2 style="color: #0B7A5A; margin-top: 0;">Reset Your Password</h2>
+        <p>Hi {user.name},</p>
+        <p>We received a request to reset your Chametu password. Use the code below to proceed:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0B7A5A; background: #F0FDF4; padding: 10px 20px; border-radius: 8px;">
+                {code}
+            </span>
+        </div>
+        <p>This code will expire in 15 minutes. If you didn't request a password reset, you can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #E3E9EF; margin: 20px 0;">
+        <p style="font-size: 13px; color: #64748B;">Thank you,<br/>The Chametu Team</p>
+    </div>
+    """
+    
+    send_email(user.email, subject, html)
+
+    logger.info('Password reset code sent to %s', user.email)
+    return jsonify({"message": "If that email is registered, a reset code has been sent."}), 200
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+@log_writes(logger, 'auth.reset_password')
+def reset_password():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").lower().strip()
+    code = (data.get("code") or "").strip()
+    new_password = data.get("newPassword")
+
+    if not email or not code or not new_password:
+        return jsonify({"message": "Email, code, and new password are required"}), 400
+
+    if len(new_password) < 6:
+        return jsonify({"message": "Password must be at least 6 characters"}), 400
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        return jsonify({"message": "Invalid request"}), 400
+
+    if user.reset_code != code:
+        return jsonify({"message": "Invalid reset code"}), 400
+
+    # FIXED: Handle timezone-aware datetime from Neon DB
+    if user.reset_code_expires:
+        expires = user.reset_code_expires
+        if expires.tzinfo is not None:
+            expires = expires.replace(tzinfo=None)
+        
+        if expires < datetime.utcnow():
+            return jsonify({"message": "Reset code has expired. Please request a new one."}), 400
+
+    # Update password and clear the reset code
+    user.set_password(new_password)
+    user.reset_code = None
+    user.reset_code_expires = None
+    db.session.commit()
+
+    logger.info('Password successfully reset for %s', user.email)
+    return jsonify({"message": "Password reset successfully. You can now log in."}), 200
