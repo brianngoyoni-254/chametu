@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Search, Smartphone, CheckCircle2, AlertCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
+import { useTrial } from '../../context/TrialContext'
 import { ledgerApi } from '../../lib/ledgerApi'
 
 const statusStyle = {
@@ -13,6 +14,8 @@ const fmt = (n) => 'KSh ' + Number(n).toLocaleString('en-KE')
 
 export default function Payments() {
   const { members } = useChama()
+  const { markPaid } = useTrial()
+
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -42,6 +45,9 @@ export default function Payments() {
     try {
       await ledgerApi.matchPayment(paymentId, memberId)
       toast.success('Payment matched')
+      // ADDED: a match can be a plan payment — re-sync trial so the lock
+      // lifts instantly without a page reload.
+      try { markPaid() } catch {}
       refresh()
     } catch (err) {
       toast.error(err.message)

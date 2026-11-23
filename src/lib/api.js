@@ -8,7 +8,7 @@ export async function api(
   // Automatically grab the token from storage if not explicitly passed.
   // This removes the need to manually pass localStorage tokens in every component.
   const authToken = token || localStorage.getItem('auth_token')
-  
+
   const headers = { 'Content-Type': 'application/json', ...(extraHeaders || {}) }
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`
 
@@ -29,9 +29,13 @@ export async function api(
 
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    throw new Error(
+    const err = new Error(
       data.message || data.detail || `Request failed (${res.status})`,
     )
+    err.status = res.status          // ADDED — used by TrialContext to detect 402/403
+    err.statusCode = res.status      // ADDED — alias for safety
+    err.data = data                  // ADDED — e.g. { endsAt, tier } on 402
+    throw err
   }
   return data
 }

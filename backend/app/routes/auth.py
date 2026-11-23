@@ -10,7 +10,7 @@ from app import db
 from app.models.user import User
 from app.models.chama import Chama, Member
 from app.logging_utils import log_writes
-from app.services import member_service
+from app.services import member_service, trial_service
 
 auth_bp = Blueprint("auth", __name__)
 logger = logging.getLogger(__name__)
@@ -27,7 +27,6 @@ def _portal_for(role: str) -> str:
 # ---------------------------------------------------------------------
 @auth_bp.route("/invites/<chama_code>/<token>", methods=["GET"])
 def verify_invite(chama_code, token):
-    """Checks if the invite link is valid and returns chama details."""
     try:
         data = member_service.verify_chama_invite(chama_code, token)
         return jsonify(data), 200
@@ -38,7 +37,6 @@ def verify_invite(chama_code, token):
 @auth_bp.route("/accept-invite", methods=["POST"])
 @log_writes(logger, 'auth.invite_accept')
 def accept_invite():
-    """Creates a new user account from an invite and logs them in."""
     data = request.get_json() or {}
 
     email = (data.get("email") or "").lower().strip()
@@ -52,7 +50,6 @@ def accept_invite():
     if not email or not name or len(password) < 6 or not chama_code:
         return jsonify({"message": "Name, email, password and chama code are required"}), 400
 
-    # Blocked chama check
     chama = Chama.query.filter_by(code=chama_code).first()
     if chama and chama.is_blocked:
         return jsonify({"message": "This chama account is suspended. Please contact the chairman or support."}), 403
@@ -94,14 +91,6 @@ def accept_invite():
 
 
 # ---------------------------------------------------------------------
-# NOTE: there is intentionally no /register endpoint here.
-# Every chama starts with a paid plan: sign-up goes through
-# POST /api/billing/signup/checkout (routes/billing.py), which only creates the
-# account and chama after the M-Pesa payment is confirmed.
-# ---------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------
 # LOGIN
 # ---------------------------------------------------------------------
 @auth_bp.route("/login", methods=["POST"])
@@ -132,7 +121,6 @@ def login():
         )
         return jsonify({"message": "Chama not found"}), 404
 
-    # Blocked chama check
     if chama.is_blocked:
         logger.warning('login blocked: chama %s is suspended (user=%s, role=%s)',
                        chama.code, email, member.role)
@@ -151,6 +139,8 @@ def login():
             "portal": portal,
         },
     )
+
+    trial_status = trial_service.get_status(chama.id)
 
     logger.info(
         'login ok: user=%s role=%s chama=%s',
@@ -175,6 +165,7 @@ def login():
             "monthly_contribution": chama.monthly_contribution,
             "due_day": chama.due_day,
         },
+        "trial": trial_status,
     }), 200
 
 

@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 
 from app.models.billing import SubscriptionPayment
 from app.services import billing_service as svc
-from app.services import rewards_service
+from app.services import rewards_service, trial_service
 
 billing_bp = Blueprint('billing', __name__)
 logger = logging.getLogger(__name__)
@@ -23,15 +23,10 @@ def _is_admin():
 
 
 # ---------------------------------------------------------------------
-# PAY-FIRST SIGNUP (public: the chama does not exist yet)
+# PAY-FIRST SIGNUP (existing)
 # ---------------------------------------------------------------------
 @billing_bp.route('/signup/checkout', methods=['POST'])
 def signup_checkout():
-    """
-    Start a new chama signup. Sends the M-Pesa STK push; the account and chama
-    are only created once the payment is confirmed.
-    Body: {name, email, password, phone, chama_name, tier}
-    """
     data = request.get_json(silent=True) or {}
     try:
         ps = svc.start_signup_payment(
@@ -50,17 +45,12 @@ def signup_checkout():
     return jsonify({
         'message': 'Check your phone and enter your M-Pesa PIN to complete payment.',
         'signup': svc.serialize_signup(ps),
-        'claim': ps.claim_token,   # shown once; required to poll this signup
+        'claim': ps.claim_token,
     }), 201
 
 
 @billing_bp.route('/signup/<signup_id>/status', methods=['POST'])
 def signup_status(signup_id):
-    """
-    Poll every ~3s. Reconciles with IntaSend. Once paid, returns `session`
-    (token + user + chama) so the browser can log the new chairman straight in.
-    Body: {claim}
-    """
     data = request.get_json(silent=True) or {}
     ps = svc.get_signup(signup_id, data.get('claim'))
     if not ps:
@@ -76,12 +66,55 @@ def signup_status(signup_id):
 
 
 # ---------------------------------------------------------------------
+# NEW: TRIAL-FIRST SIGNUP
+# ---------------------------------------------------------------------
+@billing_bp.route('/signup/start-trial', methods=['POST'])
+def signup_start_trial():
+    data = request.get_json(silent=True) or {}
+    try:
+        result = svc.start_trial_signup(
+            name=data.get('name'),
+            email=data.get('email'),
+            password=data.get('password'),
+            phone_raw=data.get('phone'),
+            chama_name=data.get('chama_name'),
+            tier_name=data.get('tier'),
+        )
+    except ValueError as e:
+        logger.warning(
+            'trial signup rejected (email=%s tier=%s): %s',
+            (data.get('email') or '').lower().strip(),
+            data.get('tier'), e,
+        )
+        return jsonify({'message': str(e)}), 400
+
+    return jsonify({
+        'message': 'Your 7-day free trial has started.',
+        'session': result['session'],
+        'trial': result['trial'],
+        'chama': result['chama'],
+    }), 201
+
+
+# ---------------------------------------------------------------------
+# NEW: TRIAL STATUS
+# ---------------------------------------------------------------------
+@billing_bp.route('/trial/status', methods=['GET'])
+@jwt_required()
+def trial_status():
+    chama_id = _cid()
+    if not chama_id:
+        return jsonify({'message': 'No chama in session'}), 400
+    status = trial_service.get_status(chama_id)
+    return jsonify({'trial': status}), 200
+
+
+# ---------------------------------------------------------------------
 # UPGRADES FOR EXISTING CHAMAS
 # ---------------------------------------------------------------------
 @billing_bp.route('/checkout', methods=['POST'])
 @jwt_required()
 def checkout():
-    """Start an M-Pesa STK push for a tier upgrade. Body: {tier, phone}."""
     if not _is_admin():
         return jsonify({'message': 'Only the Chairman or Treasurer can pay for a plan.'}), 403
 
@@ -106,7 +139,6 @@ def checkout():
 @billing_bp.route('/payments/<payment_id>', methods=['GET'])
 @jwt_required()
 def payment_status(payment_id):
-    """Poll this every ~3s after checkout. It also reconciles with IntaSend."""
     payment = SubscriptionPayment.query.filter_by(id=payment_id, chama_id=_cid()).first()
     if not payment:
         return jsonify({'message': 'Payment not found'}), 404
@@ -133,7 +165,6 @@ def payment_history():
 
 @billing_bp.route('/webhook/intasend', methods=['POST'])
 def intasend_webhook():
-    """Public endpoint called by IntaSend. Authenticated by the shared challenge."""
     payload = request.get_json(silent=True) or {}
     try:
         status, body = svc.handle_webhook(payload)

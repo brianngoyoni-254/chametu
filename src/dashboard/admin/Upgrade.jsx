@@ -6,6 +6,7 @@ import {
 import { toast } from 'sonner'
 import { ORDER } from '../../lib/tiers'
 import { useTier } from '../../context/TierContext'
+import { useTrial } from '../../context/TrialContext'
 import { api } from '../../lib/api'
 import { friendlyFailureReason } from '../../lib/paymentMessages'
 
@@ -24,6 +25,7 @@ export default function Upgrade() {
   const location = useLocation()
   const navigate = useNavigate()
   const { baseTier, tier, refresh, tiers } = useTier()
+  const { markPaid } = useTrial()
 
   const needed = location.state?.needed
   const from = location.state?.from
@@ -99,11 +101,15 @@ export default function Upgrade() {
     let cancelled = false
     const paymentId = paymentIdRef.current
 
-    const applyOutcome = (p) => {
+    const applyOutcome = async (p) => {
       setPayment(p)
 
       if (p.status === 'complete') {
         setStage('success')
+        // ADDED: unlock the trial gate instantly and refresh trial status
+        // so the lock/banner updates without a page reload.
+        try { markPaid(p.tier || selectedTier) } catch {}
+        try { await refresh() } catch { /* server already upgraded */ }
         toast.success(`${p.tier} plan activated`)
         return true
       }
@@ -129,11 +135,7 @@ export default function Upgrade() {
       try {
         const res = await api(`/api/billing/payments/${paymentId}`)
         if (cancelled) return true
-        const p = res.payment
-        const done = applyOutcome(p)
-        if (done && p.status === 'complete') {
-          try { await refresh() } catch { /* server already upgraded */ }
-        }
+        const done = await applyOutcome(res.payment)
         return done
       } catch {
         return false

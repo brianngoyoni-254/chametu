@@ -16,7 +16,7 @@ from app.models.pending_signup import PendingSignup
 from app.models.rewards import TierConfig
 from app.models.settings import PlatformSettings
 from app.models.user import User
-from app.services import intasend, rewards_service, signup_service
+from app.services import intasend, rewards_service, signup_service, trial_service
 from app.services import notification_service as notif_svc
 from app.services.intasend import friendly_failure_reason
 
@@ -174,9 +174,14 @@ def _apply_state(payment_id, state, failed_reason=None, amount_seen=None, source
         chama = Chama.query.get(p.chama_id)
         if chama:
             chama.base_tier = p.tier
+
+        try:
+            trial_service.mark_paid(p.chama_id, p.tier)
+        except Exception:
+            logger.exception('trial mark_paid failed payment=%s', p.id)
+
         db.session.commit()
 
-        # Issue the persistent receipt exactly once.
         try:
             from app.services import receipt_service
             receipt_service.issue_for_payment(p)
@@ -578,7 +583,11 @@ def _finalize_signup(ps, source):
         chama.base_tier = ps.tier
         db.session.commit()
 
-        # Issue the persistent receipt exactly once.
+        try:
+            trial_service.mark_paid(chama.id, ps.tier)
+        except Exception:
+            logger.exception('trial mark_paid failed (paid signup) signup=%s', ps.id)
+
         try:
             from app.services import receipt_service
             receipt_service.issue_for_signup(ps)
@@ -600,3 +609,81 @@ def _finalize_signup(ps, source):
     except Exception:
         pass
     return ps
+
+
+# ======================================================================
+# TRIAL-FIRST SIGNUP (7-day free trial, no charge today)
+# ======================================================================
+def start_trial_signup(*, name, email, password, phone_raw, chama_name, tier_name):
+    """
+    Create the chama + chairman account immediately and start a 7-day trial.
+    Returns {session, trial, chama}. No IntaSend call.
+    """
+    name = (name or '').strip()
+    email = (email or '').lower().strip()
+    phone_raw = (phone_raw or '').strip()
+    chama_name = (chama_name or '').strip() or f"{name}'s Chama"
+
+    if not name or not email or len(password or '') < 8:
+        raise ValueError('Name, email and a password of at least 8 characters are required.')
+
+    mpesa_phone = intasend.normalize_phone(phone_raw)
+    if not mpesa_phone:
+        raise ValueError('Enter a valid Safaricom number, e.g. 0712345678.')
+
+    if tier_name not in ('Starter', 'Growth', 'Business', 'Gold'):
+        raise ValueError('Choose a valid plan.')
+
+    price_for(tier_name)
+
+    if User.query.filter_by(email=email).first():
+        raise ValueError('An account with that email already exists. Please log in instead.')
+
+    phone_taken = User.query.filter_by(phone=mpesa_phone).first() is not None
+
+    try:
+        user, chama, member = signup_service.create_chama_account(
+            name=name,
+            email=email,
+            phone=None if phone_taken else mpesa_phone,
+            member_phone=mpesa_phone,
+            chama_name=chama_name,
+            tier=tier_name,
+            password=password,
+        )
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ValueError('An account with that email already exists.')
+
+    trial = trial_service.start_trial(chama.id, tier=tier_name)
+
+    logger.info(
+        'TRIAL SIGNUP created: chama=%s tier=%s ends=%s',
+        chama.id, tier_name, trial.ends_at.isoformat(),
+    )
+
+    try:
+        notif_svc.notify_chama_admins(
+            chama_id=chama.id,
+            type='success',
+            event='billing',
+            title='Your 7-day free trial has started',
+            body=f'Welcome to Chametu, {name.split(" ")[0]}! Your {tier_name} plan is free for 7 days.',
+            link='/dashboard',
+        )
+    except Exception:
+        logger.exception('welcome notification failed chama=%s', chama.id)
+
+    session = signup_service.build_session(user, chama, member)
+
+    return {
+        'session': session,
+        'trial': trial_service.get_status(chama.id),
+        'chama': {
+            'id': chama.id,
+            'name': chama.name,
+            'code': chama.code,
+            'tier': chama.base_tier,
+        },
+    }

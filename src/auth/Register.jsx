@@ -1,3 +1,4 @@
+// src/pages/Register.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
@@ -8,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useTier } from '../context/TierContext'
+import { useTrial } from '../context/TrialContext'
 import { ORDER } from '../lib/tiers'
 import { toast } from 'sonner'
 import { api } from '../lib/api'
@@ -18,7 +20,6 @@ import logo from '../assets/logos.png'
 
 /* ================================================================== */
 /*  REAL M-PESA LOGO — inline SVG, matches the official wordmark      */
-/*  (bold green wordmark + the signature swoosh under the “M”)        */
 /* ================================================================== */
 function MpesaLogo({ className = 'h-5', color = '#00A651' }) {
   return (
@@ -30,29 +31,15 @@ function MpesaLogo({ className = 'h-5', color = '#00A651' }) {
       xmlns="http://www.w3.org/2000/svg"
       preserveAspectRatio="xMidYMid meet"
     >
-      {/* Wordmark: M-PESA drawn as thick strokes so it scales cleanly */}
       <g fill={color}>
-        {/* M */}
         <path d="M4 34 V14 h4.2 l5.6 9.4 5.6-9.4 H23.6 V34 h-4 V22.2 L15.4 30 h-2.8 L8 22.2 V34 Z" />
-        {/* - */}
         <rect x="28.4" y="27.6" width="6.4" height="3.2" rx="1.2" />
-        {/* P */}
         <path d="M38 34 V14 h8.2 c4.4 0 7.4 2.6 7.4 6.6 s-3 6.6-7.4 6.6 H42.4 V34 Z M42.4 23.6 h3.6 c2.2 0 3.6-1.2 3.6-3 s-1.4-3-3.6-3 h-3.6 Z" />
-        {/* E */}
         <path d="M56 34 V14 h13 v3.6 H60.4 v4.4 h8 v3.6 h-8 v4.8 H69 V34 Z" />
-        {/* S */}
         <path d="M78.2 34.4 c-3 0-5.4-1-7.2-2.6 l2.4-3 c1.4 1.2 3 1.9 4.8 1.9 1.8 0 2.9-.8 2.9-2 0-1.1-.7-1.7-3.3-2.3 l-1.8-.4 c-3.4-.8-5.3-2.4-5.3-5.4 0-3.4 2.9-5.9 7.1-5.9 2.9 0 5.2 1 6.7 2.5 l-2.3 3 c-1.2-1-2.7-1.7-4.4-1.7-1.7 0-2.7.7-2.7 1.9 0 1 .7 1.6 3 2.1 l1.8.4 c3.7.9 5.5 2.5 5.5 5.6 0 3.5-2.9 6.1-7.2 6.1 Z" />
-        {/* A */}
         <path d="M88 34 L94.6 14 h4.4 L105.6 34 h-4.3 l-1.3-4.2 h-6.2 L92.5 34 Z M95 18.4 l-2.3 7.6 h4.6 Z" />
       </g>
-      {/* The signature swoosh under the wordmark */}
-      <path
-        d="M4 42 C 34 36, 74 36, 108 42"
-        stroke={color}
-        strokeWidth="3.4"
-        strokeLinecap="round"
-        fill="none"
-      />
+      <path d="M4 42 C 34 36, 74 36, 108 42" stroke={color} strokeWidth="3.4" strokeLinecap="round" fill="none" />
     </svg>
   )
 }
@@ -73,35 +60,27 @@ function KenyaFlag() {
 /* ---------- Tier visuals ---------- */
 const TIER_STYLES = {
   Starter: {
-    accent: '#64748B',
-    accentDark: '#CBD5E1',
-    accentSoft: 'rgba(100,116,139,0.10)',
-    accentSoftDark: 'rgba(203,213,225,0.12)',
+    accent: '#64748B', accentDark: '#CBD5E1',
+    accentSoft: 'rgba(100,116,139,0.10)', accentSoftDark: 'rgba(203,213,225,0.12)',
     accentRing: 'rgba(100,116,139,0.25)',
     gradient: 'linear-gradient(135deg, #64748B, #94A3B8)',
   },
   Growth: {
-    accent: '#00A651',
-    accentDark: '#4ADE80',
-    accentSoft: 'rgba(0,166,81,0.10)',
-    accentSoftDark: 'rgba(74,222,128,0.14)',
+    accent: '#00A651', accentDark: '#4ADE80',
+    accentSoft: 'rgba(0,166,81,0.10)', accentSoftDark: 'rgba(74,222,128,0.14)',
     accentRing: 'rgba(0,166,81,0.28)',
     gradient: 'linear-gradient(135deg, #00A651, #008C44)',
     badge: { text: 'MOST POPULAR', bg: 'linear-gradient(135deg, #00A651, #008C44)', color: '#fff' },
   },
   Business: {
-    accent: '#0B1F33',
-    accentDark: '#93C5FD',
-    accentSoft: 'rgba(11,31,51,0.08)',
-    accentSoftDark: 'rgba(147,197,253,0.14)',
+    accent: '#0B1F33', accentDark: '#93C5FD',
+    accentSoft: 'rgba(11,31,51,0.08)', accentSoftDark: 'rgba(147,197,253,0.14)',
     accentRing: 'rgba(11,31,51,0.22)',
     gradient: 'linear-gradient(135deg, #0B1F33, #0A3D46)',
   },
   Gold: {
-    accent: '#B8860B',
-    accentDark: '#FCD34D',
-    accentSoft: 'rgba(245,185,66,0.16)',
-    accentSoftDark: 'rgba(252,211,77,0.16)',
+    accent: '#B8860B', accentDark: '#FCD34D',
+    accentSoft: 'rgba(245,185,66,0.16)', accentSoftDark: 'rgba(252,211,77,0.16)',
     accentRing: 'rgba(245,185,66,0.45)',
     gradient: 'linear-gradient(135deg, #F5B942, #E8A21F)',
     badge: { text: 'BEST VALUE', bg: 'linear-gradient(135deg, #F5B942, #E8A21F)', color: '#2E2200' },
@@ -128,7 +107,7 @@ const readPending = () => { try { return JSON.parse(sessionStorage.getItem(PENDI
 const writePending = (v) => { try { sessionStorage.setItem(PENDING_KEY, JSON.stringify(v)) } catch {} }
 const clearPending = () => { try { sessionStorage.removeItem(PENDING_KEY) } catch {} }
 
-const STEPS = ['Details & plan', 'Pay with M-Pesa', 'Chama ready']
+const STEPS = ['Details & plan', 'Start trial', 'Chama ready']
 const isValidEmail = (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)
 
 const stripDigits = (v) => String(v || '').replace(/\D/g, '').slice(0, 10)
@@ -144,6 +123,7 @@ const formatKsh = (n) => `KSh ${Number(n || 0).toLocaleString()}`
 export default function Register() {
   const { adoptSession } = useAuth()
   const { tiers, refresh: refreshTier } = useTier()
+  const { refreshTrial } = useTrial()   // CHANGED: sync trial after signup
   const navigate = useNavigate()
 
   const [name, setName] = useState('')
@@ -213,9 +193,10 @@ export default function Register() {
 
     setBusy(true)
     try {
-      if (price <= 0) return setError('This plan is not available right now. Please choose another plan.')
-
-      const res = await api('/api/billing/signup/checkout', {
+      // CHANGED: hit the trial-signup endpoint (not the immediate-charge one).
+      // Backend should create the chama, start a 7-day trial, and return
+      // a session without charging anything today.
+      const res = await api('/api/billing/signup/start-trial', {
         method: 'POST',
         body: {
           name: name.trim(),
@@ -224,19 +205,46 @@ export default function Register() {
           phone,
           chama_name: chamaName.trim(),
           tier: selectedTier,
+          trial_days: 7,
         },
       })
-      claimRef.current = res.claim
-      signupIdRef.current = res.signup.id
-      writePending({ id: res.signup.id, claim: res.claim, tier: res.signup.tier, amount: res.signup.amount, phone: res.signup.phone })
-      setSignup(res.signup)
-      triesRef.current = 0
-      reviewSeenRef.current = 0
-      setElapsed(0)
-      setPollCount(0)
-      setStage('waiting')
+
+      // Session is returned immediately — no M-Pesa STK needed for a trial.
+      if (res?.session) {
+        const sessionUser = adoptSession(res.session)
+        try { await refreshTier() } catch {}
+        try { await refreshTrial() } catch {}
+        clearPending()
+        setCompletedAt(new Date())
+        setSignup({
+          id: res.session?.user?.id || '',
+          tier: selectedTier,
+          amount: 0,
+          phone,
+        })
+        setDestination(routeFor(sessionUser.portal))
+        setStage('success')
+        toast.success('Your 7-day free trial has started 🎉')
+        return
+      }
+
+      // Fallback: if backend still returns an M-Pesa claim, keep the old flow.
+      if (res?.claim && res?.signup?.id) {
+        claimRef.current = res.claim
+        signupIdRef.current = res.signup.id
+        writePending({ id: res.signup.id, claim: res.claim, tier: res.signup.tier, amount: res.signup.amount, phone: res.signup.phone })
+        setSignup(res.signup)
+        triesRef.current = 0
+        reviewSeenRef.current = 0
+        setElapsed(0)
+        setPollCount(0)
+        setStage('waiting')
+        return
+      }
+
+      setError('Unexpected response from server. Please try again.')
     } catch (err) {
-      setError(err?.message || 'Could not start your signup. Please try again.')
+      setError(err?.message || 'Could not start your trial. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -254,7 +262,8 @@ export default function Register() {
         if (s.session) {
           const sessionUser = adoptSession(s.session)
           setDestination(routeFor(sessionUser.portal))
-          try { await refreshTier() } catch { /* tier loads on next navigation */ }
+          try { await refreshTier() } catch {}
+          try { await refreshTrial() } catch {}
         } else {
           setDestination('/login')
         }
@@ -333,7 +342,7 @@ export default function Register() {
 
   const finish = () => {
     if (destination !== '/login') {
-      toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your chama is ready.`)
+      toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your trial is running.`)
     }
     navigate(destination, { replace: true })
   }
@@ -364,7 +373,7 @@ export default function Register() {
         </ul>
         <div className="relative mt-auto hidden items-start gap-2.5 rounded-2xl border border-white/20 bg-white/[0.07] p-4 text-[0.88rem] leading-relaxed lg:flex">
           <LockIcon size={16} strokeWidth={2} className="mt-0.5 shrink-0 text-gold" />
-          <span><b className="text-gold">Pay first, then you're in.</b> Your chama is created the moment M-Pesa confirms your plan payment.</span>
+          <span><b className="text-gold">Try free for 7 days.</b> No M-Pesa charge today. Pick a plan any time before day 7 to keep your chama running.</span>
         </div>
       </aside>
 
@@ -378,12 +387,13 @@ export default function Register() {
           </div>
 
           <div className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-widest text-[#8A6417] dark:bg-gold/20 dark:text-gold">
-            <Crown size={11} /> Chairman signup
+            <Crown size={11} /> Chairman signup · 7-day free trial
           </div>
 
-          <h1 className="mt-4 font-display text-[2rem] font-bold tracking-tight text-navy dark:text-white">Create your chama</h1>
+          <h1 className="mt-4 font-display text-[2rem] font-bold tracking-tight text-navy dark:text-white">Start your free trial</h1>
           <p className="mb-5 mt-2 leading-relaxed text-ink-soft dark:text-slate-300">
-            You'll be set up as the chama's chairman. Choose a plan, pay securely with M-Pesa, and your chama is created as soon as payment is confirmed.
+            You'll be set up as the chama's chairman. Your chosen plan runs free for 7 days 
+            no card, no M-Pesa charge today. Add payment before day 7 to keep going.
           </p>
 
           <Stepper stage={stage} />
@@ -432,7 +442,7 @@ export default function Register() {
               <Field label="Chama name">
                 <IconInput icon={<Building2 size={18} strokeWidth={1.8} />} value={chamaName} onChange={(e) => setChamaName(e.target.value)} placeholder="e.g. Umoja Investment Chama" />
               </Field>
-              <Field label="M-Pesa phone (required)">
+              <Field label="M-Pesa phone (used for plan later)">
                 <PhoneInput value={phone} onChange={(digits) => setPhone(digits)} valid={phoneValid} />
               </Field>
             </div>
@@ -442,14 +452,14 @@ export default function Register() {
                 <MpesaLogo className="h-6" />
               </span>
               <div className="min-w-0">
-                <div className="text-[0.82rem] font-semibold text-navy dark:text-white">Pay securely with M-Pesa</div>
-                <div className="text-[0.74rem] leading-snug text-ink-soft dark:text-slate-300">STK Push to your phone · No card needed · Instant activation</div>
+                <div className="text-[0.82rem] font-semibold text-navy dark:text-white">7 days free, no card needed</div>
+                <div className="text-[0.74rem] leading-snug text-ink-soft dark:text-slate-300">Start instantly · M-Pesa only when you upgrade · Cancel any time</div>
               </div>
             </div>
 
             <div className="mb-3.5 flex items-center justify-between">
               <b className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-ink-soft dark:text-slate-300">Choose your plan</b>
-              <span className="text-[0.76rem] text-ink-soft dark:text-slate-400">Upgrade anytime · billed monthly</span>
+              <span className="text-[0.76rem] text-ink-soft dark:text-slate-400">Starts after trial · billed monthly</span>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -462,9 +472,13 @@ export default function Register() {
               <div className="dark:text-slate-300">
                 <b className="text-navy dark:text-white">Due today</b>
                 <br />
-                <span className="text-ink-soft dark:text-slate-400">{selectedTier} plan · billed monthly via M-Pesa</span>
+                <span className="text-ink-soft dark:text-slate-400">{selectedTier} plan · free for 7 days</span>
               </div>
-              <b className="font-mono text-[1.25rem] text-navy dark:text-white">KSh {price.toLocaleString()}</b>
+              <b className="font-mono text-[1.25rem] text-navy dark:text-white">KSh 0</b>
+            </div>
+
+            <div className="mb-3 text-right text-[0.78rem] text-ink-soft dark:text-slate-400">
+              Then <b className="text-navy dark:text-white">{formatKsh(price)}/month</b> from day 8 if you upgrade
             </div>
 
             <button type="submit" disabled={busy}
@@ -472,11 +486,11 @@ export default function Register() {
               <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               <span className="relative flex items-center gap-3">
                 <span className="grid h-11 w-16 flex-none place-items-center rounded-xl bg-white shadow-sm">
-                  {busy ? <Loader2 size={18} className="animate-spin text-[#00A651]" /> : <MpesaLogo className="h-6" />}
+                  {busy ? <Loader2 size={18} className="animate-spin text-[#00A651]" /> : <Sparkles size={18} className="text-[#00A651]" />}
                 </span>
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">{busy ? 'Sending STK push…' : 'Pay with M-Pesa'}</span>
-                  <span className="font-display text-[1rem] font-bold">KSh {price.toLocaleString()}</span>
+                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">{busy ? 'Starting your trial…' : 'Start 7-day free trial'}</span>
+                  <span className="font-display text-[1rem] font-bold">No charge today</span>
                 </span>
               </span>
               <span className="relative flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1 text-[0.72rem] font-bold tracking-wide backdrop-blur">
@@ -487,11 +501,12 @@ export default function Register() {
 
             <div className="mt-3 flex items-center justify-center gap-2 text-[0.72rem] text-ink-soft dark:text-slate-400">
               <ShieldCheck size={12} className="text-[#00A651]" />
-              <span>Secured by Safaricom · No card needed · Instant activation</span>
+              <span>No card · No M-Pesa charge today · Cancel any time in 7 days</span>
             </div>
 
             <p className="mt-3 text-center text-[0.76rem] text-ink-soft dark:text-slate-400">
-              An M-Pesa prompt will be sent to <b className="font-mono text-navy dark:text-white">{phone ? formatPhone(phone) : 'your phone number'}</b>. Your chama is created once payment is confirmed.
+              We'll remind you on day 4, day 6, and day 7 before your trial ends. Add payment
+              before day 7 to keep access. If you don't, your account is locked data is kept.
             </p>
 
             {error && (<div role="alert" className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-center text-[0.84rem] text-red-600 dark:bg-red-500/15 dark:text-red-300">{error}</div>)}
@@ -509,7 +524,7 @@ export default function Register() {
 }
 
 /* ================================================================== */
-/*  Receipt success view — driven by the backend receipt              */
+/*  Receipt success view                                              */
 /* ================================================================== */
 function ReceiptSuccessView({ signup, claim, completedAt, onFinish }) {
   const [stage, setStage] = useState('processing')
@@ -520,7 +535,6 @@ function ReceiptSuccessView({ signup, claim, completedAt, onFinish }) {
   const signupId = signup?.id || ''
   const when = completedAt || new Date()
 
-  // Fetch the persisted receipt from the backend.
   useEffect(() => {
     let cancelled = false
     let tries = 0
@@ -627,9 +641,9 @@ function ReceiptSuccessView({ signup, claim, completedAt, onFinish }) {
         <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-emerald/10 text-emerald ring-1 ring-emerald/20 dark:bg-emerald/15 dark:text-emerald-300 dark:ring-emerald/30">
           <Receipt size={22} strokeWidth={2.2} />
         </div>
-        <h3 className="mt-3 font-display text-[1.15rem] font-bold text-navy dark:text-white">Payment confirmed</h3>
+        <h3 className="mt-3 font-display text-[1.15rem] font-bold text-navy dark:text-white">Trial started</h3>
         <p className="mx-auto mt-1 max-w-[42ch] text-[0.86rem] leading-relaxed text-ink-soft dark:text-slate-300">
-          Your <b className="text-navy dark:text-white">{signup?.tier || receipt?.tier}</b> plan is active. Here's your official receipt.
+          Your <b className="text-navy dark:text-white">{signup?.tier || receipt?.tier}</b> plan is live for 7 days, no charge. Here's your trial receipt.
         </p>
       </div>
 
@@ -735,7 +749,7 @@ function ReceiptBody({ receipt }) {
           {receipt.brand?.name || 'CHAMETU'}
         </div>
         <div className="text-[0.58rem] uppercase tracking-[0.24em]" style={{ color: '#3B5063' }}>
-          Official Receipt
+          Trial Receipt
         </div>
         <div className="mt-1 text-[0.6rem] font-mono" style={{ color: '#3B5063' }}>
           Ref · {receipt.receiptNumber}
@@ -773,14 +787,14 @@ function ReceiptBody({ receipt }) {
       <Divider />
 
       <div className="flex items-baseline justify-between py-1">
-        <span className="font-display text-[0.86rem] font-bold uppercase tracking-wider" style={{ color: '#0B1F33' }}>Total paid</span>
-        <span className="font-mono text-[1.05rem] font-extrabold" style={{ color: '#0B7A5A' }}>{receipt.amountLabel}</span>
+        <span className="font-display text-[0.86rem] font-bold uppercase tracking-wider" style={{ color: '#0B1F33' }}>Trial · 7 days free</span>
+        <span className="font-mono text-[1.05rem] font-extrabold" style={{ color: '#0B7A5A' }}>KSh 0</span>
       </div>
 
       <Divider char="=" />
 
       <div className="text-center text-[0.62rem] font-mono" style={{ color: '#3B5063' }}>
-        Paid via M-Pesa · Thank you!
+        No charge today · Upgrade before day 7
       </div>
       <div className="mt-1 text-center text-[0.58rem] font-mono" style={{ color: '#0B1F33' }}>
         {receipt.brand?.supportEmail || 'support@chametu.co.ke'}
@@ -828,7 +842,7 @@ function PhoneInput({ value = '', onChange, valid = false }) {
   )
 }
 
-/* ---------- Tier card (dark-mode-safe price) ---------- */
+/* ---------- Tier card ---------- */
 function PlanCard({ tierName, tier, meta, selected, onSelect }) {
   const style = TIER_STYLES[tierName] || TIER_STYLES.Starter
   const badge = meta.popular || meta.star ? style.badge : null
@@ -906,6 +920,9 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
           <div className="mt-4 flex items-baseline gap-1">
             <span className="tier-price font-display text-[1.7rem] font-bold leading-none tracking-tight">KSh {tier.price.toLocaleString()}</span>
             <span className="tier-price-suffix text-[0.76rem] font-medium">/mo</span>
+          </div>
+          <div className="mt-1 text-[0.7rem] font-semibold" style={{ color: style.accent }}>
+            Free for 7 days
           </div>
 
           <div className="tier-divider my-3.5 h-px w-full" data-selected={selected ? 'true' : 'false'} />

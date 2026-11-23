@@ -13,6 +13,8 @@ import Terms from '../home/Terms'
 import Contact from '../home/Contact'
 
 import ProtectedRoute from './ProtectedRoute'
+import TrialGate from '../components/TrialGate'
+import BillingUpgrade from '../auth/BillingUpgrade'
 import DashboardLayout from '../dashboard/DashboardLayout'
 
 import Rewards from '../rewards/Rewards'
@@ -102,7 +104,14 @@ export default function AppRoutes() {
 
       {/* Admin — protected */}
       <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
+        {/* Billing upgrade lives OUTSIDE TrialGate so a locked-out
+            chairman can still reach it to pay and unlock. */}
+        <Route path="/billing/upgrade" element={<BillingUpgrade />} />
+
+        {/* Everything else in the admin area goes through TrialGate. */}
+        <Route element={<TrialGate>
+          <DashboardLayout />
+        </TrialGate>}>
           <Route path="/dashboard" element={<Overview />} />
           <Route path="/dashboard/invite" element={<InviteMembers />} />
           <Route path="/dashboard/chama" element={<MyChama />} />
@@ -135,7 +144,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Member portal — protected */}
+      {/* Member portal — protected (members inherit chairman's plan, not gated) */}
       <Route element={<ProtectedRoute />}>
         <Route path="/member" element={<MemberLayout />}>
           <Route index element={<MemberOverview />} />
