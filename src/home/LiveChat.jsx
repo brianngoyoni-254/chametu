@@ -1,6 +1,6 @@
-// src/components/LiveChat.jsx
+// src/home/LiveChat.jsx
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import {
   FiMessageCircle, FiX, FiSend, FiMail, FiPhone, FiArrowRight,
   FiCheckCircle, FiClock, FiUsers, FiThumbsUp, FiThumbsDown,
@@ -17,6 +17,7 @@ const EMAIL = 'support@chametu.co.ke'
 
 export default function LiveChat() {
   const { isAuthenticated } = useAuth()
+  const location = useLocation()                       // ADDED
 
   const [open, setOpen] = useState(false)
   const [dismissedTeaser, setDismissedTeaser] = useState(false)
@@ -30,6 +31,9 @@ export default function LiveChat() {
   const [ended, setEnded] = useState(false)
   const rootRef = useRef(null)
   const bodyRef = useRef(null)
+
+  // ADDED: hard guard — never render inside the superadmin area.
+  const isSuperAdminArea = location.pathname.startsWith('/superadmin')
 
   // Load or create the session when the chat opens
   useEffect(() => {
@@ -204,6 +208,9 @@ export default function LiveChat() {
   }, [])
 
   /* ---------- Render ---------- */
+
+  // ADDED: bail out entirely inside the superadmin area.
+  if (isSuperAdminArea) return null
 
   return (
     <>
@@ -476,29 +483,27 @@ export default function LiveChat() {
 
             {/* Escalation strip */}
             <div className="flex-none border-t border-line bg-paper/60 px-3 py-2.5 sm:px-4">
-              <p className="text-[0.62rem] font-bold uppercase tracking-wider text-ink-soft">
-                Need a human?
+              <p className="mb-1.5 text-[0.66rem] font-semibold uppercase tracking-wider text-ink-soft">
+                Prefer to talk to a human?
               </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 <a
-                  href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
-                    'Hi Chametu team, I need help with'
-                  )}`}
+                  href={`https://wa.me/${WHATSAPP_NUMBER}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#25D366] px-2.5 py-1.5 text-[0.7rem] font-semibold text-white transition hover:bg-[#1EB857] sm:px-3 sm:text-[0.72rem]"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-[#25D366]/10 px-2.5 py-1.5 text-[0.72rem] font-semibold text-[#128C7E] transition hover:bg-[#25D366]/20"
                 >
-                  <FaWhatsapp size={11} /> WhatsApp
+                  <FaWhatsapp size={12} /> WhatsApp
                 </a>
                 <a
-                  href={`tel:${PHONE_DISPLAY.replace(/\s/g, '')}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy transition hover:border-forest/40 sm:px-3 sm:text-[0.72rem]"
+                  href={`tel:${WHATSAPP_NUMBER}`}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-forest/10 px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:bg-forest/15"
                 >
-                  <FiPhone size={11} /> Call
+                  <FiPhone size={11} /> {PHONE_DISPLAY}
                 </a>
                 <a
                   href={`mailto:${EMAIL}`}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-2.5 py-1.5 text-[0.7rem] font-semibold text-navy transition hover:border-forest/40 sm:px-3 sm:text-[0.72rem]"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-forest/10 px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:bg-forest/15"
                 >
                   <FiMail size={11} /> Email
                 </a>
@@ -508,34 +513,22 @@ export default function LiveChat() {
             {/* Input */}
             <form
               onSubmit={submit}
-              className="flex-none border-t border-line bg-white px-3 py-2.5 sm:px-3"
+              className="flex-none border-t border-line bg-white px-3 py-2.5 sm:px-4"
             >
               <div className="flex items-end gap-2">
                 <input
+                  type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={
-                    ended
-                      ? 'Chat ended. Tap New chat above.'
-                      : !isAuthenticated
-                      ? 'Log in to chat'
-                      : 'Ask a question'
-                  }
-                  disabled={ended || !isAuthenticated || sending}
-                  className={`w-full rounded-xl border border-line bg-white px-3.5 py-2.5 text-[0.84rem] text-navy outline-none focus:border-forest ${
-                    ended || !isAuthenticated ? 'cursor-not-allowed opacity-60' : ''
-                  }`}
-                  aria-label="Ask a question"
+                  placeholder={ended ? 'Chat ended — start a new one' : 'Type a message…'}
+                  disabled={!isAuthenticated || sending || ended || loading}
+                  className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-[0.82rem] text-navy placeholder:text-ink-soft/60 focus:border-forest/50 focus:bg-white focus:outline-none disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={!input.trim() || ended || !isAuthenticated || sending}
-                  className={`grid h-10 w-10 flex-none place-items-center rounded-xl text-white transition ${
-                    input.trim() && !ended && isAuthenticated && !sending
-                      ? 'bg-forest hover:bg-forest-dark'
-                      : 'cursor-not-allowed bg-line'
-                  }`}
+                  disabled={!isAuthenticated || !input.trim() || sending || ended || loading}
                   aria-label="Send"
+                  className="grid h-9 w-9 flex-none place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald text-white shadow-md transition hover:brightness-110 disabled:opacity-40"
                 >
                   {sending ? (
                     <FiLoader size={14} className="animate-spin" />
@@ -544,21 +537,14 @@ export default function LiveChat() {
                   )}
                 </button>
               </div>
-              <p className="mt-1.5 flex items-center justify-between gap-2 text-[0.62rem] text-ink-soft">
-                <span className="flex items-center gap-1">
-                  <FiCheckCircle size={9} className="text-forest" />
-                  Never share your M-Pesa PIN.
-                </span>
-                {session && messages.length > 1 && !ended && (
-                  <button
-                    type="button"
-                    onClick={endChat}
-                    className="flex items-center gap-1 text-forest hover:underline"
-                  >
-                    <FiCheckCircle size={9} /> End chat
-                  </button>
-                )}
-              </p>
+              {!isAuthenticated && (
+                <p className="mt-1.5 text-center text-[0.66rem] text-ink-soft">
+                  <Link to="/login" className="font-semibold text-forest hover:underline">
+                    Log in
+                  </Link>{' '}
+                  to chat with the assistant.
+                </p>
+              )}
             </form>
           </div>
         </>
