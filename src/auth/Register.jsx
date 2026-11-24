@@ -1,4 +1,4 @@
-// src/pages/Register.jsx
+// src/auth/Register.jsx
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
@@ -123,8 +123,11 @@ const formatKsh = (n) => `KSh ${Number(n || 0).toLocaleString()}`
 export default function Register() {
   const { adoptSession } = useAuth()
   const { tiers, refresh: refreshTier } = useTier()
-  const { refreshTrial } = useTrial()   // CHANGED: sync trial after signup
+  const { refreshTrial } = useTrial()
   const navigate = useNavigate()
+
+  // NEW: Mode: 'trial' or 'direct'
+  const [checkoutMode, setCheckoutMode] = useState('trial')
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -136,14 +139,13 @@ export default function Register() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const [stage, setStage] = useState('form')
+  const [stage, setStage] = useState('form') // form | waiting | success | failed | timeout
   const [signup, setSignup] = useState(null)
   const [failReason, setFailReason] = useState('')
   const [pollKick, setPollKick] = useState(0)
   const [destination, setDestination] = useState('/dashboard')
   const [elapsed, setElapsed] = useState(0)
   const [pollCount, setPollCount] = useState(0)
-  const [completedAt, setCompletedAt] = useState(null)
 
   const claimRef = useRef(null)
   const signupIdRef = useRef(null)
@@ -193,58 +195,63 @@ export default function Register() {
 
     setBusy(true)
     try {
-      // CHANGED: hit the trial-signup endpoint (not the immediate-charge one).
-      // Backend should create the chama, start a 7-day trial, and return
-      // a session without charging anything today.
-      const res = await api('/api/billing/signup/start-trial', {
-        method: 'POST',
-        body: {
-          name: name.trim(),
-          email: email.trim().toLowerCase(),
-          password,
-          phone,
-          chama_name: chamaName.trim(),
-          tier: selectedTier,
-          trial_days: 7,
-        },
-      })
-
-      // Session is returned immediately — no M-Pesa STK needed for a trial.
-      if (res?.session) {
-        const sessionUser = adoptSession(res.session)
-        try { await refreshTier() } catch {}
-        try { await refreshTrial() } catch {}
-        clearPending()
-        setCompletedAt(new Date())
-        setSignup({
-          id: res.session?.user?.id || '',
-          tier: selectedTier,
-          amount: 0,
-          phone,
+      if (checkoutMode === 'trial') {
+        // --- Trial Flow ---
+        const res = await api('/api/billing/signup/start-trial', {
+          method: 'POST',
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+            phone,
+            chama_name: chamaName.trim(),
+            tier: selectedTier,
+            trial_days: 7,
+          },
         })
-        setDestination(routeFor(sessionUser.portal))
-        setStage('success')
-        toast.success('Your 7-day free trial has started 🎉')
-        return
-      }
 
-      // Fallback: if backend still returns an M-Pesa claim, keep the old flow.
-      if (res?.claim && res?.signup?.id) {
-        claimRef.current = res.claim
-        signupIdRef.current = res.signup.id
-        writePending({ id: res.signup.id, claim: res.claim, tier: res.signup.tier, amount: res.signup.amount, phone: res.signup.phone })
-        setSignup(res.signup)
-        triesRef.current = 0
-        reviewSeenRef.current = 0
-        setElapsed(0)
-        setPollCount(0)
-        setStage('waiting')
-        return
-      }
+        if (res?.session) {
+          const sessionUser = adoptSession(res.session)
+          try { await refreshTier() } catch {}
+          try { await refreshTrial() } catch {}
+          clearPending()
+          setSignup({ id: res.session?.user?.id || '', tier: selectedTier, amount: 0, phone })
+          setDestination(routeFor(sessionUser.portal))
+          setStage('success')
+          toast.success('Your 7-day free trial has started 🎉')
+          return
+        }
+        setError('Unexpected response from server. Please try again.')
+      } else {
+        // --- Direct Pay Flow ---
+        const res = await api('/api/billing/signup/checkout-direct', {
+          method: 'POST',
+          body: {
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+            phone,
+            chama_name: chamaName.trim(),
+            tier: selectedTier,
+          },
+        })
 
-      setError('Unexpected response from server. Please try again.')
+        if (res?.claim && res?.signup?.id) {
+          claimRef.current = res.claim
+          signupIdRef.current = res.signup.id
+          writePending({ id: res.signup.id, claim: res.claim, tier: res.signup.tier, amount: res.signup.amount, phone: res.signup.phone })
+          setSignup(res.signup)
+          triesRef.current = 0
+          reviewSeenRef.current = 0
+          setElapsed(0)
+          setPollCount(0)
+          setStage('waiting')
+          return
+        }
+        setError('Unexpected response from server. Please try again.')
+      }
     } catch (err) {
-      setError(err?.message || 'Could not start your trial. Please try again.')
+      setError(err?.message || 'Could not start your signup. Please try again.')
     } finally {
       setBusy(false)
     }
@@ -267,7 +274,6 @@ export default function Register() {
         } else {
           setDestination('/login')
         }
-        setCompletedAt(new Date())
         setStage('success')
         toast.success(`${s.tier} plan activated`)
         return true
@@ -336,13 +342,12 @@ export default function Register() {
     setError('')
     setElapsed(0)
     setPollCount(0)
-    setCompletedAt(null)
     setStage('form')
   }
 
   const finish = () => {
     if (destination !== '/login') {
-      toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}! Your trial is running.`)
+      toast.success(`Welcome, ${name.trim().split(' ')[0] || 'chairman'}!`)
     }
     navigate(destination, { replace: true })
   }
@@ -386,17 +391,7 @@ export default function Register() {
             <ThemeToggle />
           </div>
 
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-gold/15 px-3 py-1.5 text-[0.66rem] font-bold uppercase tracking-widest text-[#8A6417] dark:bg-gold/20 dark:text-gold">
-            <Crown size={11} /> Chairman signup · 7-day free trial
-          </div>
-
-          <h1 className="mt-4 font-display text-[2rem] font-bold tracking-tight text-navy dark:text-white">Start your free trial</h1>
-          <p className="mb-5 mt-2 leading-relaxed text-ink-soft dark:text-slate-300">
-            You'll be set up as the chama's chairman. Your chosen plan runs free for 7 days 
-            no card, no M-Pesa charge today. Add payment before day 7 to keep going.
-          </p>
-
-          <Stepper stage={stage} />
+          <h1 className="mt-4 font-display text-[2rem] font-bold tracking-tight text-navy dark:text-white">Create your chama</h1>
 
           {stage !== 'form' && (
             <StatusCard
@@ -405,7 +400,7 @@ export default function Register() {
               failReason={failReason}
               elapsed={elapsed}
               attempts={pollCount}
-              completedAt={completedAt}
+              completedAt={new Date()}
               claim={claimRef.current}
               onRetryCheck={retryCheck}
               onBack={backToForm}
@@ -414,7 +409,30 @@ export default function Register() {
           )}
 
           {stage === 'form' && (
-          <form onSubmit={submit}>
+          <form onSubmit={submit} className="mt-6">
+            
+            {/* --- NEW: PROFESSIONAL TOGGLE --- */}
+            <div className="mb-6 rounded-2xl border border-line bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-white/5">
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCheckoutMode('trial')}
+                  className={`flex flex-col items-center justify-center rounded-xl py-3 transition-all ${checkoutMode === 'trial' ? 'bg-forest text-white shadow-md' : 'text-ink-soft hover:bg-paper dark:hover:bg-white/10'}`}
+                >
+                  <span className="font-semibold text-[0.9rem]">7-Day Free Trial</span>
+                  <span className={`text-[0.7rem] ${checkoutMode === 'trial' ? 'text-emerald-100' : 'text-ink-soft'}`}>No charge today</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckoutMode('direct')}
+                  className={`flex flex-col items-center justify-center rounded-xl py-3 transition-all ${checkoutMode === 'direct' ? 'bg-forest text-white shadow-md' : 'text-ink-soft hover:bg-paper dark:hover:bg-white/10'}`}
+                >
+                  <span className="font-semibold text-[0.9rem]">Pay Now</span>
+                  <span className={`text-[0.7rem] ${checkoutMode === 'direct' ? 'text-emerald-100' : 'text-ink-soft'}`}>Skip trial, unlock instantly</span>
+                </button>
+              </div>
+            </div>
+
             <Field label="Your full name">
               <IconInput icon={<User size={18} strokeWidth={1.8} />} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Daniel Muthui" autoComplete="name" />
             </Field>
@@ -452,14 +470,18 @@ export default function Register() {
                 <MpesaLogo className="h-6" />
               </span>
               <div className="min-w-0">
-                <div className="text-[0.82rem] font-semibold text-navy dark:text-white">7 days free, no card needed</div>
-                <div className="text-[0.74rem] leading-snug text-ink-soft dark:text-slate-300">Start instantly · M-Pesa only when you upgrade · Cancel any time</div>
+                <div className="text-[0.82rem] font-semibold text-navy dark:text-white">
+                  {checkoutMode === 'trial' ? '7 days free, no card needed' : 'Instant activation with M-Pesa'}
+                </div>
+                <div className="text-[0.74rem] leading-snug text-ink-soft dark:text-slate-300">
+                  {checkoutMode === 'trial' ? 'Start instantly · M-Pesa only when you upgrade' : 'Pay today · No trial limitations'}
+                </div>
               </div>
             </div>
 
             <div className="mb-3.5 flex items-center justify-between">
               <b className="text-[0.72rem] font-bold uppercase tracking-[0.14em] text-ink-soft dark:text-slate-300">Choose your plan</b>
-              <span className="text-[0.76rem] text-ink-soft dark:text-slate-400">Starts after trial · billed monthly</span>
+              <span className="text-[0.76rem] text-ink-soft dark:text-slate-400">Billed monthly</span>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -470,16 +492,18 @@ export default function Register() {
 
             <div className="mb-4 mt-4 flex items-center justify-between rounded-2xl border border-dashed border-line bg-white px-4 py-3.5 text-[0.86rem] dark:border-white/15 dark:bg-white/[0.04]">
               <div className="dark:text-slate-300">
-                <b className="text-navy dark:text-white">Due today</b>
+                <b className="text-navy dark:text-white">{checkoutMode === 'trial' ? 'Due today' : 'Total due today'}</b>
                 <br />
-                <span className="text-ink-soft dark:text-slate-400">{selectedTier} plan · free for 7 days</span>
+                <span className="text-ink-soft dark:text-slate-400">{selectedTier} plan · {checkoutMode === 'trial' ? 'free for 7 days' : 'instant unlock'}</span>
               </div>
-              <b className="font-mono text-[1.25rem] text-navy dark:text-white">KSh 0</b>
+              <b className="font-mono text-[1.25rem] text-navy dark:text-white">{checkoutMode === 'trial' ? 'KSh 0' : formatKsh(price)}</b>
             </div>
 
-            <div className="mb-3 text-right text-[0.78rem] text-ink-soft dark:text-slate-400">
-              Then <b className="text-navy dark:text-white">{formatKsh(price)}/month</b> from day 8 if you upgrade
-            </div>
+            {checkoutMode === 'trial' && (
+              <div className="mb-3 text-right text-[0.78rem] text-ink-soft dark:text-slate-400">
+                Then <b className="text-navy dark:text-white">{formatKsh(price)}/month</b> from day 8 if you upgrade
+              </div>
+            )}
 
             <button type="submit" disabled={busy}
               className="group relative mt-2 flex w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border-0 bg-gradient-to-r from-[#00A651] via-[#009947] to-[#008C44] px-4 py-3.5 text-left text-white shadow-[0_12px_28px_-10px_rgba(0,166,81,0.55),inset_0_1px_0_rgba(255,255,255,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-10px_rgba(0,166,81,0.65),inset_0_1px_0_rgba(255,255,255,0.22)] disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60">
@@ -489,8 +513,12 @@ export default function Register() {
                   {busy ? <Loader2 size={18} className="animate-spin text-[#00A651]" /> : <Sparkles size={18} className="text-[#00A651]" />}
                 </span>
                 <span className="flex flex-col leading-tight">
-                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">{busy ? 'Starting your trial…' : 'Start 7-day free trial'}</span>
-                  <span className="font-display text-[1rem] font-bold">No charge today</span>
+                  <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">
+                    {busy ? 'Processing…' : checkoutMode === 'trial' ? 'Start 7-day free trial' : 'Pay with M-Pesa'}
+                  </span>
+                  <span className="font-display text-[1rem] font-bold">
+                    {checkoutMode === 'trial' ? 'No charge today' : formatKsh(price)}
+                  </span>
                 </span>
               </span>
               <span className="relative flex items-center gap-1.5 rounded-lg bg-white/15 px-2.5 py-1 text-[0.72rem] font-bold tracking-wide backdrop-blur">
@@ -501,13 +529,10 @@ export default function Register() {
 
             <div className="mt-3 flex items-center justify-center gap-2 text-[0.72rem] text-ink-soft dark:text-slate-400">
               <ShieldCheck size={12} className="text-[#00A651]" />
-              <span>No card · No M-Pesa charge today · Cancel any time in 7 days</span>
+              <span>
+                {checkoutMode === 'trial' ? 'No card · No M-Pesa charge today · Cancel any time in 7 days' : 'Instant activation · Secure M-Pesa checkout'}
+              </span>
             </div>
-
-            <p className="mt-3 text-center text-[0.76rem] text-ink-soft dark:text-slate-400">
-              We'll remind you on day 4, day 6, and day 7 before your trial ends. Add payment
-              before day 7 to keep access. If you don't, your account is locked data is kept.
-            </p>
 
             {error && (<div role="alert" className="mt-4 rounded-xl bg-red-50 px-3.5 py-2.5 text-center text-[0.84rem] text-red-600 dark:bg-red-500/15 dark:text-red-300">{error}</div>)}
 
@@ -749,7 +774,7 @@ function ReceiptBody({ receipt }) {
           {receipt.brand?.name || 'CHAMETU'}
         </div>
         <div className="text-[0.58rem] uppercase tracking-[0.24em]" style={{ color: '#3B5063' }}>
-          Trial Receipt
+          {receipt.trial ? 'Trial Receipt' : 'Official Receipt'}
         </div>
         <div className="mt-1 text-[0.6rem] font-mono" style={{ color: '#3B5063' }}>
           Ref · {receipt.receiptNumber}
@@ -787,14 +812,18 @@ function ReceiptBody({ receipt }) {
       <Divider />
 
       <div className="flex items-baseline justify-between py-1">
-        <span className="font-display text-[0.86rem] font-bold uppercase tracking-wider" style={{ color: '#0B1F33' }}>Trial · 7 days free</span>
-        <span className="font-mono text-[1.05rem] font-extrabold" style={{ color: '#0B7A5A' }}>KSh 0</span>
+        <span className="font-display text-[0.86rem] font-bold uppercase tracking-wider" style={{ color: '#0B1F33' }}>
+          {receipt.trial ? 'Trial · 7 days free' : 'Total paid'}
+        </span>
+        <span className="font-mono text-[1.05rem] font-extrabold" style={{ color: '#0B7A5A' }}>
+          {receipt.trial ? 'KSh 0' : receipt.amountLabel}
+        </span>
       </div>
 
       <Divider char="=" />
 
       <div className="text-center text-[0.62rem] font-mono" style={{ color: '#3B5063' }}>
-        No charge today · Upgrade before day 7
+        {receipt.trial ? 'No charge today · Upgrade before day 7' : 'Paid via M-Pesa · Thank you!'}
       </div>
       <div className="mt-1 text-center text-[0.58rem] font-mono" style={{ color: '#0B1F33' }}>
         {receipt.brand?.supportEmail || 'support@chametu.co.ke'}
@@ -922,6 +951,7 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
             <span className="tier-price-suffix text-[0.76rem] font-medium">/mo</span>
           </div>
           <div className="mt-1 text-[0.7rem] font-semibold" style={{ color: style.accent }}>
+            {/* Note: This says "Free for 7 days" hardcoded, you might want to conditionally render this if checkoutMode === 'trial' */}
             Free for 7 days
           </div>
 

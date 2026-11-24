@@ -17,7 +17,7 @@ const EMAIL = 'support@chametu.co.ke'
 
 export default function LiveChat() {
   const { isAuthenticated } = useAuth()
-  const location = useLocation()                       // ADDED
+  const location = useLocation()
 
   const [open, setOpen] = useState(false)
   const [dismissedTeaser, setDismissedTeaser] = useState(false)
@@ -32,10 +32,8 @@ export default function LiveChat() {
   const rootRef = useRef(null)
   const bodyRef = useRef(null)
 
-  // ADDED: hard guard — never render inside the superadmin area.
   const isSuperAdminArea = location.pathname.startsWith('/superadmin')
 
-  // Load or create the session when the chat opens
   useEffect(() => {
     if (!open || !isAuthenticated) return
     if (session) return
@@ -65,7 +63,6 @@ export default function LiveChat() {
     }
   }, [open, isAuthenticated, session])
 
-  // Close on Escape / outside click
   useEffect(() => {
     if (!open) return
     const onKey = (e) => e.key === 'Escape' && setOpen(false)
@@ -80,7 +77,6 @@ export default function LiveChat() {
     }
   }, [open])
 
-  // Auto scroll
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight
   }, [messages, sending])
@@ -93,7 +89,6 @@ export default function LiveChat() {
     setError(null)
     setInput('')
 
-    // Optimistic user message
     const tempUser = {
       id: `temp-${Date.now()}`,
       sender: 'user',
@@ -108,7 +103,6 @@ export default function LiveChat() {
         body: { text: q },
       })
 
-      // Replace optimistic user msg with the server's version + append bot reply
       setMessages((m) => {
         const withoutTemp = m.filter((x) => x.id !== tempUser.id)
         return [...withoutTemp, res.user, res.bot]
@@ -121,7 +115,6 @@ export default function LiveChat() {
       }
     } catch (err) {
       setError(err.message || 'Message failed')
-      // Revert optimistic on failure
       setMessages((m) => m.filter((x) => x.id !== tempUser.id))
     } finally {
       setSending(false)
@@ -137,9 +130,7 @@ export default function LiveChat() {
         method: 'POST',
         body: { feedback },
       })
-    } catch {
-      // Silently ignore — feedback is not critical
-    }
+    } catch {}
   }
 
   async function endChat() {
@@ -198,7 +189,6 @@ export default function LiveChat() {
     } catch {}
   }
 
-  // Load teaser preference once
   useEffect(() => {
     try {
       if (sessionStorage.getItem('chametu_chat_teaser') === 'dismissed') {
@@ -209,7 +199,6 @@ export default function LiveChat() {
 
   /* ---------- Render ---------- */
 
-  // ADDED: bail out entirely inside the superadmin area.
   if (isSuperAdminArea) return null
 
   return (
@@ -217,16 +206,16 @@ export default function LiveChat() {
       {/* Floating button */}
       <div className="fixed bottom-4 right-4 z-40 sm:bottom-6 sm:right-6">
         {!open && !dismissedTeaser && (
-          <div className="relative mb-3 hidden max-w-[280px] rounded-2xl border border-line bg-white p-3.5 shadow-[0_20px_50px_-20px_rgba(11,31,51,0.35)] sm:block">
+          <div className="relative mb-3 hidden max-w-[280px] rounded-2xl border border-line bg-card p-3.5 shadow-[0_20px_50px_-20px_rgba(11,31,51,0.35)] sm:block">
             <button
               onClick={dismissTeaser}
-              className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-line bg-white text-ink-soft transition hover:bg-paper"
+              className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-line bg-card text-ink-soft transition hover:bg-paper"
               aria-label="Dismiss"
             >
               <FiX size={11} />
             </button>
             <div className="flex items-start gap-2.5">
-              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-forest/10 text-forest">
+              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-tint text-forest">
                 <FiMessageCircle size={15} />
               </span>
               <div className="min-w-0">
@@ -277,7 +266,7 @@ export default function LiveChat() {
             aria-label="Support chat"
             aria-modal="true"
             className="
-              chat-panel fixed z-50 flex flex-col overflow-hidden bg-white shadow-[0_40px_80px_-24px_rgba(11,31,51,0.55)]
+              chat-panel fixed z-50 flex flex-col overflow-hidden bg-card text-navy shadow-[0_40px_80px_-24px_rgba(11,31,51,0.55)]
               inset-x-0 bottom-0 w-full rounded-t-3xl border-t border-line
               sm:inset-auto sm:right-6 sm:bottom-24 sm:w-[400px] sm:rounded-3xl sm:border
             "
@@ -286,7 +275,7 @@ export default function LiveChat() {
               maxHeight: 'calc(100svh - 1rem)',
             }}
           >
-            {/* Header */}
+            {/* Header — always the green gradient in both modes */}
             <div className="relative flex-none overflow-hidden bg-gradient-to-br from-[#0B7A5A] via-[#0A6B4E] to-[#065C42] px-4 pb-4 pt-4 text-white sm:px-5 sm:pb-5 sm:pt-5">
               <div
                 className="pointer-events-none absolute inset-0 opacity-[0.15]"
@@ -302,7 +291,7 @@ export default function LiveChat() {
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-[#7CF0C0] ring-2 ring-[#0A6B4E]" />
                   </span>
                   <div className="min-w-0">
-                    <h3 className="truncate font-display text-[0.95rem] font-bold leading-tight sm:text-[1rem]">
+                    <h3 className="truncate font-display text-[0.95rem] font-bold leading-tight text-white sm:text-[1rem]">
                       Chametu Assistant
                     </h3>
                     <p className="mt-0.5 flex items-center gap-1.5 text-[0.68rem] text-white/75 sm:text-[0.72rem]">
@@ -356,7 +345,7 @@ export default function LiveChat() {
               )}
 
               {error && (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[0.78rem] text-red-700">
+                <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-[0.78rem] text-red-600">
                   {error}
                 </div>
               )}
@@ -365,12 +354,12 @@ export default function LiveChat() {
                 <div key={m.id}>
                   {m.sender === 'bot' ? (
                     <div className="flex items-start gap-2.5">
-                      <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-forest/10 text-forest">
+                      <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-tint text-forest">
                         <FiMessageCircle size={14} />
                       </span>
                       <div className="min-w-0 max-w-[85%]">
                         <div className="rounded-2xl rounded-tl-md bg-paper px-3.5 py-2.5">
-                          <p className="whitespace-pre-wrap text-[0.8rem] leading-relaxed text-ink-soft">
+                          <p className="whitespace-pre-wrap text-[0.8rem] leading-relaxed text-ink">
                             {m.body}
                           </p>
                         </div>
@@ -378,7 +367,7 @@ export default function LiveChat() {
                           <Link
                             to={m.link}
                             onClick={() => setOpen(false)}
-                            className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-forest/10 px-2.5 py-1 text-[0.72rem] font-semibold text-forest transition hover:bg-forest/15"
+                            className="mt-1.5 inline-flex items-center gap-1 rounded-lg bg-tint px-2.5 py-1 text-[0.72rem] font-semibold text-forest transition hover:opacity-80"
                           >
                             {m.linkText || 'Open'} <FiArrowRight size={11} />
                           </Link>
@@ -390,7 +379,7 @@ export default function LiveChat() {
                               aria-label="Helpful"
                               className={`grid h-6 w-6 place-items-center rounded-md transition ${
                                 m.feedback === 'up'
-                                  ? 'bg-forest/15 text-forest'
+                                  ? 'bg-tint text-forest'
                                   : 'text-ink-soft/60 hover:bg-paper hover:text-forest'
                               }`}
                             >
@@ -443,7 +432,7 @@ export default function LiveChat() {
                       key={s}
                       onClick={() => sendMessage(s)}
                       disabled={sending}
-                      className="rounded-full border border-line bg-white px-2.5 py-1 text-[0.72rem] font-medium text-navy transition hover:border-forest/40 hover:bg-forest/[0.04] disabled:opacity-50"
+                      className="rounded-full border border-line bg-card px-2.5 py-1 text-[0.72rem] font-medium text-navy transition hover:border-forest/40 hover:bg-tint disabled:opacity-50"
                     >
                       {s}
                     </button>
@@ -453,7 +442,7 @@ export default function LiveChat() {
 
               {sending && (
                 <div className="flex items-start gap-2.5">
-                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-forest/10 text-forest">
+                  <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-tint text-forest">
                     <FiMessageCircle size={14} />
                   </span>
                   <div className="rounded-2xl rounded-tl-md bg-paper px-3.5 py-3">
@@ -497,23 +486,23 @@ export default function LiveChat() {
                 </a>
                 <a
                   href={`tel:${WHATSAPP_NUMBER}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-forest/10 px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:bg-forest/15"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-tint px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:opacity-80"
                 >
                   <FiPhone size={11} /> {PHONE_DISPLAY}
                 </a>
                 <a
                   href={`mailto:${EMAIL}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-forest/10 px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:bg-forest/15"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-tint px-2.5 py-1.5 text-[0.72rem] font-semibold text-forest transition hover:opacity-80"
                 >
                   <FiMail size={11} /> Email
                 </a>
               </div>
             </div>
 
-            {/* Input */}
+            {/* ===== INPUT — theme-aware via design tokens ===== */}
             <form
               onSubmit={submit}
-              className="flex-none border-t border-line bg-white px-3 py-2.5 sm:px-4"
+              className="flex-none border-t border-line bg-card px-3 py-2.5 sm:px-4"
             >
               <div className="flex items-end gap-2">
                 <input
@@ -522,7 +511,15 @@ export default function LiveChat() {
                   onChange={(e) => setInput(e.target.value)}
                   placeholder={ended ? 'Chat ended — start a new one' : 'Type a message…'}
                   disabled={!isAuthenticated || sending || ended || loading}
-                  className="min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 py-2 text-[0.82rem] text-navy placeholder:text-ink-soft/60 focus:border-forest/50 focus:bg-white focus:outline-none disabled:opacity-50"
+                  autoComplete="off"
+                  className="
+                    min-w-0 flex-1 rounded-xl border border-line bg-paper px-3 py-2
+                    text-[0.82rem] text-navy placeholder:text-ink-soft/70
+                    outline-none transition
+                    focus:border-forest focus:bg-card focus:ring-2 focus:ring-forest/20
+                    disabled:opacity-50
+                  "
+                  style={{ caretColor: 'var(--color-forest)' }}
                 />
                 <button
                   type="submit"

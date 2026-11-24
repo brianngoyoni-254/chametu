@@ -97,6 +97,37 @@ def signup_start_trial():
 
 
 # ---------------------------------------------------------------------
+# NEW: DIRECT SIGNUP (Pay Now, no trial)
+# ---------------------------------------------------------------------
+@billing_bp.route('/signup/checkout-direct', methods=['POST'])
+def signup_checkout_direct():
+    """
+    Start a new chama signup with immediate payment (no trial).
+    Body: {name, email, password, phone, chama_name, tier}
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        ps = svc.start_signup_payment(
+            name=data.get('name'),
+            email=data.get('email'),
+            password=data.get('password'),
+            phone_raw=data.get('phone'),
+            chama_name=data.get('chama_name'),
+            tier_name=data.get('tier'),
+        )
+    except ValueError as e:
+        logger.warning('billing: direct signup rejected (tier=%s, email=%s): %s',
+                       data.get('tier'), (data.get('email') or '').lower().strip(), e)
+        return jsonify({'message': str(e)}), 400
+
+    return jsonify({
+        'message': 'Check your phone and enter your M-Pesa PIN to complete payment.',
+        'signup': svc.serialize_signup(ps),
+        'claim': ps.claim_token,
+    }), 201
+
+
+# ---------------------------------------------------------------------
 # NEW: TRIAL STATUS
 # ---------------------------------------------------------------------
 @billing_bp.route('/trial/status', methods=['GET'])
