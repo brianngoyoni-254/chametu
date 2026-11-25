@@ -139,6 +139,13 @@ export default function Register() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // --- NEW: Email Verification State ---
+  const [emailVerified, setEmailVerified] = useState(false)
+  const [verificationCode, setVerificationCode] = useState('')
+  const [isSendingCode, setIsSendingCode] = useState(false)
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false)
+  const [showCodeInput, setShowCodeInput] = useState(false)
+
   const [stage, setStage] = useState('form') // form | waiting | success | failed | timeout
   const [signup, setSignup] = useState(null)
   const [failReason, setFailReason] = useState('')
@@ -179,6 +186,38 @@ export default function Register() {
       (/[^A-Za-z0-9]/.test(v) ? 1 : 0)
     )
   })()
+  
+  // --- NEW: Email Verification Handlers ---
+  const handleSendCode = async () => {
+    if (!isValidEmail(email)) return setError('Enter a valid email address first.')
+    setError('')
+    setIsSendingCode(true)
+    try {
+      await api('/api/auth/send-verification-code', { method: 'POST', body: { email } })
+      toast.success('Verification code sent to your email.')
+      setShowCodeInput(true)
+    } catch (err) {
+      toast.error(err?.message || 'Failed to send code.')
+    } finally {
+      setIsSendingCode(false)
+    }
+  }
+
+  const handleVerifyCode = async () => {
+    if (verificationCode.length !== 6) return setError('Enter the 6-digit code.')
+    setError('')
+    setIsVerifyingCode(true)
+    try {
+      await api('/api/auth/verify-code', { method: 'POST', body: { email, code: verificationCode } })
+      toast.success('Email verified successfully!')
+      setEmailVerified(true)
+      setShowCodeInput(false)
+    } catch (err) {
+      toast.error(err?.message || 'Invalid or expired code.')
+    } finally {
+      setIsVerifyingCode(false)
+    }
+  }
 
   const selectedPlan = tiers[selectedTier]
   const price = Number(selectedPlan?.price ?? 0)
@@ -189,6 +228,7 @@ export default function Register() {
     setError('')
     if (name.trim().length < 2) return setError('Enter your full name.')
     if (!isValidEmail(email)) return setError('Enter a valid email address.')
+    if (!emailVerified) return setError('Please verify your email address first.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (chamaName.trim().length < 2) return setError('Enter your chama name.')
     if (!isValidPhone(phone)) return setError('Enter a valid 10-digit Kenyan phone number (e.g., 0712 345 678).')
@@ -436,9 +476,64 @@ export default function Register() {
             <Field label="Your full name">
               <IconInput icon={<User size={18} strokeWidth={1.8} />} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Daniel Muthui" autoComplete="name" />
             </Field>
+
+            {/* --- UPDATED: EMAIL FIELD WITH VERIFICATION --- */}
             <Field label="Email">
-              <IconInput type="email" icon={<Mail size={18} strokeWidth={1.8} />} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" />
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <IconInput 
+                    type="email" 
+                    icon={<Mail size={18} strokeWidth={1.8} />} 
+                    value={email} 
+                    onChange={(e) => {
+                      setEmail(e.target.value)
+                      setEmailVerified(false)
+                      setShowCodeInput(false)
+                    }} 
+                    placeholder="you@example.com" 
+                    autoComplete="email" 
+                    disabled={emailVerified}
+                  />
+                </div>
+                {!emailVerified && (
+                  <button
+                    type="button"
+                    onClick={handleSendCode}
+                    disabled={isSendingCode || !isValidEmail(email)}
+                    className="rounded-xl bg-forest px-4 text-sm font-semibold text-white disabled:opacity-50 transition hover:bg-forest-dark"
+                  >
+                    {isSendingCode ? <Loader2 size={16} className="animate-spin" /> : 'Verify'}
+                  </button>
+                )}
+              </div>
+              
+              {emailVerified && (
+                <div className="mt-2 flex items-center gap-1.5 text-[0.8rem] font-semibold text-forest">
+                  <CheckCircle2 size={14} /> Email verified successfully
+                </div>
+              )}
+
+              {showCodeInput && !emailVerified && (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="Enter 6-digit code"
+                    className="flex-1 rounded-xl border-[1.5px] border-line bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-emerald focus:ring-4 focus:ring-emerald/15 dark:bg-white/5 dark:border-white/15 dark:text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyCode}
+                    disabled={isVerifyingCode || verificationCode.length !== 6}
+                    className="rounded-xl bg-navy px-4 text-sm font-semibold text-white disabled:opacity-50 transition hover:bg-navy/90 dark:bg-emerald dark:text-[#06331F] dark:hover:bg-emerald/90"
+                  >
+                    {isVerifyingCode ? <Loader2 size={16} className="animate-spin" /> : 'Confirm'}
+                  </button>
+                </div>
+              )}
             </Field>
+
             <Field label="Password">
               <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-[#F8FAFC] px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
                 <Lock size={18} strokeWidth={1.8} className="shrink-0 text-ink-soft dark:text-slate-300" />
@@ -505,7 +600,7 @@ export default function Register() {
               </div>
             )}
 
-            <button type="submit" disabled={busy}
+            <button type="submit" disabled={busy || !emailVerified}
               className="group relative mt-2 flex w-full cursor-pointer items-center justify-between gap-3 overflow-hidden rounded-2xl border-0 bg-gradient-to-r from-[#00A651] via-[#009947] to-[#008C44] px-4 py-3.5 text-left text-white shadow-[0_12px_28px_-10px_rgba(0,166,81,0.55),inset_0_1px_0_rgba(255,255,255,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-10px_rgba(0,166,81,0.65),inset_0_1px_0_rgba(255,255,255,0.22)] disabled:cursor-not-allowed disabled:transform-none disabled:opacity-60">
               <span aria-hidden="true" className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
               <span className="relative flex items-center gap-3">
@@ -514,7 +609,7 @@ export default function Register() {
                 </span>
                 <span className="flex flex-col leading-tight">
                   <span className="text-[0.66rem] font-semibold uppercase tracking-[0.16em] text-white/80">
-                    {busy ? 'Processing…' : checkoutMode === 'trial' ? 'Start 7-day free trial' : 'Pay with M-Pesa'}
+                    {busy ? 'Processing…' : !emailVerified ? 'Verify email to continue' : checkoutMode === 'trial' ? 'Start 7-day free trial' : 'Pay with M-Pesa'}
                   </span>
                   <span className="font-display text-[1rem] font-bold">
                     {checkoutMode === 'trial' ? 'No charge today' : formatKsh(price)}
@@ -951,7 +1046,6 @@ function PlanCard({ tierName, tier, meta, selected, onSelect }) {
             <span className="tier-price-suffix text-[0.76rem] font-medium">/mo</span>
           </div>
           <div className="mt-1 text-[0.7rem] font-semibold" style={{ color: style.accent }}>
-            {/* Note: This says "Free for 7 days" hardcoded, you might want to conditionally render this if checkoutMode === 'trial' */}
             Free for 7 days
           </div>
 

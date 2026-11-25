@@ -7,7 +7,7 @@ from flask_jwt_extended import create_access_token
 
 from app import db
 from app.models.chama import Chama, ChamaSettings, Member
-from app.models.user import User
+from app.models.user import User, EmailVerification
 
 ADMIN_ROLES = ("Chairman", "Treasurer", "Secretary")
 
@@ -38,6 +38,11 @@ def create_chama_account(*, name, email, phone, chama_name, tier,
     Create User + Chama + ChamaSettings + Member(Chairman). Flushes but does NOT
     commit, so the caller controls the transaction.
     """
+    # --- Security Check: Ensure the email was verified before creating the account ---
+    ev = EmailVerification.query.filter_by(email=email, verified=True).first()
+    if not ev:
+        raise ValueError("Email address must be verified before creating an account.")
+
     user = User(name=name, email=email, phone=phone)
     if password_hash:
         user.password_hash = password_hash

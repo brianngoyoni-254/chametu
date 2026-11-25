@@ -10,7 +10,7 @@ from flask_jwt_extended import (
 )
 
 from app import db
-from app.models.user import User
+from app.models.user import User, EmailVerification
 from app.models.chama import Chama, Member
 from app.logging_utils import log_writes
 from app.services import member_service, trial_service
@@ -24,6 +24,72 @@ ADMIN_ROLES = ["Chairman", "Treasurer", "Secretary"]
 
 def _portal_for(role: str) -> str:
     return "admin" if role in ADMIN_ROLES else "member"
+
+
+# ---------------------------------------------------------------------
+# EMAIL VERIFICATION FOR REGISTRATION
+# ---------------------------------------------------------------------
+@auth_bp.route("/send-verification-code", methods=["POST"])
+def send_verification_code():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").lower().strip()
+
+    if not email:
+        return jsonify({"message": "Email is required"}), 400
+
+    if User.query.filter_by(email=email).first():
+        return jsonify({"message": "An account with this email already exists."}), 400
+
+    # Invalidate any previous unverified codes for this email
+    EmailVerification.query.filter_by(email=email, verified=False).delete()
+
+    code = ''.join(random.choices(string.digits, k=6))
+    expires_at = datetime.utcnow() + timedelta(minutes=15)
+
+    ev = EmailVerification(email=email, code=code, expires_at=expires_at)
+    db.session.add(ev)
+    db.session.commit()
+
+    subject = "Chametu Email Verification Code"
+    html = f"""
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 500px; margin: 0 auto; color: #0B1F33; padding: 20px;">
+        <h2 style="color: #0B7A5A; margin-top: 0;">Verify Your Email</h2>
+        <p>Hello,</p>
+        <p>Use the code below to verify your email address for Chametu:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: #0B7A5A; background: #F0FDF4; padding: 10px 20px; border-radius: 8px;">
+                {code}
+            </span>
+        </div>
+        <p>This code will expire in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
+        <hr style="border: none; border-top: 1px solid #E3E9EF; margin: 20px 0;">
+        <p style="font-size: 13px; color: #64748B;">Thank you,<br/>The Chametu Team</p>
+    </div>
+    """
+    
+    send_email(email, subject, html)
+    return jsonify({"message": "Verification code sent."}), 200
+
+
+@auth_bp.route("/verify-code", methods=["POST"])
+def verify_code():
+    data = request.get_json() or {}
+    email = (data.get("email") or "").lower().strip()
+    code = (data.get("code") or "").strip()
+
+    if not email or not code:
+        return jsonify({"message": "Email and code are required"}), 400
+
+    ev = EmailVerification.query.filter_by(email=email, code=code, verified=False).first()
+    if not ev:
+        return jsonify({"message": "Invalid verification code."}), 400
+
+    if ev.expires_at < datetime.utcnow():
+        return jsonify({"message": "Verification code has expired."}), 400
+
+    ev.verified = True
+    db.session.commit()
+    return jsonify({"message": "Email verified successfully."}), 200
 
 
 # ---------------------------------------------------------------------
