@@ -203,6 +203,8 @@ def save_prefs(user_id, prefs):
         p.prefs = prefs
     db.session.commit()
     return get_prefs(user_id)
+
+
 # ============================================================
 # CONVENIENCE HELPERS — called from route handlers
 # ============================================================
@@ -218,12 +220,17 @@ def notify_chama_admins(chama_id, type, event, title, body=None, link=None):
         .filter(Member.chama_id == chama_id, Member.role.in_(admin_roles))
         .all()
     )
+    
     if not admins:
         # Fallback: broadcast (no admin found — rare)
         return [create_notification(chama_id, None, type, event, title, body, link)]
 
     created = []
     for m in admins:
+        # Safeguard: Skip members without a linked user account to prevent accidental broadcasts
+        if not m.user_id:
+            continue
+            
         n = create_notification(
             chama_id=chama_id,
             user_id=m.user_id,
@@ -234,6 +241,11 @@ def notify_chama_admins(chama_id, type, event, title, body=None, link=None):
             link=link,
         )
         created.append(n)
+    
+    # If no admins had a valid user_id, fallback to broadcast
+    if not created:
+        return [create_notification(chama_id, None, type, event, title, body, link)]
+        
     return created
 
 
