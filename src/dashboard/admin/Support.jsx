@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   LifeBuoy, Plus, MessageSquare, Clock, CheckCircle2, X, Send, Search,
-  Loader2, Lock,
+  Loader2, Lock, Bell
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useChama } from '../../context/ChamaContext'
@@ -87,6 +87,21 @@ export default function Support() {
     }
   }
 
+  // Marks ticket as read and clears the badge
+  const openTicket = async (t) => {
+    setViewing(t)
+    if (t.unreadCount > 0) {
+      try {
+        await api(`/api/support/${t.id}/read`, { method: 'POST' })
+        setTickets((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, unreadCount: 0 } : x)),
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
   const addReply = async (ticket, body, internal = false) => {
     if (!body.trim()) return
     try {
@@ -119,6 +134,11 @@ export default function Support() {
     }
   }
 
+  const totalUnread = useMemo(
+    () => tickets.reduce((s, t) => s + (t.unreadCount || 0), 0),
+    [tickets],
+  )
+
   return (
     <div className="mx-auto max-w-[1180px] space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3.5">
@@ -126,6 +146,11 @@ export default function Support() {
           <h1 className="font-display text-2xl font-bold text-navy">Support</h1>
           <p className="mt-1 text-sm text-ink-soft">
             {chama?.name ? `Tickets from ${chama.name}` : 'All tickets'} — every issue raised by members of this chama
+            {totalUnread > 0 && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[0.7rem] font-bold text-red-700">
+                <Bell size={10} /> {totalUnread} new
+              </span>
+            )}
           </p>
         </div>
         <button
@@ -188,33 +213,43 @@ export default function Support() {
           </div>
         ) : (
           <div className="divide-y divide-line">
-            {filtered.map((t) => (
-              <button
-                key={t.id}
-                onClick={() => setViewing(t)}
-                className="flex w-full items-start gap-3 p-4 text-left hover:bg-forest/[0.03] transition"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-forest/10 text-forest">
-                  <LifeBuoy size={15} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-[0.7rem] text-ink-soft">{t.id.slice(0, 8)}</span>
-                    <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[t.status].cls}`}>
-                      {STATUS_META[t.status].label}
-                    </span>
-                    <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${PRIORITY_META[t.priority]}`}>
-                      {t.priority}
-                    </span>
+            {filtered.map((t) => {
+              const unread = t.unreadCount || 0
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => openTicket(t)}
+                  className="flex w-full items-start gap-3 p-4 text-left hover:bg-forest/[0.03] transition"
+                >
+                  <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-forest/10 text-forest">
+                    <LifeBuoy size={15} />
+                    {unread > 0 && (
+                      <span className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-red-600 px-1 text-[0.58rem] font-bold text-white">
+                        {unread > 9 ? '9+' : unread}
+                      </span>
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-[0.7rem] text-ink-soft">{t.id.slice(0, 8)}</span>
+                      <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${STATUS_META[t.status].cls}`}>
+                        {STATUS_META[t.status].label}
+                      </span>
+                      <span className={`rounded-md px-2 py-0.5 text-[0.66rem] font-bold ${PRIORITY_META[t.priority]}`}>
+                        {t.priority}
+                      </span>
+                    </div>
+                    <p className={`mt-1 truncate text-navy ${unread > 0 ? 'font-bold' : 'font-semibold'}`}>
+                      {t.subject}
+                    </p>
+                    <p className="mt-0.5 truncate text-[0.76rem] text-ink-soft">{t.description}</p>
+                    <p className="mt-1 text-[0.7rem] text-ink-soft">
+                      {t.requester ? `${t.requester} · ` : ''}Updated {fmtRelative(t.updatedAt)}
+                    </p>
                   </div>
-                  <p className="mt-1 truncate font-semibold text-navy">{t.subject}</p>
-                  <p className="mt-0.5 truncate text-[0.76rem] text-ink-soft">{t.description}</p>
-                  <p className="mt-1 text-[0.7rem] text-ink-soft">
-                    {t.requester ? `${t.requester} · ` : ''}Updated {fmtRelative(t.updatedAt)}
-                  </p>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
