@@ -17,6 +17,7 @@ from app.models.trial import ChamaTrial
 from app.services.email_service import send_email
 from app.services.intasend import send_stk_push, generate_checkout_link
 from app.services import support_service, trial_service
+from app.services import notification_service as notif_svc
 
 superadmin_bp = Blueprint('superadmin', __name__)
 logger = logging.getLogger(__name__)
@@ -613,6 +614,20 @@ def reply_ticket(ticket_id):
     ))
     ticket.updated_at = datetime.utcnow()
     db.session.commit()
+
+    # Notify the Chama Admins so the global bell icon lights up
+    if not internal:
+        try:
+            notif_svc.notify_chama_admins(
+                chama_id=ticket.chama_id,
+                type='info',
+                event='support',
+                title='New message from Chametu Support',
+                body=f'A developer replied to your ticket: {str(ticket.subject or "Support Ticket")[:40]}...',
+                link='/dashboard/support'
+            )
+        except Exception:
+            logger.exception('Failed to send notification for superadmin reply')
 
     return jsonify({"message": "Reply sent"}), 201
 
