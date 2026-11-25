@@ -156,7 +156,7 @@ export default function Topbar({ onBurger }) {
         </button>
 
         {bellOpen && (
-          <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
+          <div className="fixed right-4 top-16 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl sm:absolute sm:right-0 sm:top-full sm:w-[380px]">
             <div className="flex items-center justify-between border-b border-line px-4 py-3">
               <div className="flex items-center gap-2">
                 <h3 className="font-display text-[0.9rem] font-bold text-navy">

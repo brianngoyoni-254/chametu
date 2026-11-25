@@ -107,7 +107,6 @@ function MemberShell() {
   const displayName = profile?.name || user?.name || 'Member'
   const displayRole = profile?.role || user?.role || 'Member'
   
-  // Check if the current member has admin privileges
   const isAdmin = ["Chairman", "Treasurer", "Secretary"].includes(displayRole)
 
   function handleLogout() {
@@ -131,7 +130,7 @@ function MemberShell() {
 
       <main className="min-w-0 flex-1">
         <div className="sticky top-0 z-30 border-b border-line/80 bg-paper/85 backdrop-blur-xl">
-          <div className="flex items-center gap-4 px-4 py-3.5 sm:px-6">
+          <div className="flex items-center gap-3 px-4 py-3.5 sm:gap-4 sm:px-6">
             <button
               onClick={() => setSidebarOpen(true)}
               className="flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-line bg-card text-navy transition hover:border-forest hover:bg-forest/[0.04] lg:hidden"
@@ -154,14 +153,14 @@ function MemberShell() {
                 className="hidden items-center gap-2 rounded-xl border border-forest/20 bg-forest/[0.06] px-3 py-1.5 text-[0.75rem] font-semibold text-forest transition hover:bg-forest/10 sm:inline-flex"
               >
                 <ArrowLeftRight size={13} /> 
-                Admin Dashboard
+                <span className="hidden md:inline">Admin Dashboard</span>
               </Link>
             )}
 
             <div className="relative" ref={bellRef}>
               <button
                 onClick={() => setBellOpen((v) => !v)}
-                className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-card text-navy transition hover:border-forest"
+                className="relative flex h-9 w-9 flex-none items-center justify-center rounded-xl border border-line bg-card text-navy transition hover:border-forest"
                 aria-label="Notifications"
                 aria-expanded={bellOpen}
               >
@@ -174,7 +173,7 @@ function MemberShell() {
               </button>
 
               {bellOpen && (
-                <div className="absolute right-0 mt-2 w-[calc(100vw-1rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl">
+                <div className="fixed right-4 top-16 z-50 mt-2 w-[calc(100vw-2rem)] max-w-[380px] origin-top-right overflow-hidden rounded-2xl border border-line bg-card shadow-2xl sm:absolute sm:right-0 sm:top-full sm:w-[380px]">
                   <div className="flex items-center justify-between border-b border-line px-4 py-3">
                     <div className="flex items-center gap-2">
                       <h3 className="font-display text-[0.9rem] font-bold text-navy">
@@ -288,7 +287,7 @@ function MemberShell() {
               )}
             </div>
 
-            <div className="flex items-center gap-2.5 rounded-2xl border border-line bg-card py-1.5 pl-1.5 pr-3">
+            <div className="flex items-center gap-2 rounded-2xl border border-line bg-card py-1.5 pl-1.5 pr-2 sm:gap-2.5 sm:pr-3">
               <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-forest to-emerald font-display text-[0.7rem] font-bold text-white shadow-sm">
                 {initials(displayName)}
               </span>
@@ -302,7 +301,7 @@ function MemberShell() {
               </div>
               <button
                 onClick={handleLogout}
-                className="ml-1 flex items-center gap-1 rounded-lg px-2 py-1 text-[0.68rem] font-semibold text-ink-soft transition hover:bg-red-500/10 hover:text-red-600"
+                className="ml-1 flex items-center gap-1 rounded-lg p-1.5 text-[0.68rem] font-semibold text-ink-soft transition hover:bg-red-500/10 hover:text-red-600 sm:px-2 sm:py-1"
               >
                 <LogOut size={12} />
                 <span className="hidden sm:inline">Log out</span>
