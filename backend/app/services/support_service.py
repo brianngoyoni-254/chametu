@@ -97,7 +97,7 @@ def get_ticket(chama_id, ticket_id, include_internal=True, viewer_user_id=None):
     return _serialize_ticket(t, include_internal=include_internal, viewer_user_id=viewer_user_id)
 
 
-def create_ticket(chama_id, user_id, subject, description, category, priority):
+def create_ticket(chama_id, user_id, subject, description, category, priority, requester_name=None):
     if not subject or not description:
         raise ValueError('Subject and description are required')
     if category not in VALID_CATEGORIES:
@@ -108,6 +108,9 @@ def create_ticket(chama_id, user_id, subject, description, category, priority):
     user = User.query.get(user_id)
     if not user:
         raise ValueError('User not found')
+
+    # Use provided requester name if available (e.g., Chairman raising on behalf), otherwise user's name
+    final_author_name = requester_name.strip() if requester_name and requester_name.strip() else user.name
 
     ticket = Ticket(
         chama_id=chama_id,
@@ -124,7 +127,7 @@ def create_ticket(chama_id, user_id, subject, description, category, priority):
     db.session.add(TicketMessage(
         ticket_id=ticket.id,
         author_user_id=user_id,
-        author_name=user.name,
+        author_name=final_author_name,
         role='requester',
         body=description.strip(),
         internal=False,
@@ -132,7 +135,7 @@ def create_ticket(chama_id, user_id, subject, description, category, priority):
     db.session.commit()
 
     logger.info('ticket created: id=%s chama=%s user=%s', ticket.id, chama_id, user_id)
-    return _serialize_ticket(ticket, include_internal=True, viewer_user_id=user_id)
+    return _serialize_ticket(ticket, include_internal=True, viewer_user_id=user_id, requester_info=final_author_name)
 
 
 def add_message(chama_id, ticket_id, user_id, body, internal=False, as_agent=False):
