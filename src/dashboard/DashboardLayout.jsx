@@ -8,13 +8,16 @@ export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="grid min-h-screen grid-cols-1 bg-paper hero:grid-cols-[250px_1fr]">
+    <div className="flex min-h-screen w-full bg-paper">
+      {/* Sidebar is fixed on mobile, sticky on desktop (lg breakpoint) */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      <main className="flex min-w-0 flex-col">
+      {/* Main content takes up the remaining space */}
+      <main className="flex-1 flex flex-col min-w-0 lg:pl-0 h-screen overflow-hidden">
         <Topbar onBurger={() => setSidebarOpen(true)} />
 
-        <div className="flex-1 px-4 py-6 sm:px-6">
+        {/* The actual page content is scrollable here */}
+        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
           <Outlet />
         </div>
       </main>
