@@ -36,3 +36,13 @@ class SuperAdmin(db.Model):
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
+
+class EmailVerification(db.Model):
+    """Temporarily stores codes to verify emails before registration."""
+    __tablename__ = 'email_verifications'
+
+    id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = db.Column(db.String(120), nullable=False, index=True)
+    code = db.Column(db.String(6), nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    verified = db.Column(db.Boolean, default=False)
