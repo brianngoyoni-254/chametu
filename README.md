@@ -64,7 +64,7 @@ Explore the Chametu platform through its different interfaces and features.
 
 #### Landing Page
 
-<p align="center">
+<!-- <p align="center">
   <img src="docs/screenshots/landing-page.png" alt="Chametu Landing Page" width="100%" />
 </p>
 
@@ -72,7 +72,7 @@ Explore the Chametu platform through its different interfaces and features.
 
 <p align="center">
   <img src="docs/screenshots/admin-dashboard.png" alt="Chametu Admin Dashboard" width="100%" />
-</p>
+</p> -->
 
 #### Financial Overview
 
@@ -107,17 +107,17 @@ Chametu also provides mobile access, making it easier for members to interact wi
 <table>
   <tr>
     <td align="center" width="33%">
-      <img src="docs/screenshots/mobile-home.png" alt="Chametu Mobile Home" width="220" />
+      <img src="docs/screenshots/mobile-home.jpeg" alt="Chametu Mobile Home" width="220" />
       <br />
       <strong>Mobile Dashboard</strong>
     </td>
     <td align="center" width="33%">
-      <img src="docs/screenshots/mobile-contributions.png" alt="Chametu Mobile Contributions" width="220" />
+      <img src="docs/screenshots/mobile-contributions.jpeg" alt="Chametu Mobile Contributions" width="220" />
       <br />
       <strong>Contributions</strong>
     </td>
     <td align="center" width="33%">
-      <img src="docs/screenshots/mobile-loans.png" alt="Chametu Mobile Loans" width="220" />
+      <img src="docs/screenshots/mobile-loans.jpeg" alt="Chametu Mobile Loans" width="220" />
       <br />
       <strong>Loans & Repayments</strong>
     </td>
@@ -629,7 +629,7 @@ Chametu is maintained by:
 
 | Contributor | Role |
 |---|---|
-| **Danny** | Lead Developer |
+| **Danny** |  Developer |
 | **Brian** | Developer |
 
 ---
