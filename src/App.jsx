@@ -2,6 +2,7 @@
 import { useLocation } from 'react-router-dom'
 import AppRoutes from './routes/AppRoutes'
 import LiveChat from './home/LiveChat'
+import InstallPWA from './components/InstallPWA' // ADDED: PWA install prompt
 
 export default function App() {
   const location = useLocation()
@@ -14,6 +15,7 @@ export default function App() {
     <>
       <AppRoutes />
       {!isSuperAdminArea && <LiveChat />}
+      {!isSuperAdminArea && <InstallPWA />} {/* ADDED: Don't show install prompt in superadmin */}
     </>
   )
 }

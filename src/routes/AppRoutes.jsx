@@ -104,11 +104,8 @@ export default function AppRoutes() {
 
       {/* Admin — protected */}
       <Route element={<ProtectedRoute />}>
-        {/* Billing upgrade lives OUTSIDE TrialGate so a locked-out
-            chairman can still reach it to pay and unlock. */}
         <Route path="/billing/upgrade" element={<BillingUpgrade />} />
 
-        {/* Everything else in the admin area goes through TrialGate. */}
         <Route element={<TrialGate>
           <DashboardLayout />
         </TrialGate>}>
@@ -144,7 +141,7 @@ export default function AppRoutes() {
         </Route>
       </Route>
 
-      {/* Member portal — protected (members inherit chairman's plan, not gated) */}
+      {/* Member portal — protected */}
       <Route element={<ProtectedRoute />}>
         <Route path="/member" element={<MemberLayout />}>
           <Route index element={<MemberOverview />} />
