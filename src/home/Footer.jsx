@@ -19,7 +19,7 @@ const COLUMNS = [
     links: [
       { to: '/register', label: 'Create your chama' },
       { to: '/login', label: 'Log in' },
-      { to: '/rewards/plans', label: 'Plans & pricing' },
+      { to: '/rewards/how-it-works#plans', label: 'Plans & pricing' },
       { to: '/rewards/how-it-works', label: 'Rewards' },
     ],
   },
@@ -77,9 +77,9 @@ export default function Footer() {
 
         {COLUMNS.map((col) => (
           <nav key={col.title} aria-label={col.title}>
-            <h2 className="font-display text-[0.88rem] font-semibold text-navy sm:text-[.9rem]">
+            <h3 className="font-display text-[0.88rem] font-semibold text-navy sm:text-[.9rem]">
               {col.title}
-            </h2>
+            </h3>
             <ul className="mt-4 space-y-2.5">
               {col.links.map((l) => (
                 <li key={l.to}>

@@ -4,6 +4,7 @@ import {
   FiArrowLeft, FiCheckCircle,
 } from 'react-icons/fi'
 import Reveal from './Reveal'
+import Seo from '../components/Seo'
 
 const SECTIONS = [
   {
@@ -59,6 +60,7 @@ const SECTIONS = [
 export default function Privacy() {
   return (
     <main className="bg-paper">
+      <Seo title="Privacy Policy" path="/privacy" description="How Chametu collects, uses and protects your chama's data under the Kenya Data Protection Act 2019. Never sold, encrypted at rest and in transit." />
       <section className="pt-[100px] pb-14">
         <div className="wrap">
           <Link

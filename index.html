@@ -1,16 +1,41 @@
 <!doctype html>
-<html lang="en">
+<html lang="en-KE">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/logos.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Chametu</title>
-    
-    <!-- ADDED: iOS PWA Meta Tags -->
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Chametu">
-    <link rel="apple-touch-icon" href="/pwa-192x192.png">
+
+    <!-- Fallback SEO (per-page values are set by <Seo /> at runtime) -->
+    <title>Chametu | Chama Management Software in Kenya</title>
+    <meta
+      name="description"
+      content="Chametu is chama management software for Kenya: track contributions, M-Pesa payments, loans, welfare, investments, meetings and reports in one secure ledger."
+    />
+    <meta name="theme-color" content="#0B1F33" />
+    <meta name="geo.region" content="KE" />
+    <link rel="canonical" href="https://www.chametu.co.ke" />
+
+    <!-- Open Graph / Twitter fallback (crawlers that don't run JS read these) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Chametu" />
+    <meta property="og:locale" content="en_KE" />
+    <meta property="og:title" content="Chametu | Chama Management Software in Kenya" />
+    <meta
+      property="og:description"
+      content="Run your chama with total clarity: contributions, M-Pesa, loans, investments, meetings and reports in one secure ledger."
+    />
+    <meta property="og:url" content="https://www.chametu.co.ke" />
+    <meta property="og:image" content="https://www.chametu.co.ke/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://www.chametu.co.ke/og-image.png" />
+
+    <link rel="icon" type="image/png" href="/logos.png" />
+    <link rel="apple-touch-icon" href="/pwa-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Chametu" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -21,6 +46,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <h1>Chametu: chama management software for Kenya</h1>
+      <p>
+        Manage contributions, M-Pesa payments, loans, welfare, investments, meetings and reports in one secure
+        ledger.
+      </p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

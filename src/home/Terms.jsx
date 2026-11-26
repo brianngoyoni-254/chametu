@@ -4,6 +4,7 @@ import {
   FiAlertTriangle, FiCreditCard, FiMail,
 } from 'react-icons/fi'
 import Reveal from './Reveal'
+import Seo from '../components/Seo'
 
 const SECTIONS = [
   {
@@ -64,6 +65,7 @@ const SECTIONS = [
 export default function Terms() {
   return (
     <main className="bg-paper">
+      <Seo title="Terms of Service" path="/terms" description="Chametu's terms of service: accounts, subscriptions, contributions and loans, acceptable use and liability, in plain English for chama officials." />
       <section className="pt-[100px] pb-14">
         <div className="wrap">
           <Link

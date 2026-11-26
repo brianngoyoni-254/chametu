@@ -26,7 +26,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallback: '/offline.html',
+        navigateFallback: '/index.html', // FIXED: was '/offline.html', which served the offline page for every route
+        navigateFallbackDenylist: [/^\/sitemap\.xml$/, /^\/robots\.txt$/, /^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/api\.chametu\.co\.ke\/.*/i, // Change if your backend URL is different

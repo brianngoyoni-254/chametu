@@ -3,12 +3,14 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import Seo from '../components/Seo'
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
     <div className="flex min-h-screen w-full bg-paper">
+      <Seo title="Dashboard" path="/dashboard" noindex />
       {/* Sidebar is fixed on mobile, sticky on desktop (lg breakpoint) */}
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 

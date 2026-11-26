@@ -6,28 +6,29 @@ import {
 } from 'react-icons/fi'
 import { toast } from 'sonner'
 import Reveal from './Reveal'
+import Seo from '../components/Seo'
 
 const CHANNELS = [
   {
     icon: FiMail,
     title: 'Email support',
-    value: 'support@chametu.co.ke',
+    value: '@chametu.co.ke@gmail.com',
     hint: 'Fastest way to reach us',
-    href: 'mailto:support@chametu.co.ke',
+    href: 'mailto:chametu.co.ke@gmail.com',
   },
   {
     icon: FiPhone,
     title: 'Call us',
-    value: '+254 700 000 000',
+    value: '+254 102 795 735',
     hint: 'Mon–Fri, 9am–6pm EAT',
-    href: 'tel:+254700000000',
+    href: 'tel:+254 102 795 735',
   },
   {
     icon: FiMessageCircle,
     title: 'WhatsApp',
-    value: '+254 711 000 000',
+    value: '+254 102 795 735',
     hint: 'Quick questions, no forms',
-    href: 'https://wa.me/254711000000',
+    href: 'https://wa.me/254 102 795 735',
   },
 ]
 
@@ -68,6 +69,7 @@ export default function Contact() {
 
   return (
     <main className="bg-paper">
+      <Seo title="Contact us" path="/contact" description="Talk to the Chametu team in Nairobi. Get support, ask about billing, or request a 30-minute demo for your chama or SACCO." />
       <section className="pt-[100px] pb-14">
         <div className="wrap">
           <Link

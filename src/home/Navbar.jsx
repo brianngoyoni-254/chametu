@@ -5,10 +5,10 @@ import logo from '../assets/logos.png'
 import ThemeToggle from '../components/ThemeToggle'
 
 const LINKS = [
-  { href: '#cartoon', label: 'How it works' },
-  { href: '#features', label: 'Features' },
-  { href: '#rewards', label: 'Rewards' },
-  { href: '#security', label: 'Security' },
+  { href: '/#cartoon', label: 'How it works' },
+  { href: '/#features', label: 'Features' },
+  { href: '/#rewards', label: 'Rewards' },
+  { href: '/#security', label: 'Security' },
 ]
 
 export default function Navbar() {

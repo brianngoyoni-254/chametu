@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import SuperAdminSidebar from './SuperAdminSidebar'
 import SuperAdminNavbar from './SuperAdminNavbar'
+import Seo from '../components/Seo'
 
 export default function SuperAdminLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -9,6 +10,7 @@ export default function SuperAdminLayout() {
   return (
     // FIXED: Changed dark:bg-paper to dark:bg-[#071625] so the background is dark in dark mode
     <div className="flex min-h-screen bg-[#F7F9FB] dark:bg-[#071625]">
+      <Seo title="Super Admin" path="/superadmin" noindex />
       <SuperAdminSidebar open={drawerOpen} onClose={() => setDrawerOpen(false)} />
 
       <div className="flex min-w-0 flex-1 flex-col">

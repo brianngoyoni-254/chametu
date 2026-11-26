@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMemberAuth } from '../lib/memberAuth'
 import ThemeToggle from '../components/ThemeToggle'
 import logo from '../assets/logos.png'
+import Seo from '../components/Seo'
 
 const ROLES = {
   Chairman: {
@@ -103,6 +104,7 @@ export default function Login() {
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-[#F5F7F9] lg:grid-cols-[1.05fr_1fr]">
+      <Seo title="Log in" path="/login" noindex />
       <aside className="relative hidden flex-col overflow-hidden bg-navy p-10 text-white lg:flex lg:p-14">
         <div
           className="pointer-events-none absolute inset-0"

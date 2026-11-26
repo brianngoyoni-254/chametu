@@ -17,6 +17,7 @@ import { friendlyFailureReason } from '../lib/paymentMessages'
 import MpesaWaiting from '../components/MpesaWaiting'
 import { ReceiptPrinter } from '../components/ReceiptPrinter'
 import logo from '../assets/logos.png'
+import Seo from '../components/Seo'
 
 /* ================================================================== */
 /*  REAL M-PESA LOGO — inline SVG, matches the official wordmark      */
@@ -396,6 +397,7 @@ export default function Register() {
 
   return (
     <div className="grid min-h-screen grid-cols-1 bg-paper lg:grid-cols-[minmax(340px,5fr)_7fr]">
+      <Seo title="Create your chama (7-day free trial)" path="/register" description="Create your chama on Chametu in minutes. Start a 7-day free trial, invite your treasurer and members, and collect contributions with M-Pesa." />
       <aside className="relative flex flex-col gap-4 overflow-hidden bg-navy p-7 text-white lg:sticky lg:top-0 lg:h-screen lg:gap-7 lg:p-11">
         <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(600px 400px at 0 0, rgba(16,185,129,0.35), transparent), linear-gradient(160deg, #0B1F33, #0A3D46)' }} />
         <Link to="/" className="relative flex items-center gap-2.5 text-white no-underline">

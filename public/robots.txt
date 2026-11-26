@@ -1,0 +1,13 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /member
+Disallow: /superadmin
+Disallow: /billing
+Disallow: /payment
+Disallow: /join/
+Disallow: /demo/
+Disallow: /reset-password
+Disallow: /forgot-password
+
+Sitemap: https://www.chametu.co.ke/sitemap.xml

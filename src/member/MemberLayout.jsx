@@ -10,6 +10,7 @@ import MemberSidebar from './MemberSidebar'
 import { useAuth } from '../context/AuthContext'
 import { MemberProvider, useMember } from '../context/MemberContext'
 import { useNotifications } from '../lib/notifications'
+import Seo from '../components/Seo'
 
 const TITLES = {
   '': 'Overview',
@@ -122,6 +123,7 @@ function MemberShell() {
 
   return (
     <div className="min-h-screen bg-paper lg:flex">
+      <Seo title={`${title} - Member portal`} path="/member" noindex />
       <MemberSidebar
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
