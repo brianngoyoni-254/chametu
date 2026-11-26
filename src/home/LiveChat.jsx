@@ -10,9 +10,9 @@ import { FaWhatsapp } from 'react-icons/fa'
 import { api } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
 
-const WHATSAPP_NUMBER = '254110279735'
-const WHATSAPP_DISPLAY = '+254 110 279 735'
-const PHONE_DISPLAY = '+254 110 279 735'
+const WHATSAPP_NUMBER = '25410279735'
+const WHATSAPP_DISPLAY = '+254 10 279 735'
+const PHONE_DISPLAY = '+254 10 279 735'
 const EMAIL = 'support@chametu.co.ke'
 
 export default function LiveChat() {
