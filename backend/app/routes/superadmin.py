@@ -272,7 +272,6 @@ def get_billing():
             if c.id in paid_recently:
                 continue
                 
-            # Check trial status
             trial_info = trial_service.get_status(c.id)
             trial_status = trial_info['status'] if trial_info else 'none'
             days_left = trial_info['daysLeft'] if trial_info else 0
@@ -615,20 +614,6 @@ def reply_ticket(ticket_id):
     ticket.updated_at = datetime.utcnow()
     db.session.commit()
 
-    # Notify the Chama Admins so the global bell icon lights up
-    if not internal:
-        try:
-            notif_svc.notify_chama_admins(
-                chama_id=ticket.chama_id,
-                type='info',
-                event='support',
-                title='New message from Chametu Support',
-                body=f'A developer replied to your ticket: {str(ticket.subject or "Support Ticket")[:40]}...',
-                link='/dashboard/support'
-            )
-        except Exception:
-            logger.exception('Failed to send notification for superadmin reply')
-
     return jsonify({"message": "Reply sent"}), 201
 
 
@@ -726,6 +711,7 @@ def get_platform_settings():
         'platformName': settings.platform_name,
         'supportEmail': settings.support_email,
         'timezone': settings.timezone,
+        'publicStats': settings.public_stats,  # <--- NEW
     }), 200
 
 
@@ -758,6 +744,10 @@ def update_platform_settings():
         settings.support_email = data['supportEmail']
     if 'timezone' in data:
         settings.timezone = data['timezone']
+        
+    # --- NEW: Save public stats overrides ---
+    if 'publicStats' in data:
+        settings.public_stats = data['publicStats']
 
     db.session.commit()
     return jsonify({"message": "Settings saved"}), 200

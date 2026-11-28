@@ -3,9 +3,10 @@ import logging
 
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt
+from sqlalchemy import func
 
 from app import db
-from app.models.chama import Chama, ChamaSettings
+from app.models.chama import Chama, ChamaSettings, Member
 from app.models.settings import PlatformSettings
 
 settings_bp = Blueprint('settings', __name__)
@@ -32,7 +33,6 @@ def get_settings():
             'monthly_contribution': chama.monthly_contribution,
             'due_day': chama.due_day,
             'contribution_frequency': chama.contribution_frequency,
-            # Return the new loan fields
             'max_loan_multiple': chama.max_loan_multiple,
             'interest_rate': chama.interest_rate,
             'interest_type': chama.interest_type,
@@ -50,7 +50,6 @@ def get_settings():
             'monthlyProfitTarget': float(settings.monthly_profit_target or 0),
             'profitTargetBasis': settings.profit_target_basis or 'savings',
             'profitTargetPeriod': settings.profit_target_period or 'month',
-            # ---- NEW: M-Pesa contribution method fields ----
             'contribution_method': settings.contribution_method or 'paybill',
             'contribution_number': settings.contribution_number or '',
             'contribution_account_ref': settings.contribution_account_ref or '',
@@ -71,13 +70,11 @@ def update_settings():
     if not settings:
         settings = ChamaSettings(chama_id=cid)
 
-    # ---------- Chama Details ----------
     if 'name' in data and data['name']:
         chama.name = data['name']
     if 'location' in data:
         chama.type = data['location']
 
-    # ---------- Contribution Rules ----------
     if 'amount' in data or 'monthlyContribution' in data:
         try:
             val = data.get('amount') or data.get('monthlyContribution')
@@ -87,7 +84,6 @@ def update_settings():
     if 'dueDay' in data or 'due_day' in data:
         chama.due_day = int(data.get('dueDay') or data.get('due_day') or 30)
 
-    # ---------- Loan Rules ----------
     if 'maxMultiple' in data:
         chama.max_loan_multiple = float(data['maxMultiple'])
     if 'interest' in data:
@@ -99,7 +95,6 @@ def update_settings():
     if 'repayment' in data:
         chama.repayment_frequency = data['repayment']
 
-    # ---------- Platform Settings ----------
     if 'platformName' in data:
         settings.platform_name = data['platformName']
     if 'supportEmail' in data:
@@ -115,7 +110,6 @@ def update_settings():
     if 'accountRef' in data:
         settings.account_ref = data['accountRef']
 
-    # ---------- target profit ----------
     if 'monthlyProfitTarget' in data:
         try:
             value = float(data['monthlyProfitTarget'] or 0)
@@ -135,7 +129,6 @@ def update_settings():
             return jsonify({'message': 'Invalid profit target period'}), 400
         settings.profit_target_period = data['profitTargetPeriod']
 
-    # ---------- NEW: M-Pesa contribution method ----------
     if 'contribution_method' in data:
         if data['contribution_method'] not in ('send_money', 'paybill', 'till'):
             return jsonify({'message': 'Invalid contribution method'}), 400
@@ -159,3 +152,70 @@ def get_public_prices():
     if not settings or not settings.prices:
         return jsonify({'Starter': 500, 'Growth': 1000, 'Business': 2000, 'Gold': 3000}), 200
     return jsonify(settings.prices), 200
+
+
+@settings_bp.route('/public-stats', methods=['GET'])
+def get_public_stats():
+    """Public endpoint for the landing page to fetch real stats."""
+    try:
+        settings = PlatformSettings.query.first()
+        overrides = settings.public_stats if settings else None
+
+        # If Superadmin has set manual overrides, use those
+        if overrides and overrides.get('chamas') is not None:
+            return jsonify({
+                'chamas': overrides.get('chamas', 0),
+                'members': overrides.get('members', 0),
+                'managed': overrides.get('managed', 'KSh 0'),
+                'uptime': overrides.get('uptime', '99.98%')
+            }), 200
+
+        # Fallback: Automatically calculate from the database
+        chamas_count = Chama.query.count()
+        members_count = Member.query.filter_by(status='active').count()
+        total_savings = db.session.query(func.sum(Member.savings)).scalar() or 0.0
+        
+        if total_savings >= 1_000_000_000:
+            managed_str = f"KSh {total_savings / 1_000_000_000:.1f}B"
+        elif total_savings >= 1_000_000:
+            managed_str = f"KSh {total_savings / 1_000_000:.1f}M"
+        elif total_savings >= 1_000:
+            managed_str = f"KSh {total_savings / 1_000:.1f}K"
+        else:
+            managed_str = f"KSh {int(total_savings)}"
+
+        return jsonify({
+            'chamas': chamas_count,
+            'members': members_count,
+            'managed': managed_str,
+            'uptime': '99.98%'
+        }), 200
+    except Exception as e:
+        logger.error("Error fetching public stats: %s", e)
+        return jsonify({'error': 'Failed to load stats'}), 500
+
+
+@settings_bp.route('/superadmin/public-stats', methods=['PUT'])
+@jwt_required()
+def update_public_stats():
+    """Superadmin endpoint to override the public stats with custom marketing numbers."""
+    if not get_jwt().get('is_superadmin'):
+        return jsonify({'message': 'Unauthorized'}), 403
+
+    data = request.get_json() or {}
+    settings = PlatformSettings.query.first()
+    if not settings:
+        settings = PlatformSettings()
+        db.session.add(settings)
+
+    # Store the overrides as JSON
+    settings.public_stats = {
+        'chamas': data.get('chamas', 0),
+        'members': data.get('members', 0),
+        'managed': data.get('managed', 'KSh 0'),
+        'uptime': data.get('uptime', '99.98%')
+    }
+    
+    db.session.commit()
+    logger.info("Superadmin updated public stats")
+    return jsonify({'message': 'Public stats updated successfully'}), 200
