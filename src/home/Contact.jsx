@@ -12,7 +12,7 @@ const CHANNELS = [
   {
     icon: FiMail,
     title: 'Email support',
-    value: '@chametu.co.ke@gmail.com',
+    value: 'chametu.co.ke@gmail.com',
     hint: 'Fastest way to reach us',
     href: 'mailto:chametu.co.ke@gmail.com',
   },
