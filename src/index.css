@@ -1,6 +1,10 @@
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap");
 @import "tailwindcss";
 
+/* Tailwind v4: make every dark: utility follow the data-theme switch set by
+   ThemeToggle, instead of the operating system colour preference. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 /* ============================================================
    DESIGN TOKENS
    ============================================================ */
@@ -726,6 +730,63 @@ body[data-scroll-lock="true"] {
 [data-theme="dark"] h3 em {
   color: var(--color-emerald) !important;
 }
+
+/* ============================================================
+   DARK MODE - FORM FIELDS
+   Unlayered on purpose: utility classes such as text-slate-900 live in
+   Tailwind's utilities layer, and unlayered rules always win over layers.
+   ============================================================ */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="submit"]):not([type="button"]),
+[data-theme="dark"] textarea,
+[data-theme="dark"] select {
+  color: var(--color-ink);
+  caret-color: var(--color-ink);
+}
+
+[data-theme="dark"] select option {
+  background-color: var(--color-card);
+  color: var(--color-ink);
+}
+
+[data-theme="dark"] input:disabled,
+[data-theme="dark"] textarea:disabled,
+[data-theme="dark"] select:disabled {
+  color: var(--color-ink);
+  -webkit-text-fill-color: var(--color-ink);
+  opacity: 0.7;
+}
+
+/* Browser autofill paints its own light background and dark text. */
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] textarea:-webkit-autofill,
+[data-theme="dark"] select:-webkit-autofill {
+  -webkit-text-fill-color: var(--color-ink);
+  caret-color: var(--color-ink);
+  transition: background-color 600000s 0s, color 600000s 0s;
+}
+
+/* ============================================================
+   DARK MODE - REGISTER PLAN CARDS
+   Register.jsx styles these with a .dark class that is never set, so the
+   dark rules are mirrored here against data-theme.
+   ============================================================ */
+[data-theme="dark"] .tier-card { background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.10); box-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+[data-theme="dark"] .tier-card[data-selected="true"] { border-color: var(--tier-accent-dark); box-shadow: 0 0 0 3px var(--tier-accent-soft-dark), 0 18px 40px -16px var(--tier-accent-dark); }
+[data-theme="dark"] .tier-price { color: #FFFFFF; }
+[data-theme="dark"] .tier-price-suffix { color: #CBD5E1; }
+[data-theme="dark"] .tier-name { color: var(--tier-accent-dark); }
+[data-theme="dark"] .tier-members { color: #CBD5E1; }
+[data-theme="dark"] .tier-feature-text { color: #CBD5E1; }
+[data-theme="dark"] .tier-check-bubble { background: var(--tier-accent-soft-dark); }
+[data-theme="dark"] .tier-check-icon { color: var(--tier-accent-dark); }
+[data-theme="dark"] .tier-divider { background: linear-gradient(90deg, rgba(255,255,255,0.12), transparent); }
+[data-theme="dark"] .tier-divider[data-selected="true"] { background: linear-gradient(90deg, var(--tier-accent-dark), transparent); opacity: 0.7; }
+[data-theme="dark"] .tier-strip { background: rgba(255,255,255,0.05); color: #CBD5E1; }
+[data-theme="dark"] .tier-strip[data-selected="true"] { background: var(--tier-accent-soft-dark); color: var(--tier-accent-dark); }
+[data-theme="dark"] .tier-radio { border-color: rgba(255,255,255,0.3); }
+[data-theme="dark"] .tier-radio[data-selected="true"] { border-color: var(--tier-accent-dark); background: var(--tier-accent-dark); }
 
 /* ============================================================
    REDUCED MOTION

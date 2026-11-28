@@ -538,7 +538,6 @@ export default function Register() {
                   onChange={(e) => setPassword(e.target.value)} 
                   placeholder="At least 8 characters" 
                   autoComplete="new-password" 
-                  /* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */
                   className="min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400" 
                 />
                 <button type="button" onClick={() => setShowPassword((v) => !v)} className="p-1 text-ink-soft transition hover:text-navy dark:text-slate-300 dark:hover:text-white" aria-label={showPassword ? 'Hide password' : 'Show password'} tabIndex={-1}>
@@ -954,7 +953,6 @@ function PhoneInput({ value = '', onChange, valid = false }) {
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           maxLength={12} placeholder="0712 345 678" aria-label="M-Pesa phone number"
           aria-invalid={showWarn || undefined}
-          /* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */
           className="min-w-0 flex-1 border-0 bg-transparent py-2 font-mono text-sm font-medium tracking-wide text-slate-900 outline-none placeholder:font-sans placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400" />
         <span className="grid h-6 w-6 flex-none place-items-center">
           {showGreen && <Check size={14} strokeWidth={3} className="text-[#00A651] dark:text-emerald-400" />}
@@ -1183,7 +1181,7 @@ function IconInput({ icon, className = '', ...props }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-slate-50 px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
       <span className="shrink-0 text-ink-soft dark:text-slate-300">{icon}</span>
-      {/* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */}
+      {/* The dark mode text is handled by dark:text-white. The light mode is handled by text-slate-900. */}
       <input {...props} className={`min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400 ${className}`} />
     </div>
   )
