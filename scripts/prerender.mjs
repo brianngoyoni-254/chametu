@@ -26,6 +26,33 @@ const MIME = {
 
 const log = (...a) => console.log('[prerender]', ...a)
 
+// On Vercel's build machine the system Chrome libraries are missing, so use
+// @sparticuz/chromium (Chrome packaged with its own libraries). Everywhere
+// else (your laptop) use the normal puppeteer Chrome.
+async function launchBrowser(puppeteer) {
+  if (process.env.VERCEL) {
+    try {
+      // The package only unpacks its bundled libraries when it thinks it runs
+      // on AWS Lambda (which Vercel runs on), so say so before importing it.
+      process.env.AWS_EXECUTION_ENV ||= `AWS_Lambda_nodejs${process.versions.node.split('.')[0]}.x`
+      const chromium = (await import('@sparticuz/chromium')).default
+      const browser = await puppeteer.launch({
+        args: chromium.args,
+        executablePath: await chromium.executablePath(),
+        headless: 'shell',
+      })
+      log('using @sparticuz/chromium')
+      return browser
+    } catch (e) {
+      log('serverless Chrome failed, trying normal Chrome:', e.message.split('\n')[0])
+    }
+  }
+  return puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+  })
+}
+
 async function main() {
   if (!existsSync(path.join(DIST, 'index.html'))) return log('skipped: dist/index.html not found')
 
@@ -33,7 +60,11 @@ async function main() {
   try {
     puppeteer = (await import('puppeteer')).default
   } catch {
-    return log('skipped: puppeteer not installed (run: npm i -D puppeteer)')
+    try {
+      puppeteer = (await import('puppeteer-core')).default
+    } catch {
+      return log('skipped: puppeteer not installed (run: npm i -D puppeteer)')
+    }
   }
 
   // Keep the pristine shell in memory: we overwrite dist/index.html for "/".
@@ -61,10 +92,7 @@ async function main() {
 
   let browser
   try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-    })
+    browser = await launchBrowser(puppeteer)
   } catch (e) {
     server.close()
     return log('skipped: could not launch Chrome:', e.message.split('\n')[0])
