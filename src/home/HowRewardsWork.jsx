@@ -10,6 +10,7 @@ import {
 import { ORDER, TIERS } from '../lib/tiers'
 import { usePublicRewards } from '../lib/usePublicRewards'
 import { useAuth } from '../context/AuthContext'
+import Seo from '../components/Seo'
 
 const EARN_RULES = [
   {
@@ -47,6 +48,7 @@ export default function HowRewardsWork() {
 
   return (
     <main className="bg-paper">
+      <Seo title="How Chametu Points work" path="/rewards/how-it-works" description="Earn Chametu Points for paying on time, upgrading and referring other chamas, then redeem them for subscription credit and perks. 1,000 points = KSh 100." />
       {/* Hero */}
       <section className="pt-[100px] pb-14">
         <div className="wrap">
@@ -108,7 +110,7 @@ export default function HowRewardsWork() {
       </section>
 
       {/* Plans matrix */}
-      <section className="pb-14">
+      <section id="plans" className="pb-14 scroll-mt-24">
         <div className="wrap">
           <h2 className="text-2xl font-bold text-navy">Plans</h2>
           <p className="mt-2 max-w-[60ch] text-ink-soft">

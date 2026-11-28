@@ -127,7 +127,6 @@ export default function Register() {
   const { refreshTrial } = useTrial()
   const navigate = useNavigate()
 
-  // NEW: Mode: 'trial' or 'direct'
   const [checkoutMode, setCheckoutMode] = useState('trial')
 
   const [name, setName] = useState('')
@@ -140,14 +139,13 @@ export default function Register() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // --- NEW: Email Verification State ---
   const [emailVerified, setEmailVerified] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isVerifyingCode, setIsVerifyingCode] = useState(false)
   const [showCodeInput, setShowCodeInput] = useState(false)
 
-  const [stage, setStage] = useState('form') // form | waiting | success | failed | timeout
+  const [stage, setStage] = useState('form')
   const [signup, setSignup] = useState(null)
   const [failReason, setFailReason] = useState('')
   const [pollKick, setPollKick] = useState(0)
@@ -188,7 +186,6 @@ export default function Register() {
     )
   })()
   
-  // --- NEW: Email Verification Handlers ---
   const handleSendCode = async () => {
     if (!isValidEmail(email)) return setError('Enter a valid email address first.')
     setError('')
@@ -237,7 +234,6 @@ export default function Register() {
     setBusy(true)
     try {
       if (checkoutMode === 'trial') {
-        // --- Trial Flow ---
         const res = await api('/api/billing/signup/start-trial', {
           method: 'POST',
           body: {
@@ -264,7 +260,6 @@ export default function Register() {
         }
         setError('Unexpected response from server. Please try again.')
       } else {
-        // --- Direct Pay Flow ---
         const res = await api('/api/billing/signup/checkout-direct', {
           method: 'POST',
           body: {
@@ -453,7 +448,6 @@ export default function Register() {
           {stage === 'form' && (
           <form onSubmit={submit} className="mt-6">
             
-            {/* --- NEW: PROFESSIONAL TOGGLE --- */}
             <div className="mb-6 rounded-2xl border border-line bg-white p-1.5 shadow-sm dark:border-white/10 dark:bg-white/5">
               <div className="grid grid-cols-2 gap-1">
                 <button
@@ -479,7 +473,6 @@ export default function Register() {
               <IconInput icon={<User size={18} strokeWidth={1.8} />} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Daniel Muthui" autoComplete="name" />
             </Field>
 
-            {/* --- UPDATED: EMAIL FIELD WITH VERIFICATION --- */}
             <Field label="Email">
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -522,7 +515,7 @@ export default function Register() {
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="Enter 6-digit code"
-                    className="flex-1 rounded-xl border-[1.5px] border-line bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-emerald focus:ring-4 focus:ring-emerald/15 dark:bg-white/5 dark:border-white/15 dark:text-white"
+                    className="flex-1 rounded-xl border-[1.5px] border-line bg-slate-50 px-3.5 py-2.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 focus:border-emerald focus:bg-white focus:ring-4 focus:ring-emerald/15 dark:bg-white/5 dark:border-white/15 dark:text-white dark:placeholder:text-slate-400"
                   />
                   <button
                     type="button"
@@ -537,9 +530,17 @@ export default function Register() {
             </Field>
 
             <Field label="Password">
-              <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-[#F8FAFC] px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
+              <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-slate-50 px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
                 <Lock size={18} strokeWidth={1.8} className="shrink-0 text-ink-soft dark:text-slate-300" />
-                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" autoComplete="new-password" className="min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm text-navy outline-none placeholder:text-ink-soft/70 dark:text-white dark:placeholder:text-slate-400" />
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  value={password} 
+                  onChange={(e) => setPassword(e.target.value)} 
+                  placeholder="At least 8 characters" 
+                  autoComplete="new-password" 
+                  /* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */
+                  className="min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400" 
+                />
                 <button type="button" onClick={() => setShowPassword((v) => !v)} className="p-1 text-ink-soft transition hover:text-navy dark:text-slate-300 dark:hover:text-white" aria-label={showPassword ? 'Hide password' : 'Show password'} tabIndex={-1}>
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -943,7 +944,7 @@ function PhoneInput({ value = '', onChange, valid = false }) {
 
   return (
     <div>
-      <div className={`flex items-center gap-2 rounded-xl border-[1.5px] bg-[#F8FAFC] px-2.5 py-1.5 transition dark:bg-white/[0.04] ${focused ? 'border-[#00A651] bg-white ring-4 ring-[#00A651]/15 dark:bg-white/[0.06]' : showWarn ? 'border-red-300 bg-white dark:bg-white/[0.06]' : showGreen ? 'border-[#00A651]/60 bg-white dark:bg-white/[0.06]' : 'border-line dark:border-white/15'}`}>
+      <div className={`flex items-center gap-2 rounded-xl border-[1.5px] bg-slate-50 px-2.5 py-1.5 transition dark:bg-white/[0.04] ${focused ? 'border-[#00A651] bg-white ring-4 ring-[#00A651]/15 dark:bg-white/[0.06]' : showWarn ? 'border-red-300 bg-white dark:bg-white/[0.06]' : showGreen ? 'border-[#00A651]/60 bg-white dark:bg-white/[0.06]' : 'border-line dark:border-white/15'}`}>
         <span className={`flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-[0.78rem] font-semibold transition ${focused ? 'border-[#00A651]/40 bg-[#00A651]/[0.08] text-navy dark:text-white' : 'border-line bg-white text-navy dark:border-white/15 dark:bg-white/[0.06] dark:text-white'}`}>
           <KenyaFlag />
           <span className="font-mono tracking-tight">+254</span>
@@ -953,7 +954,8 @@ function PhoneInput({ value = '', onChange, valid = false }) {
           onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
           maxLength={12} placeholder="0712 345 678" aria-label="M-Pesa phone number"
           aria-invalid={showWarn || undefined}
-          className="min-w-0 flex-1 border-0 bg-transparent py-2 font-mono text-sm tracking-wide text-navy outline-none placeholder:font-sans placeholder:text-ink-soft/70 dark:text-white dark:placeholder:text-slate-400" />
+          /* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */
+          className="min-w-0 flex-1 border-0 bg-transparent py-2 font-mono text-sm font-medium tracking-wide text-slate-900 outline-none placeholder:font-sans placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400" />
         <span className="grid h-6 w-6 flex-none place-items-center">
           {showGreen && <Check size={14} strokeWidth={3} className="text-[#00A651] dark:text-emerald-400" />}
           {showWarn && <AlertCircle size={14} strokeWidth={2.4} className="text-red-500" />}
@@ -1179,9 +1181,10 @@ function Field({ label, children }) {
 }
 function IconInput({ icon, className = '', ...props }) {
   return (
-    <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-[#F8FAFC] px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
+    <div className="flex items-center gap-2.5 rounded-xl border-[1.5px] border-line bg-slate-50 px-3.5 transition focus-within:border-emerald focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald/15 dark:border-white/15 dark:bg-white/[0.04] dark:focus-within:bg-white/[0.06]">
       <span className="shrink-0 text-ink-soft dark:text-slate-300">{icon}</span>
-      <input {...props} className={`min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm text-navy outline-none placeholder:text-ink-soft/70 dark:text-white dark:placeholder:text-slate-400 ${className}`} />
+      {/* FIX: Changed to text-slate-900 and placeholder:text-slate-400 for high visibility in light mode */}
+      <input {...props} className={`min-w-0 flex-1 border-0 bg-transparent py-3.5 text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400 dark:text-white dark:placeholder:text-slate-400 ${className}`} />
     </div>
   )
 }

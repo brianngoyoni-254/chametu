@@ -1575,8 +1575,9 @@ export default function HeroCartoon() {
                 ready ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0'
               }`}
             >
-              Contributions, M-Pesa payments, loans, investments, meetings and reports in one
-              secure ledger. Every official and every member sees the same numbers.
+              Chametu is chama management software for Kenya: contributions, M-Pesa payments, loans,
+              investments, meetings and reports in one secure ledger. Every official and every member
+              sees the same numbers.
             </p>
 
             <div

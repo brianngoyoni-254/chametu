@@ -46,6 +46,16 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Prerendered snapshots are only valid for the URL they were captured on.
+      // If the service worker serves this shell for another route, clear it
+      // before first paint so users never see the wrong page flash.
+      (function () {
+        var r = document.getElementById('root')
+        var here = location.pathname.replace(/\/$/, '') || '/'
+        if (r && r.getAttribute('data-prerendered') !== here) r.innerHTML = ''
+      })()
+    </script>
     <noscript>
       <h1>Chametu: chama management software for Kenya</h1>
       <p>
