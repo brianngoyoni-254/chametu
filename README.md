@@ -75,6 +75,9 @@ Explore the Chametu platform through its different interfaces and features.
 </p> -->
 
 #### Financial Overview
+<p align="center">
+  <img src="docs/screenshots/receipt-dashboard.jpeg" alt="printed receipt once paid" width="100%" />
+</p>
 
 <p align="center">
   <img src="docs/screenshots/financial-dashboard.png" alt="Chametu Financial Overview" width="100%" />

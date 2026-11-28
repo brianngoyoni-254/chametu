@@ -22,4 +22,8 @@ class PlatformSettings(db.Model):
         'Starter': 500, 'Growth': 1000, 'Business': 2000, 'Gold': 3000
     })
 
+    # --- NEW: Landing page stat overrides ---
+    # If null, the frontend falls back to calculating real numbers from the DB
+    public_stats = db.Column(db.JSON, nullable=True)
+
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Save, CreditCard, Smartphone, ShieldAlert, Building2, Percent,
   Clock, AlertTriangle, Bell, Lock, Globe, Mail, MessageSquare,
-  Check, BellOff, ShieldCheck
+  Check, BellOff, ShieldCheck, BarChart3
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useNotifications, DEFAULT_PREFS } from './useNotifications'
@@ -18,10 +18,17 @@ const DEFAULT_SETTINGS = {
   platformName: 'Chametu',
   supportEmail: 'support@chametu.co.ke',
   timezone: 'Africa/Nairobi',
+  publicStats: {
+    chamas: '',
+    members: '',
+    managed: '',
+    uptime: '99.98%'
+  }
 }
 
 const TABS = [
   { key: 'general', label: 'General', icon: Globe },
+  { key: 'stats', label: 'Public Stats', icon: BarChart3 },
   { key: 'pricing', label: 'Pricing', icon: Percent },
   { key: 'payments', label: 'Payments', icon: CreditCard },
   { key: 'enforcement', label: 'Enforcement', icon: ShieldAlert },
@@ -71,7 +78,12 @@ export default function SuperAdminSettings() {
       try {
         const token = localStorage.getItem('superadmin_token')
         const data = await api('/api/superadmin/settings', { token })
-        setSettings(data)
+        
+        // Merge publicStats to ensure empty defaults if null
+        setSettings({
+          ...data,
+          publicStats: data.publicStats || DEFAULT_SETTINGS.publicStats
+        })
       } catch (err) {
         toast.error('Failed to load settings')
       } finally {
@@ -95,6 +107,10 @@ export default function SuperAdminSettings() {
 
   const update = (patch) => { setSettings((s) => ({ ...s, ...patch })); setDirty(true) }
   const updatePrice = (tier, v) => { update({ prices: { ...settings.prices, [tier]: Number(v) } }) }
+  const updateStat = (key, v) => { 
+    update({ publicStats: { ...settings.publicStats, [key]: v } }) 
+  }
+
   const updatePref = (path, value) => {
     setLocalPrefs((p) => ({ ...p, [path]: { ...p[path], ...value } }))
     setPrefsDirty(true)
@@ -217,6 +233,32 @@ export default function SuperAdminSettings() {
                     <option value="Africa/Nairobi">Africa/Nairobi (EAT)</option>
                     <option value="UTC">UTC</option>
                   </select>
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {tab === 'stats' && (
+            <div className="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/5 sm:p-5">
+              <div className="mb-3 flex items-center gap-2 sm:mb-4">
+                <BarChart3 size={15} className="text-forest dark:text-emerald" />
+                <h2 className="font-display text-[0.98rem] font-bold text-navy dark:text-white sm:text-[1.02rem]">Landing Page Stats</h2>
+              </div>
+              <p className="mb-4 text-[0.76rem] text-ink-soft">
+                These numbers appear on the home page. Leave blank to automatically calculate real totals from the database.
+              </p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                <Field label="Total Chamas" icon={BarChart3} hint="e.g. 1,284">
+                  <input value={settings.publicStats.chamas} onChange={(e) => updateStat('chamas', e.target.value)} placeholder="Auto-calculated" className={inputCls} />
+                </Field>
+                <Field label="Active Members" icon={BarChart3} hint="e.g. 18,420">
+                  <input value={settings.publicStats.members} onChange={(e) => updateStat('members', e.target.value)} placeholder="Auto-calculated" className={inputCls} />
+                </Field>
+                <Field label="Managed on Platform" icon={BarChart3} hint="e.g. KSh 1.4B">
+                  <input value={settings.publicStats.managed} onChange={(e) => updateStat('managed', e.target.value)} placeholder="Auto-calculated" className={inputCls} />
+                </Field>
+                <Field label="Platform Uptime" icon={BarChart3} hint="e.g. 99.98%">
+                  <input value={settings.publicStats.uptime} onChange={(e) => updateStat('uptime', e.target.value)} placeholder="99.98%" className={inputCls} />
                 </Field>
               </div>
             </div>
